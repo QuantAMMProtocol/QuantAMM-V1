@@ -46,7 +46,6 @@ updates and guard rails.
 
 
 /// @title UpdateWeightRunner singleton contract that is responsible for running all weight updates
-import "hardhat/console.sol";
 
 interface IUpdateWeightRunner {
     // Store the current execution context for callbacks

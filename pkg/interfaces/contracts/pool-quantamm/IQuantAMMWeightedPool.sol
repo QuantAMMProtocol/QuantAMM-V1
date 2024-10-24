@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@prb/math/contracts/PRBMathSD59x18.sol";
-import "./rules/IUpdateRule.sol";
+import "./IUpdateRule.sol";
 
 /// @title the main central quantammBase containing records and balances of all pools. Contains all user-pool interaction functions.
 interface IQuantAMMWeightedPool {

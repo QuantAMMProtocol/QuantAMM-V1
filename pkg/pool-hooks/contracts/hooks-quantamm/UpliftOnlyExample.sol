@@ -18,7 +18,7 @@ import {
     PoolData
 } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 
-import { IUpdateWeightRunner } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/i_update_weight_runner.sol";
+import { IUpdateWeightRunner } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateWeightRunner.sol";
 
 import { BaseHooks } from "@balancer-labs/v3-vault/contracts/BaseHooks.sol";
 import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol";
@@ -130,8 +130,9 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
     constructor(
         IVault vault,
         IWETH weth,
-        IPermit2 permit2
-    ) MinimalRouter(vault, weth, permit2) {
+        IPermit2 permit2,
+        string memory version
+    ) MinimalRouter(vault, weth, permit2, version) {
         // solhint-disable-previous-line no-empty-blocks
     }
 
@@ -145,7 +146,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
         uint256 exactBptAmountOut,
         bool wethIsEth,
         bytes memory userData
-    ) external payable saveSender returns (uint256[] memory amountsIn) {
+    ) external payable saveSender(msg.sender) returns (uint256[] memory amountsIn) {
 
         if(poolsFeeData[pool][msg.sender].length > 100){
             revert TooManyDeposits();

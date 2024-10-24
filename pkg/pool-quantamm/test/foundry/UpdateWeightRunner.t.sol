@@ -6,7 +6,7 @@ import "../../contracts/mock/MockUpdateWeightRunner.sol"; // Update with your ac
 import "../../contracts/mock/MockChainlinkOracles.sol"; // Update with your actual path
 import "../../contracts/mock/MockIdentityRules.sol"; // Update with your actual path
 import "../../contracts/mock/MockQuantAMMBasePool.sol"; // Update with your actual path
-import "../../contracts/IQuantAMMWeightedPool.sol"; // Update with your actual path
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol"; // Update with your actual path
 
 contract UpdateWeightRunnerTest is Test {
     MockUpdateWeightRunner internal updateWeightRunner;

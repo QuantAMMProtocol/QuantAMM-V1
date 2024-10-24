@@ -15,17 +15,16 @@ import { ArrayHelpers } from "@balancer-labs/v3-solidity-utils/contracts/test/Ar
 import { BalancerPoolToken } from "@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol";
 import { BaseVaultTest } from "@balancer-labs/v3-vault/test/foundry/utils/BaseVaultTest.sol";
 
-import { IQuantAMMWeightedPool } from "../../contracts/IQuantAMMWeightedPool.sol";
 import { QuantAMMWeightedPool } from "../../contracts/QuantAMMWeightedPool.sol";
 import { QuantAMMWeightedPoolFactory } from "../../contracts/QuantAMMWeightedPoolFactory.sol";
 import { QuantAMMWeightedPoolContractsDeployer } from "./utils/QuantAMMWeightedPoolContractsDeployer.sol";
 import { PoolSwapParams, SwapKind } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
-import { OracleWrapper } from "../../contracts/OracleWrapper.sol";
+import { OracleWrapper } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
 import { MockUpdateWeightRunner } from "../../contracts/mock/MockUpdateWeightRunner.sol";
 import { MockMomentumRule } from "../../contracts/mock/mockRules/MockMomentumRule.sol";
 import { MockChainlinkOracle } from "../../contracts/mock/MockChainlinkOracles.sol";
 
-import "../../contracts/IQuantAMMWeightedPool.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 
 contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, BaseVaultTest {
     using CastingHelpers for address[];

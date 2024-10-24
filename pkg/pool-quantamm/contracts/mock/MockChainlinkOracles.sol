@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "../OracleWrapper.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
 
 contract MockChainlinkOracle is OracleWrapper {
     int216 private fixedReply;

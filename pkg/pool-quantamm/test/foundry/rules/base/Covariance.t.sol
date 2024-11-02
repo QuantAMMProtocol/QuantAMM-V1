@@ -77,29 +77,7 @@ contract QuantAMMVarianceTest is Test, QuantAMMTestUtils {
                 for (uint256 k = 0; k < n; k++) {
                     assertEq(res[i][j][k], expectedRes[i][j][k], "Values are not the same");
                 }
-               //string memory resultStr = "[";
-               //for (uint256 k = 0; k < res[i][j].length; k++) {
-               //    string memory negative = "";
-               //    if (res[i][j][k] < 0) {
-               //        negative = "-";
-               //    }
-               //    resultStr = string(abi.encodePacked(resultStr, "PRBMathSD59x18.fromInt(", negative,Strings.toString(uint256(res[i][j][k])), ")"));
-               //    if (k < res[i][j].length - 1) {
-               //        resultStr = string(abi.encodePacked(resultStr, ", "));
-               //    }
-               //}
-               //if(j < n - 1) {
-               //    resultStr = string(abi.encodePacked(resultStr, "],"));
-               //} else {
-               //    resultStr = string(abi.encodePacked(resultStr, "]"));
-               //}
-               //console.log(resultStr);
             }
-            //if(i < res.length - 1) {
-            //    console.log("],");
-            //} else {
-            //    console.log("]");
-            //}
         }
     }
 

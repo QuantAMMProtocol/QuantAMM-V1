@@ -39,6 +39,7 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     }
 
     int256[] weights;
+    uint40 lastInterpolationTimePossible;
 
     uint numBaseAssets; // How many base assets are included in the pool, between 0 and assets.length
     uint numTotalAssets;
@@ -63,7 +64,10 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
         int256[] calldata _weights,
         address _poolAddress,
         uint40 _lastInterpolationTimePossible
-    ) external override {}
+    ) external override {
+        weights = _weights;
+        lastInterpolationTimePossible = _lastInterpolationTimePossible;
+    }
 
     function poolRegistry(address _poolAddress) external view override returns (uint256) {}
 

@@ -27,15 +27,26 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
-    function testPowerChannelKappaZeroQGreaterThanOneShouldBeAccepted() public view {
+    function testPowerChannelKappaZeroQGreaterThanOneShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
-        parameters[0][0] = PRBMathSD59x18.fromInt(1);  // kappa = 1
+        parameters[0][0] = PRBMathSD59x18.fromInt(0);  // kappa = 1
         parameters[1] = new int256[](1);
         parameters[1][0] = PRBMathSD59x18.fromInt(2);  // q > 1
 
         bool valid = rule.validParameters(parameters);
-        assertTrue(valid);
+        assertFalse(valid);
+    }
+
+    function testFuzz_PowerChannelKappaZeroQGreaterThanOneShouldNotBeAccepted(int256 q) public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(0);  // kappa = 1
+        parameters[1] = new int256[](1);
+        parameters[1][0] = PRBMathSD59x18.fromInt(bound(q, 1, maxScaledFixedPoint18()));  // q > 1
+
+        bool valid = rule.validParameters(parameters);
+        assertFalse(valid);
     }
 
     function testPowerChannelKappaGreaterThanZeroQGreaterThanOneShouldBeAccepted() public view {
@@ -60,12 +71,34 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
+    function testFuzz_PowerChannelKappaGreaterThanZeroQEqualToOneShouldNotBeAccepted(int256 kappa) public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(bound(kappa, 1, maxScaledFixedPoint18()));  // kappa > 0
+        parameters[1] = new int256[](1);
+        parameters[1][0] = PRBMathSD59x18.fromInt(1);  // q = 1
+
+        bool valid = rule.validParameters(parameters);
+        assertFalse(valid);
+    }
+
     function testPowerChannelKappaLessThanZeroQGreaterThanOneShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(-1); // kappa < 0
         parameters[1] = new int256[](1);
         parameters[1][0] = PRBMathSD59x18.fromInt(2);  // q > 1
+
+        bool valid = rule.validParameters(parameters);
+        assertFalse(valid);
+    }
+
+    function testFuzz_PowerChannelKappaLessThanZeroQGreaterThanOneShouldNotBeAccepted(int256 kappa, int256 q) public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = -PRBMathSD59x18.fromInt(bound(kappa, 1, maxScaledFixedPoint18())); // kappa < 0
+        parameters[1] = new int256[](1);
+        parameters[1][0] = PRBMathSD59x18.fromInt(bound(q, 1, maxScaledFixedPoint18()));  // q > 1
 
         bool valid = rule.validParameters(parameters);
         assertFalse(valid);

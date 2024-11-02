@@ -43,6 +43,15 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, true); // Assert that the result is true
     }
 
+    function testFuzz_MinVarNumberBetweenZeroAndOneShouldBeAccepted(int256 param) public view {
+        int256[][] memory parameters = new int256[][](1); // Additional parameters
+        parameters[0] = new int256[](1);
+        parameters[0][0] = bound(param, 1, 0.9999999999999999e18); // 0.75 should be accepted
+
+        bool result = rule.validParameters(parameters); // Call the function
+        assertEq(result, true); // Assert that the result is true
+    }
+
     function testMinVarNumberGreaterThanOneShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1); // Additional parameters
         parameters[0] = new int256[](1);
@@ -52,10 +61,29 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, false); // Assert that the result is false
     }
 
+    function testFuzz_MinVarNumberGreaterThanOneShouldNotBeAccepted(int256 param) public view {
+        int256[][] memory parameters = new int256[][](1); // Additional parameters
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(bound(param, 1e18, maxScaledFixedPoint18())); // 2 should not be accepted
+
+        bool result = rule.validParameters(parameters); // Call the function
+        assertEq(result, false); // Assert that the result is false
+    }
+
+
     function testMinVarNumberLessThanZeroShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1); // Additional parameters
         parameters[0] = new int256[](1);
         parameters[0][0] = -PRBMathSD59x18.fromInt(1); // -1 should not be accepted
+
+        bool result = rule.validParameters(parameters); // Call the function
+        assertEq(result, false); // Assert that the result is false
+    }
+
+    function testFuzz_MinVarNumberLessThanZeroShouldNotBeAccepted(int256 param) public view {
+        int256[][] memory parameters = new int256[][](1); // Additional parameters
+        parameters[0] = new int256[](1);
+        parameters[0][0] = -PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18())); // -1 should not be accepted
 
         bool result = rule.validParameters(parameters); // Call the function
         assertEq(result, false); // Assert that the result is false
@@ -71,6 +99,22 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         bool result = rule.validParameters(parameters); // Call the function
         assertEq(result, false); // Assert that the result is false
     }
+
+    function testFuzz_MinVarAdditionalParametersShouldBeRejected(uint256 paramLength, uint256 innerLength, int256 defaultParam) public view {
+        
+        uint256 totalParams = bound(paramLength, 2, 20);
+        uint256 innerParams = bound(innerLength,2,20);
+        int256[][] memory parameters = new int256[][](totalParams); // Additional parameters
+        for(uint256 i = 0; i < totalParams; i++){
+            parameters[i] = new int256[](innerParams);
+            for(uint256 j = 0; j < innerParams; j++){
+                parameters[i][j] = PRBMathSD59x18.fromInt(bound(defaultParam, minScaledFixedPoint18(), maxScaledFixedPoint18()));
+            }
+        }
+
+        bool result = rule.validParameters(parameters); // Call the function
+        assertEq(result, false); // Assert that the result is false
+    } 
 
     function testMinVarCorrectUpdateWithLambdaPointFiveAndTwoWeights() public {
         // Set the number of assets to 2

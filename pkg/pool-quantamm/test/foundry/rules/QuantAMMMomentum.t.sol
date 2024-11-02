@@ -90,6 +90,14 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertTrue(result);
     }
 
+    function testFuzz_MomentumRuleTestPositiveNumberShouldBeAccepted(int256 param) public view {
+        int256[][] memory parameters = new int256[][](1);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18()));
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
     function testMomentumRuleTestNegativeNumberShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
@@ -97,6 +105,15 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
+
+    function testFuzz_MomentumRuleTestNegativeNumberShouldNotBeAccepted(int256 param) public {
+        int256[][] memory parameters = new int256[][](1);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = -PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18()));
+        bool result = rule.validParameters(parameters);
+        assertFalse(result);
+    }
+
     function testMomentumRuleVectorParamTestZeroShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);

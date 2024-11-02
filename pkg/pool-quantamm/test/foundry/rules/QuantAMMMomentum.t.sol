@@ -94,7 +94,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
-    function testFuzz_MomentumRuleTestNegativeNumberShouldNotBeAccepted(int256 param) public {
+    function testFuzz_MomentumRuleTestNegativeNumberShouldNotBeAccepted(int256 param) public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
         parameters[0][0] = -PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18()));

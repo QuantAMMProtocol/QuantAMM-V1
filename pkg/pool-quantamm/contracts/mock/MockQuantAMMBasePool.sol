@@ -60,6 +60,8 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
 
     uint oracleStalenessThreshold;
 
+    address poolAddress;
+
     IERC20[] public assets; // The assets of the pool. If the pool is a composite pool, contains the LP tokens of those pools
 
     UpdateWeightRunner internal immutable updateWeightRunner;
@@ -71,6 +73,7 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     ) external override {
         weights = _weights;
         lastInterpolationTimePossible = _lastInterpolationTimePossible;
+        poolAddress = _poolAddress;
     }
 
     function poolRegistry(address _poolAddress) external view override returns (uint256) {}

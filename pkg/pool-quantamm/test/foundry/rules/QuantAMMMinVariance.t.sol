@@ -70,7 +70,6 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, false); // Assert that the result is false
     }
 
-
     function testMinVarNumberLessThanZeroShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1); // Additional parameters
         parameters[0] = new int256[](1);
@@ -100,21 +99,26 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, false); // Assert that the result is false
     }
 
-    function testFuzz_MinVarAdditionalParametersShouldBeRejected(uint256 paramLength, uint256 innerLength, int256 defaultParam) public view {
-        
+    function testFuzz_MinVarAdditionalParametersShouldBeRejected(
+        uint256 paramLength,
+        uint256 innerLength,
+        int256 defaultParam
+    ) public view {
         uint256 totalParams = bound(paramLength, 2, 20);
-        uint256 innerParams = bound(innerLength,2,20);
+        uint256 innerParams = bound(innerLength, 2, 20);
         int256[][] memory parameters = new int256[][](totalParams); // Additional parameters
-        for(uint256 i = 0; i < totalParams; i++){
+        for (uint256 i = 0; i < totalParams; i++) {
             parameters[i] = new int256[](innerParams);
-            for(uint256 j = 0; j < innerParams; j++){
-                parameters[i][j] = PRBMathSD59x18.fromInt(bound(defaultParam, minScaledFixedPoint18(), maxScaledFixedPoint18()));
+            for (uint256 j = 0; j < innerParams; j++) {
+                parameters[i][j] = PRBMathSD59x18.fromInt(
+                    bound(defaultParam, minScaledFixedPoint18(), maxScaledFixedPoint18())
+                );
             }
         }
 
         bool result = rule.validParameters(parameters); // Call the function
         assertEq(result, false); // Assert that the result is false
-    } 
+    }
 
     function testMinVarCorrectUpdateWithLambdaPointFiveAndTwoWeights() public {
         // Set the number of assets to 2
@@ -155,14 +159,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         );
 
         // Calculate unguarded weights
-        rule.CalculateUnguardedWeights(
-            prevWeights,
-            data,
-            address(mockPool),
-            parameters,
-            lambda,
-            prevMovingAverages
-        );
+        rule.CalculateUnguardedWeights(prevWeights, data, address(mockPool), parameters, lambda, prevMovingAverages);
 
         // Get and check result weights
         int256[] memory res = rule.GetResultWeights();
@@ -173,7 +170,6 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
 
         checkResult(res, ex);
         // Expected result: [0.5482832618025751, 0.4517167381974248]
-       
     }
 
     function testMinVarCorrectUpdateWithLambdaPointNineAndTwoWeights() public {
@@ -203,11 +199,10 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         prevMovingAverages[2] = PRBMathSD59x18.fromInt(1);
         prevMovingAverages[3] = PRBMathSD59x18.fromInt(1) + 0.5e18;
 
-        
         int128[] memory lambda = new int128[](2);
         lambda[0] = 0.7e18;
         lambda[1] = 0.7e18;
-        
+
         // Initialize pool rule intermediate values
         rule.initialisePoolRuleIntermediateValues(
             address(mockPool),
@@ -217,22 +212,15 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         );
 
         // Calculate unguarded weights
-        rule.CalculateUnguardedWeights(
-            prevWeights,
-            data,
-            address(mockPool),
-            parameters,
-            lambda ,
-            prevMovingAverages
-        );
+        rule.CalculateUnguardedWeights(prevWeights, data, address(mockPool), parameters, lambda, prevMovingAverages);
 
         // Get and check result weights
         int256[] memory res = rule.GetResultWeights();
-        
+
         int256[] memory ex = new int256[](2);
         ex[0] = 0.509656652360515021e18;
         ex[1] = 0.490343347639484978e18;
-        
+
         checkResult(res, ex);
     }
 
@@ -276,14 +264,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         );
 
         // Calculate unguarded weights
-        rule.CalculateUnguardedWeights(
-            prevWeights,
-            data,
-            address(mockPool),
-            parameters,
-            lambda,
-            prevMovingAverages
-        );
+        rule.CalculateUnguardedWeights(prevWeights, data, address(mockPool), parameters, lambda, prevMovingAverages);
 
         // Get and check result weights
         int256[] memory res = rule.GetResultWeights();
@@ -296,7 +277,6 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         ex[1] = 0.471030042918454935e18;
 
         checkResult(res, ex);
-       
     }
 
     function testMinVarCorrectUpdateWithVectorParameterLambdaPointNineAndTwoWeights() public {
@@ -329,7 +309,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
 
         int128[] memory lambda = new int128[](1);
         lambda[0] = 0.7e18;
-        
+
         // Initialize pool rule intermediate values
         rule.initialisePoolRuleIntermediateValues(
             address(mockPool),
@@ -339,28 +319,20 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         );
 
         // Calculate unguarded weights
-        rule.CalculateUnguardedWeights(
-            prevWeights,
-            data,
-            address(mockPool),
-            parameters,
-            lambda ,
-            prevMovingAverages
-        );
+        rule.CalculateUnguardedWeights(prevWeights, data, address(mockPool), parameters, lambda, prevMovingAverages);
 
         // Get and check result weights
         int256[] memory res = rule.GetResultWeights();
-        
+
         int256[] memory ex = new int256[](2);
         ex[0] = 0.509656652360515021e18;
         // The value ex[1] is not exactly correct as it comes from floating point calcs
         // and so needs to be updated after vector parameter functionality is implemented.
         // It should be very close to this current set value, 0.47103004291845496
         ex[1] = 0.471030042918454935e18;
-        
+
         checkResult(res, ex);
     }
-
 
     function testMinVarCorrectUpdateWithScalarParameterVectorLambdaTwoWeights() public {
         // Set the number of assets to 2
@@ -392,8 +364,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         int128[] memory lambda = new int128[](2);
         lambda[0] = 0.95e18;
         lambda[1] = 0.5e18;
-        
-        
+
         // Initialize pool rule intermediate values
         rule.initialisePoolRuleIntermediateValues(
             address(mockPool),
@@ -403,22 +374,15 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         );
 
         // Calculate unguarded weights
-        rule.CalculateUnguardedWeights(
-            prevWeights,
-            data,
-            address(mockPool),
-            parameters,
-            lambda ,
-            prevMovingAverages
-        );
+        rule.CalculateUnguardedWeights(prevWeights, data, address(mockPool), parameters, lambda, prevMovingAverages);
 
         // Get and check result weights
         int256[] memory res = rule.GetResultWeights();
-        
+
         int256[] memory ex = new int256[](2);
         ex[0] = 0.543167701863354037e18;
         ex[1] = 0.456832298136645962e18;
-        
+
         checkResult(res, ex);
     }
 }

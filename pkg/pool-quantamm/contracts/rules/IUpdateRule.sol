@@ -34,7 +34,5 @@ interface IUpdateRule {
 
     /// @notice Check if the given parameters are valid for the rule
     /// @param _parameters the parameters to check
-    function validParameters(
-        int256[][] calldata _parameters
-    ) external view returns (bool);
+    function validParameters(int256[][] calldata _parameters) external view returns (bool);
 }

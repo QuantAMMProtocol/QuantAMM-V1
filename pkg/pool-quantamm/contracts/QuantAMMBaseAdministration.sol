@@ -30,22 +30,11 @@ While there is a small race condition possible during deployment, if someone doe
 /// @title QuantAMM base administration contract for low frequency, high impact admin calls to the base
 /// @notice Responsible for considerable critical setting management. Separated from the base contract due to contract size limits.
 contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage {
-    event TradingFeeSet(
-        address indexed pool,
-        uint16 tradingFee,
-        address feeRecipient
-    );
+    event TradingFeeSet(address indexed pool, uint16 tradingFee, address feeRecipient);
     event ProtocolTradingFeeSet(uint16 tradingFee, address feeRecipient);
     event MinMaxTradingFeesSet(uint16 minTradingFee, uint16 maxTradingFee);
-    event WithdrawalFixedFeeSet(
-        address indexed pool,
-        uint16 withdrawalFixedFee,
-        address feeRecipient
-    );
-    event ProtocolWithdrawalFixedFeeSet(
-        uint16 withdrawalFixedFee,
-        address feeRecipient
-    );
+    event WithdrawalFixedFeeSet(address indexed pool, uint16 withdrawalFixedFee, address feeRecipient);
+    event ProtocolWithdrawalFixedFeeSet(uint16 withdrawalFixedFee, address feeRecipient);
     event MinMaxFixedWithdrawalFeesSet(uint16 minBaseFee, uint16 maxBaseFee);
     event PoolDiluted(address indexed poolAddress, uint256 gasInUSD);
     event PoolRegistered(
@@ -62,16 +51,16 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage 
     address public updateWeightRunner;
 
     /// @notice Max and min trading fees in BPS, 100% = 10_000
-    uint16 public maxTradingFee = 10_000; 
+    uint16 public maxTradingFee = 10_000;
 
     /// @notice Min trading fees in BPS, 100% = 10_000
-    uint16 public minTradingFee = 0; 
+    uint16 public minTradingFee = 0;
 
     /// @notice Max and min fixed withdrawal fees in BPS, 100% = 10_000
-    uint16 public maxFixedWithdrawalFee = 10_000; 
+    uint16 public maxFixedWithdrawalFee = 10_000;
 
     /// @notice Min fixed withdrawal fees in BPS, 100% = 10_000
-    uint16 public minFixedWithdrawalFee = 0; 
+    uint16 public minFixedWithdrawalFee = 0;
 
     uint256 private constant MASK_POOL_ACTIVE = 1;
     uint256 private constant MASK_POOL_COMPOSITE = 2;
@@ -80,9 +69,7 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage 
     uint256 private constant MASK_POOL_COMPLIANCE_DEPOSIT = 16;
     uint256 private constant MASK_POOL_DAO_WEIGHT_UPDATES = 32;
 
-    constructor(address _daoRunner) DaoOperations(_daoRunner) {
-       
-    }
+    constructor(address _daoRunner) DaoOperations(_daoRunner) {}
 
     /// @notice one time only call during deployment to set the base pool address
     /// @param _basePoolAddress the address of the base pool

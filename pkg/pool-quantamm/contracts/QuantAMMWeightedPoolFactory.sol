@@ -54,7 +54,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         int256[] _initialIntermediateValues;
         uint256 _oracleStalenessThreshold;
     }
-    
+
     string private _poolVersion;
     address private _updateWeightRunner;
 
@@ -83,9 +83,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
      * @notice Deploys a new `WeightedPool`.
      * @dev Tokens must be sorted for pool registration.
      */
-    function create(
-        NewPoolParams memory params
-    ) external returns (address pool) {
+    function create(NewPoolParams memory params) external returns (address pool) {
         if (params.roleAccounts.poolCreator != address(0)) {
             revert StandardPoolWithCreator();
         }

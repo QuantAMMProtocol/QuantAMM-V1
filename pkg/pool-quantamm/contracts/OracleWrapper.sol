@@ -1,7 +1,6 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24;
 
-
 /// @notice Generic wrapper around an arbitrary oracle that returns normalized values.
 abstract contract OracleWrapper {
     /// @notice Type of the oracle (price, volume, variance, ...). Only price supported for now
@@ -19,10 +18,5 @@ abstract contract OracleWrapper {
     }
 
     /// @notice Get data from oracle, to be implemented by child contracts. Needs to return data with 18 decimals
-    function _getData()
-        internal
-        view
-        virtual
-        returns (int216 data, uint40 timestamp)
-    {}
+    function _getData() internal view virtual returns (int216 data, uint40 timestamp) {}
 }

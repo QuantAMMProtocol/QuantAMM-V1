@@ -9,7 +9,6 @@ import "./rules/IUpdateRule.sol";
 
 /// @title the main central quantammBase containing records and balances of all pools. Contains all user-pool interaction functions.
 interface IQuantAMMWeightedPool {
-
     struct QuantAMMBaseInterpolationVariables {
         uint40 lastUpdateIntervalTime;
         uint40 lastPossibleInterpolationTime;
@@ -22,7 +21,6 @@ interface IQuantAMMWeightedPool {
         int256 poolOptions;
         address getWeightsMethod;
     }
-
 
     /// @notice Settings that identify a pool
     struct PoolSettings {
@@ -39,7 +37,7 @@ interface IQuantAMMWeightedPool {
         address[] complianceCheckersDeposit;
         address poolManager;
     }
-    
+
     /// @notice function called to set weights and weight block multipliers
     /// @param _weights the weights to set that sum to 1
     /// @param _poolAddress the address of the pool to set the weights for
@@ -53,7 +51,7 @@ interface IQuantAMMWeightedPool {
     /// @notice used to view the pool address for a given pool settings hash if the pool is registered with the quantammBase
     /// @param _poolAddress the address of the pool to get the settings hash for
     function poolRegistry(address _poolAddress) external view returns (uint256);
-    
+
     /// @notice the acceptable number of blocks behind the current that an oracle value can be
     function getOracleStalenessThreshold() external view returns (uint);
 }

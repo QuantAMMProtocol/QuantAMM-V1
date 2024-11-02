@@ -38,38 +38,37 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     function _getWeights(
         int256[] calldata _prevWeights,
         int256[] calldata _data,
-        int256[][] calldata _parameters,//[0]=q, [1]=k, [2]=useRawPrice
+        int256[][] calldata _parameters, //[0]=q, [1]=k, [2]=useRawPrice
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {
         QuantAMMPowerChannelLocals memory locals;
         locals.prevWeightsLength = _prevWeights.length;
 
         _poolParameters.numberOfAssets = _prevWeights.length;
-        // reuse of the newWeights array allows for saved gas in array initialisation 
-        locals.newWeights = _calculateQuantAMMGradient(
-            _data,
-            _poolParameters
-        );
+        // reuse of the newWeights array allows for saved gas in array initialisation
+        locals.newWeights = _calculateQuantAMMGradient(_data, _poolParameters);
 
         locals.kappa = _parameters[0];
         locals.q = _parameters[1][0];
 
         locals.useRawPrice = false;
-        
+
         // the third parameter determines if power channel should use the price or the average price as the denominator
         if (_parameters.length > 2) {
             locals.useRawPrice = _parameters[2][0] == ONE;
         }
 
-        for (locals.i = 0 ; locals.i < locals.prevWeightsLength;) {
+        for (locals.i = 0; locals.i < locals.prevWeightsLength; ) {
             locals.denominator = _poolParameters.movingAverage[locals.i];
             if (locals.useRawPrice) {
                 locals.denominator = _data[locals.i];
             }
             locals.intermediateRes = ONE.div(locals.denominator).mul(locals.newWeights[locals.i]);
 
-            unchecked {locals.sign = locals.intermediateRes >= 0 ? ONE : -ONE;}
-            //sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q 
+            unchecked {
+                locals.sign = locals.intermediateRes >= 0 ? ONE : -ONE;
+            }
+            //sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q
             //stored as it is used in multiple places, saves on recalculation gas. _pow is quite expensive
             locals.newWeights[locals.i] = locals.sign.mul(_pow(locals.intermediateRes.abs(), locals.q));
             locals.normalizationFactor += locals.newWeights[locals.i];
@@ -77,16 +76,17 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 ++locals.i;
             }
         }
-        
+
         // To avoid intermediate overflows (because of normalization), we only downcast in the end to an uint64
         newWeightsConverted = new int256[](locals.prevWeightsLength);
 
         if (locals.kappa.length == 1) {
             locals.normalizationFactor /= int256(locals.prevWeightsLength);
 
-            for (locals.i = 0; locals.i < locals.prevWeightsLength;) {
+            for (locals.i = 0; locals.i < locals.prevWeightsLength; ) {
                 //κ · ( sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q − ℓp(t)
-                locals.res = int256(_prevWeights[locals.i]) +
+                locals.res =
+                    int256(_prevWeights[locals.i]) +
                     locals.kappa[0].mul(locals.newWeights[locals.i] - locals.normalizationFactor);
                 newWeightsConverted[locals.i] = locals.res;
                 unchecked {
@@ -96,7 +96,7 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         } else {
             //vector parameter calculation, same as scalar but using the per constituent param inside the loops
             int256 sumKappa;
-            for (locals.i = 0; locals.i < locals.kappa.length;) {
+            for (locals.i = 0; locals.i < locals.kappa.length; ) {
                 sumKappa += locals.kappa[locals.i];
                 unchecked {
                     ++locals.i;
@@ -107,7 +107,8 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
 
             for (locals.i = 0; locals.i < _prevWeights.length; ) {
                 //κ · ( sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q − ℓp(t)
-                locals.res = int256(_prevWeights[locals.i]) +
+                locals.res =
+                    int256(_prevWeights[locals.i]) +
                     locals.kappa[locals.i].mul(locals.newWeights[locals.i] - locals.normalizationFactor);
                 require(locals.res >= 0, "Invalid weight");
                 newWeightsConverted[locals.i] = locals.res;
@@ -119,16 +120,11 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         return newWeightsConverted;
     }
 
-    function _requiresPrevMovingAverage()
-        internal
-        pure
-        override
-        returns (uint16)
-    {
+    function _requiresPrevMovingAverage() internal pure override returns (uint16) {
         return REQUIRES_PREV_MAVG;
     }
 
-    /// @param _poolAddress address of pool being initialised 
+    /// @param _poolAddress address of pool being initialised
     /// @param _initialValues the initial intermediate values provided
     /// @param _numberOfAssets number of assets in the pool
     function _setInitialIntermediateValues(
@@ -141,13 +137,10 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
 
     /// @notice Check if the given parameters are valid for the rule
     /// @dev If parameters are not valid, either reverts or returns false
-    function validParameters(
-        int256[][] calldata parameters
-    ) external pure override returns (bool valid) {
+    function validParameters(int256[][] calldata parameters) external pure override returns (bool valid) {
         valid = true;
         if (
-            (parameters.length == 2 ||
-                (parameters.length == 3 && parameters[2].length == 1)) &&
+            (parameters.length == 2 || (parameters.length == 3 && parameters[2].length == 1)) &&
             (parameters[0].length > 0) &&
             parameters[1].length == 1
         ) {

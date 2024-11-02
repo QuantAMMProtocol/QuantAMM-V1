@@ -26,11 +26,7 @@ abstract contract QuantAMMMathGuard {
         _weights = _clampWeights(_weights, _absoluteWeightGuardRail);
 
         //then reduce even further if the weight change is beyond the allowed "speed limit" that protects the changes from front running
-        guardedNewWeights = _normalizeWeightUpdates(
-            _prevWeights,
-            _weights,
-            _epsilonMax
-        );
+        guardedNewWeights = _normalizeWeightUpdates(_prevWeights, _weights, _epsilonMax);
     }
 
     /// @notice Applies guard rails (min value, max value) to weights and returns the normalized weights
@@ -46,7 +42,8 @@ abstract contract QuantAMMMathGuard {
                 return _weights;
             }
             int256 absoluteMin = _absoluteWeightGuardRail;
-            int256 absoluteMax = ONE - (PRBMathSD59x18.fromInt(int256(_weights.length - 1)).mul(_absoluteWeightGuardRail));
+            int256 absoluteMax = ONE -
+                (PRBMathSD59x18.fromInt(int256(_weights.length - 1)).mul(_absoluteWeightGuardRail));
             int256 sumRemainerWeight = ONE;
             int256 sumOtherWeights;
 
@@ -54,7 +51,7 @@ abstract contract QuantAMMMathGuard {
                 if (_weights[i] < absoluteMin) {
                     _weights[i] = absoluteMin;
                     sumRemainerWeight -= absoluteMin;
-                }else if(_weights[i] > absoluteMax){
+                } else if (_weights[i] > absoluteMax) {
                     _weights[i] = absoluteMax;
                     sumOtherWeights += absoluteMax;
                 }
@@ -62,7 +59,7 @@ abstract contract QuantAMMMathGuard {
             if (sumOtherWeights != 0) {
                 int256 proportionalRemainder = sumRemainerWeight.div(sumOtherWeights);
                 for (uint i; i < weightLength; ++i) {
-                    if(_weights[i] != absoluteMin) {
+                    if (_weights[i] != absoluteMin) {
                         _weights[i] = _weights[i].mul(proportionalRemainder);
                     }
                 }
@@ -93,9 +90,7 @@ abstract contract QuantAMMMathGuard {
             if (maxAbsChange > _epsilonMax) {
                 int256 rescaleFactor = _epsilonMax.div(maxAbsChange);
                 for (uint i; i < _newWeights.length; ++i) {
-                    int256 newDelta = (_newWeights[i] - _prevWeights[i]).mul(
-                        rescaleFactor
-                    );
+                    int256 newDelta = (_newWeights[i] - _prevWeights[i]).mul(rescaleFactor);
                     _newWeights[i] = _prevWeights[i] + newDelta;
                     newWeightsSum += _newWeights[i];
                 }

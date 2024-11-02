@@ -12,7 +12,12 @@ import {
 } from "@balancer-labs/v3-interfaces/contracts/vault/IUnbalancedLiquidityInvariantRatioBounds.sol";
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
 import { IVaultErrors } from "@balancer-labs/v3-interfaces/contracts/vault/IVaultErrors.sol";
-import { SwapKind, PoolSwapParams, PoolConfig, Rounding } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
+import {
+    SwapKind,
+    PoolSwapParams,
+    PoolConfig,
+    Rounding
+} from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 import { IBasePool } from "@balancer-labs/v3-interfaces/contracts/vault/IBasePool.sol";
 
 import { BalancerPoolToken } from "@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol";
@@ -26,7 +31,6 @@ import { IQuantAMMWeightedPool } from "../IQuantAMMWeightedPool.sol";
 import { ScalarQuantAMMBaseStorage } from "../QuantAMMStorage.sol";
 import "../rules/IUpdateRule.sol";
 import "../UpdateWeightRunner.sol";
-
 
 contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     constructor(uint16 _updateInterval, address _updateWeightRunner) {
@@ -108,20 +112,10 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
         weights = _weights;
     }
 
-    function setRuleForPool(
-        PoolSettings calldata _settings
-    ) external {
-        UpdateWeightRunner(updateWeightRunner).setRuleForPool(
-            _settings
-        );
+    function setRuleForPool(PoolSettings calldata _settings) external {
+        UpdateWeightRunner(updateWeightRunner).setRuleForPool(_settings);
     }
-    function getOracleStalenessThreshold()
-        external
-        view
-        override
-        returns (uint)
-    {
+    function getOracleStalenessThreshold() external view override returns (uint) {
         return oracleStalenessThreshold;
     }
-    
 }

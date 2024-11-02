@@ -4,7 +4,7 @@ pragma solidity >=0.8.24;
 import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "../../QuantAMMStorage.sol";
 
-/// @title QuantAMMMathMovingAverage contract for QuantAMM moving average calculations and storage of moving averages for QuantAMM pools 
+/// @title QuantAMMMathMovingAverage contract for QuantAMM moving average calculations and storage of moving averages for QuantAMM pools
 /// @notice Contains the logic for calculating the moving average of the pool price and storing the moving averages
 abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
     using PRBMathSD59x18 for int256;
@@ -15,8 +15,8 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
 
     /// @notice Calculates the new moving average value, i.e. p̅(t) = p̅(t - 1) + (1 - λ)(p(t) - p̅(t - 1))
     /// @param _prevMovingAverage p̅(t - 1)
-    /// @param _newData p(t) 
-    /// @param _lambda λ 
+    /// @param _newData p(t)
+    /// @param _lambda λ
     /// @param _numberOfAssets number of assets in the pool
     /// @return p̅(t) avertage price of the pool
     function _calculateQuantAMMMovingAverage(
@@ -32,9 +32,7 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
             for (uint i; i < _numberOfAssets; ) {
                 // p̅(t) = p̅(t - 1) + (1 - λ)(p(t) - p̅(t - 1)) - see whitepaper
                 int256 movingAverageI = _prevMovingAverage[i];
-                newMovingAverage[i] =
-                    movingAverageI +
-                    oneMinusLambda.mul(_newData[i] - movingAverageI);
+                newMovingAverage[i] = movingAverageI + oneMinusLambda.mul(_newData[i] - movingAverageI);
                 unchecked {
                     ++i;
                 }
@@ -47,9 +45,7 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
                 }
                 int256 movingAverageI = _prevMovingAverage[i];
                 // p̅(t) = p̅(t - 1) + (1 - λ)(p(t) - p̅(t - 1))
-                newMovingAverage[i] =
-                    movingAverageI +
-                    oneMinusLambda.mul(_newData[i] - movingAverageI);
+                newMovingAverage[i] = movingAverageI + oneMinusLambda.mul(_newData[i] - movingAverageI);
                 unchecked {
                     ++i;
                 }
@@ -61,22 +57,17 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
 
     /// @param _poolAddress address of pool being initialised
     /// @param _initialMovingAverages array of initial moving averages
-    /// @param _numberOfAssets number of assets in the pool 
+    /// @param _numberOfAssets number of assets in the pool
     function _setInitialMovingAverages(
         address _poolAddress,
         int256[] memory _initialMovingAverages,
         uint _numberOfAssets
     ) internal {
         uint movingAverageLength = movingAverages[_poolAddress].length;
-        
-        if (
-            movingAverageLength == 0 ||
-            _initialMovingAverages.length == _numberOfAssets
-        ) {
+
+        if (movingAverageLength == 0 || _initialMovingAverages.length == _numberOfAssets) {
             //should be during create pool
-            movingAverages[_poolAddress] = _quantAMMPack128Array(
-                _initialMovingAverages
-            );
+            movingAverages[_poolAddress] = _quantAMMPack128Array(_initialMovingAverages);
         } else {
             revert("Invalid set moving avg");
         }

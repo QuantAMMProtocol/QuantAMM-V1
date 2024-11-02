@@ -33,22 +33,10 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
     ) internal {
         // Simulate setting number of assets and calculating intermediate values
         mockPool.setNumberOfAssets(numAssets);
-        rule.initialisePoolRuleIntermediateValues(
-            address(mockPool),
-            prevMovingAverages,
-            previousAlphas,
-            numAssets
-        );
-        
+        rule.initialisePoolRuleIntermediateValues(address(mockPool), prevMovingAverages, previousAlphas, numAssets);
+
         // Run calculation for unguarded weights
-        rule.CalculateUnguardedWeights(
-            prevWeights,
-            data,
-            address(mockPool),
-            parameters,
-            lambdas,
-            movingAverages
-        );
+        rule.CalculateUnguardedWeights(prevWeights, data, address(mockPool), parameters, lambdas, movingAverages);
 
         // Check results against expected weights
         int256[] memory res = rule.GetResultWeights();
@@ -57,7 +45,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
 
     function testMomentumRuleNoninitialisedParametersShouldNotBeAccepted() public view {
         int256[][] memory parameters;
-        bool result = rule.validParameters(parameters); 
+        bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
 
@@ -186,7 +174,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -239,10 +227,10 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory expectedResults = new int256[](2);
         expectedResults[0] = 0.4775e18;
         expectedResults[1] = 0.5225e18;
-        
+
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -255,8 +243,8 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
     }
 
     function testMomentumRuleTestCorrectUpdateWithHigherPrices_VectorParams() public {
-    // Define local variables for the parameters
-        int256[][] memory parameters  = new int256[][](2);
+        // Define local variables for the parameters
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -293,7 +281,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -305,10 +293,10 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-function testMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public {
-    // Define local variables for the parameters
-        
-        int256[][] memory parameters  = new int256[][](2);
+    function testMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public {
+        // Define local variables for the parameters
+
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -345,7 +333,7 @@ function testMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public 
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -356,8 +344,6 @@ function testMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public 
             expectedResults
         );
     }
-
-
 
     function testMomentumRuleTestCorrectUpdateWithHigherPricesAverageDenominator() public {
         /*
@@ -403,7 +389,7 @@ function testMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public 
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -454,10 +440,10 @@ function testMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public 
         int256[] memory expectedResults = new int256[](2);
         expectedResults[0] = 0.481583333333333333e18;
         expectedResults[1] = 0.518416666666666666e18;
-        
+
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -470,8 +456,8 @@ function testMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public 
     }
 
     function testMomentumRuleTestCorrectUpdateWithHigherPricesAverageDenominator_VectorParams() public {
-    // Define local variables for the parameters
-        int256[][] memory parameters  = new int256[][](1);
+        // Define local variables for the parameters
+        int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -506,7 +492,7 @@ function testMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public 
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -518,10 +504,10 @@ function testMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public 
         );
     }
 
-function testMomentumRuleTestCorrectUpdateWithLowerPricesAverageDenominator_VectorParams() public {
-    // Define local variables for the parameters
-        
-        int256[][] memory parameters  = new int256[][](1);
+    function testMomentumRuleTestCorrectUpdateWithLowerPricesAverageDenominator_VectorParams() public {
+        // Define local variables for the parameters
+
+        int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -556,7 +542,7 @@ function testMomentumRuleTestCorrectUpdateWithLowerPricesAverageDenominator_Vect
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,

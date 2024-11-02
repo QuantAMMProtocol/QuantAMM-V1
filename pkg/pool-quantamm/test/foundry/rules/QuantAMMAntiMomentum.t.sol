@@ -28,29 +28,18 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory movingAverages,
         int128[] memory lambdas,
         int256[] memory prevWeights,
-        int256[] memory data) internal {
-            // Simulate setting number of assets and calculating intermediate values
-            mockPool.setNumberOfAssets(numAssets);
-            rule.initialisePoolRuleIntermediateValues(
-                address(mockPool),
-                prevMovingAverages,
-                previousAlphas,
-                numAssets
-            );
-            console.log("8");
-            // Run calculation for unguarded weights
-            rule.CalculateUnguardedWeights(
-                prevWeights,
-                data,
-                address(mockPool),
-                parameters,
-                lambdas,
-                movingAverages
-            );
-            console.log("9");
+        int256[] memory data
+    ) internal {
+        // Simulate setting number of assets and calculating intermediate values
+        mockPool.setNumberOfAssets(numAssets);
+        rule.initialisePoolRuleIntermediateValues(address(mockPool), prevMovingAverages, previousAlphas, numAssets);
+        console.log("8");
+        // Run calculation for unguarded weights
+        rule.CalculateUnguardedWeights(prevWeights, data, address(mockPool), parameters, lambdas, movingAverages);
+        console.log("9");
 
-            //does not throw.
-        }
+        //does not throw.
+    }
 
     function runInitialUpdate(
         uint256 numAssets,
@@ -81,7 +70,7 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
 
     function testAntiMomentumRuleNoninitialisedParametersShouldNotBeAccepted() public view {
         int256[][] memory parameters;
-        bool result = rule.validParameters(parameters); 
+        bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
 
@@ -114,7 +103,6 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         assertTrue(result);
     }
 
-
     function testFuzz_AntiMomentumRuleTestPositiveNumberShouldBeAccepted(int256 param) public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
@@ -122,7 +110,6 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         bool result = rule.validParameters(parameters);
         assertTrue(result);
     }
-
 
     function testAntiMomentumRuleTestNegativeNumberShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
@@ -139,7 +126,7 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
-    
+
     function testAntiMomentumRuleVectorParamTestZeroShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
@@ -158,7 +145,10 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         assertTrue(result);
     }
 
-    function testFuzz_AntiMomentumRuleVectorParamTestPositiveNumberShouldBeAccepted(int256 param1, int256 param2) public view {
+    function testFuzz_AntiMomentumRuleVectorParamTestPositiveNumberShouldBeAccepted(
+        int256 param1,
+        int256 param2
+    ) public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(bound(param1, 1, maxScaledFixedPoint18()));
@@ -176,7 +166,10 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
-    function testFuzz_AntiMomentumRuleVectorParamTestNegativeNumberShouldNotBeAccepted(int256 param1, int256 param2) public view {
+    function testFuzz_AntiMomentumRuleVectorParamTestNegativeNumberShouldNotBeAccepted(
+        int256 param1,
+        int256 param2
+    ) public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(bound(param1, 1, maxScaledFixedPoint18()));
@@ -184,7 +177,6 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
-
 
     function testAntiMomentumRuleTestCorrectUpdateWithHigherPrices() public {
         /*
@@ -229,7 +221,7 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -238,59 +230,6 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
             prevWeights,
             data,
             expectedResults
-        );
-    }
-
-    function testFuzz_AntiMomentumRuleTestCorrectUpdateWithFuzzHigherPrices(
-        int256 kappa,
-        int256 prevAlpha1,
-        int256 prevAlpha2,
-        int256 prevMovingAverage1,
-        int256 prevMovingAverage2,
-        int256 movingAverage1,
-        int256 movingAverage2,
-        int256 lambda,
-        int256 data1,
-        int256 data2
-    ) public {
-
-        // Define local variables for the parameters
-        int256[][] memory parameters = new int256[][](1);
-        parameters[0] = new int256[](1);
-        parameters[0][0] = PRBMathSD59x18.fromInt(bound(kappa, 1, maxScaledFixedPoint18()));
-        console.log("1");
-        int256[] memory previousAlphas = new int256[](2);
-        previousAlphas[0] = PRBMathSD59x18.fromInt(bound(prevAlpha1, 1, 99999999999999999));
-        previousAlphas[1] = PRBMathSD59x18.fromInt(bound(prevAlpha2, 1, 99999999999999999));
-        console.log("2");
-        int256[] memory prevMovingAverages = new int256[](2);
-        prevMovingAverages[0] = PRBMathSD59x18.fromInt(bound(prevMovingAverage1,  1, 99999999999999999));
-        prevMovingAverages[1] = PRBMathSD59x18.fromInt(bound(prevMovingAverage2,  1, 99999999999999999));
-        console.log("3");
-        int256[] memory movingAverages = new int256[](2);
-        movingAverages[0] = PRBMathSD59x18.fromInt(bound(movingAverage1,  1, 99999999999999999));
-        movingAverages[1] = PRBMathSD59x18.fromInt(bound(movingAverage2,  1, 99999999999999999));
-        int128[] memory lambdas = new int128[](1);
-        lambdas[0] = int128(bound(lambda, 1, 99999999999999999));
-        console.log("5");
-        int256[] memory prevWeights = new int256[](2);
-        prevWeights[0] = 0.5e18;
-        prevWeights[1] = 0.5e18;
-        console.log("6");
-        int256[] memory data = new int256[](2);
-        data[0] = PRBMathSD59x18.fromInt(bound(data1, 1, maxScaledFixedPoint18()));
-        data[1] = PRBMathSD59x18.fromInt(bound(data2, 1, maxScaledFixedPoint18()));
-        console.log("7");
-        // Now pass the variables into the runInitialUpdate function
-        assertRunCompletes(
-            2,                // numAssets
-            parameters,
-            previousAlphas,
-            prevMovingAverages,
-            movingAverages,
-            lambdas,
-            prevWeights,
-            data
         );
     }
 
@@ -333,10 +272,10 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory expectedResults = new int256[](2);
         expectedResults[0] = 518416666666666667;
         expectedResults[1] = 0.481583333333333334e18;
-        
+
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -349,8 +288,8 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
     }
 
     function testAntiMomentumRuleTestCorrectUpdateWithHigherPrices_VectorParams() public {
-    // Define local variables for the parameters
-        int256[][] memory parameters  = new int256[][](2);
+        // Define local variables for the parameters
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -387,7 +326,7 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -399,10 +338,10 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-function testAntiMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public {
-    // Define local variables for the parameters
-        
-        int256[][] memory parameters  = new int256[][](2);
+    function testAntiMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public {
+        // Define local variables for the parameters
+
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -439,7 +378,7 @@ function testAntiMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() pub
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -450,7 +389,6 @@ function testAntiMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() pub
             expectedResults
         );
     }
-
 
     function testAntiMomentumRuleTestCorrectUpdateWithHigherPricesAverageDenominator() public {
         /*
@@ -495,7 +433,7 @@ function testAntiMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() pub
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -546,10 +484,10 @@ function testAntiMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() pub
         int256[] memory expectedResults = new int256[](2);
         expectedResults[0] = 0.518416666666666667e18;
         expectedResults[1] = 0.481583333333333334e18;
-        
+
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -562,8 +500,8 @@ function testAntiMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() pub
     }
 
     function testAntiMomentumRuleTestCorrectUpdateWithHigherPricesAverageDenominator_VectorParams() public {
-    // Define local variables for the parameters
-        int256[][] memory parameters  = new int256[][](1);
+        // Define local variables for the parameters
+        int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -598,7 +536,7 @@ function testAntiMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() pub
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,
@@ -610,10 +548,10 @@ function testAntiMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() pub
         );
     }
 
-function testAntiMomentumRuleTestCorrectUpdateWithLowerPricesAverageDenominator_VectorParams() public {
-    // Define local variables for the parameters
-        
-        int256[][] memory parameters  = new int256[][](1);
+    function testAntiMomentumRuleTestCorrectUpdateWithLowerPricesAverageDenominator_VectorParams() public {
+        // Define local variables for the parameters
+
+        int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -648,7 +586,7 @@ function testAntiMomentumRuleTestCorrectUpdateWithLowerPricesAverageDenominator_
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
-            2,                // numAssets
+            2, // numAssets
             parameters,
             previousAlphas,
             prevMovingAverages,

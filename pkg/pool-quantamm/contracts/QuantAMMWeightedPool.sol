@@ -123,17 +123,23 @@ contract QuantAMMWeightedPool is
     ///@dev Decay parameter for exponentially-weighted moving average (0 < λ < 1)
     uint64[] public lambda;
 
+    ///@dev Maximum allowed delta for a weight update, stored as SD59x18 number
     uint64 public epsilonMax; // Maximum allowed delta for a weight update, stored as SD59x18 number
 
-    uint64 public absoluteWeightGuardRail; // Maximum allowed delta for a weight update, stored as SD59x18 number
+    ///@dev Maximum allowed absolute weight allowed.
+    uint64 public absoluteWeightGuardRail;
 
-    uint256 internal maxTradeSizeRatio; // maximum trade size allowed as a fraction of the pool
+    ///@dev maximum trade size allowed as a fraction of the pool
+    uint256 internal maxTradeSizeRatio;
 
-    uint64 public updateInterval; // Minimum amount of seconds between two updates
+    ///@dev Minimum amount of seconds between two updates
+    uint64 public updateInterval;
 
+    ///@dev the maximum amount of time that an oracle an be stale.
     uint oracleStalenessThreshold;
 
-    IERC20[] public assets; // The assets of the pool. If the pool is a composite pool, contains the LP tokens of those pools
+    ///@dev The assets of the pool. If the pool is a composite pool, contains the LP tokens of those pools
+    IERC20[] public assets;
 
     constructor(
         NewPoolParams memory params,
@@ -202,6 +208,7 @@ contract QuantAMMWeightedPool is
 
         uint256 timeSinceLastUpdate = uint256(multiplierTime - variables.lastUpdateIntervalTime);
 
+        // if both tokens are within the first storage elem
         if (request.indexIn < 4 && request.indexOut < 4) {
             QuantAMMNormalisedTokenPair memory tokenWeights = _getNormalisedWeightPair(
                 request.indexIn,
@@ -212,6 +219,7 @@ contract QuantAMMWeightedPool is
             tokenInWeight = tokenWeights.firstTokenWeight;
             tokenOutWeight = tokenWeights.secondTokenWeight;
         } else if (request.indexIn > 4 && request.indexOut < 4) {
+            //if the tokens are in different storage elems
             QuantAMMNormalisedTokenPair memory tokenWeights = _getNormalisedWeightPair(
                 request.indexOut,
                 request.indexIn,

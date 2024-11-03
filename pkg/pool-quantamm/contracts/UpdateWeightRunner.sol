@@ -8,6 +8,7 @@ import "./IQuantAMMWeightedPool.sol";
 import "./QuantAMMBaseAdministration.sol";
 import "./rules/IUpdateRule.sol";
 import "./rules/UpdateRule.sol";
+import "./QuantAMMWeightedPool.sol";
 
 import { IWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-weighted/IWeightedPool.sol";
 /*
@@ -49,9 +50,11 @@ updates and guard rails.
 contract UpdateWeightRunner is Ownable2Step {
     event OracleAdded(address indexed oracleAddress);
     event OracleRemved(address indexed oracleAddress);
+    event GetData(address indexed caller, address indexed pool);
+    event SetWeightManual(address indexed caller, address indexed pool, int256[] weights, uint40 lastInterpolationTimePossible);
+    event SetIntermediateValuesManually(address indexed caller, address indexed pool, int256[] newMovingAverages, int256[] newParameters, uint numberOfAssets);
     event UpdatePerformed(address indexed caller, address indexed pool);
     event UpdatePerformedQuantAMM(address indexed caller, address indexed pool);
-    event QuantAMMWeightRunnerSet(address indexed weightRunner, bool allowed);
     event ETHUSDOracleSet(address ethUsdOracle);
     event PoolRuleSet(
         address rule,
@@ -93,6 +96,12 @@ contract UpdateWeightRunner is Ownable2Step {
 
     OracleWrapper private ethOracle;
 
+    uint256 private constant MASK_POOL_PERFORM_UPDATE = 1;
+    uint256 private constant MASK_POOL_GET_DATA = 2;
+    uint256 private constant MASK_POOL_DAO_WEIGHT_UPDATES = 4;
+    uint256 private constant MASK_POOL_OWNER_UPDATES = 8;
+    uint256 private constant MASK_POOL_QUANTAMM_ADMIN_UPDATES = 16;
+
     constructor(address _quantammAdmin, address _ethOracle) Ownable(msg.sender) {
         quantammAdmin = _quantammAdmin;
         ethOracle = OracleWrapper(_ethOracle);
@@ -108,9 +117,6 @@ contract UpdateWeightRunner is Ownable2Step {
 
     /// @notice Mapping of pool backup oracles keyed by pool address for each asset in the pool (in order of priority)
     mapping(address => address[][]) public poolBackupOracles;
-
-    /// @notice Mapping of external addresses that are owned by the protocol and can call performUpdateQuantAMM
-    mapping(address => bool) public quantAMMWeightRunners;
 
     /// @notice Get the happy path primary oracles for the constituents of a pool
     /// @param _poolAddress Address of the pool
@@ -130,8 +136,17 @@ contract UpdateWeightRunner is Ownable2Step {
         return poolRuleSettings[_poolAddress];
     }
 
+    /// @notice Get the actions a pool has been approved for
+    /// @param _poolAddress Address of the pool
+    function getPoolApprovedActions(address _poolAddress) public view returns (uint256) {
+        return approvedPoolActions[_poolAddress];
+    }
+
     /// @notice List of approved oracles that can be used for updating weights.
     mapping(address => bool) public approvedOracles;
+
+    /// @notice Mapping of actions approved for a pool by the QuantAMM protocol team.
+    mapping(address => uint256) public approvedPoolActions;
 
     /// @notice mapping keyed of oracle address to staleness threshold in seconds. Created for gas efficincy.
     mapping(address => uint) public ruleOracleStalenessThreshold;
@@ -147,9 +162,11 @@ contract UpdateWeightRunner is Ownable2Step {
 
     /// @notice Add a new oracle to the available oracles
     /// @param _oracle Oracle to add
-    function addOracle(OracleWrapper _oracle) external onlyOwner {
+    function addOracle(OracleWrapper _oracle) external {
         address oracleAddress = address(_oracle);
         require(oracleAddress != address(0), "Invalid oracle address");
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
+
         if (!approvedOracles[oracleAddress]) {
             approvedOracles[oracleAddress] = true;
         } else {
@@ -160,9 +177,15 @@ contract UpdateWeightRunner is Ownable2Step {
 
     /// @notice Removes an existing oracle from the approved oracles
     /// @param _oracleToRemove The oracle to remove
-    function removeOracle(OracleWrapper _oracleToRemove) external onlyOwner {
+    function removeOracle(OracleWrapper _oracleToRemove) external {
         approvedOracles[address(_oracleToRemove)] = false;
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
         emit OracleRemved(address(_oracleToRemove));
+    }
+
+    function setApprovedActionsForPool(address _pool, uint256 _actions) external {
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
+        approvedPoolActions[_pool] = _actions;
     }
 
     /// @notice Set a rule for a pool, called by the pool
@@ -215,30 +238,30 @@ contract UpdateWeightRunner is Ownable2Step {
         //Main external access point to trigger an update
         address rule = address(rules[_pool]);
         require(rule != address(0), "Pool not registered");
+        
         PoolRuleSettings memory settings = poolRuleSettings[_pool];
 
         require(
             block.timestamp - settings.timingSettings.lastPoolUpdateRun >= settings.timingSettings.updateInterval,
             "Update not allowed"
         );
-        _performUpdateAndGetData(_pool, settings);
 
-        // emit event for easier tracking of updates and to allow for easier querying of updates
-        emit UpdatePerformed(msg.sender, _pool);
-    }
+        uint256 poolRegistryEntry = approvedPoolActions[_pool];
+        if(poolRegistryEntry & MASK_POOL_PERFORM_UPDATE > 0){            
+            _performUpdateAndGetData(_pool, settings);
 
-    /// @notice Allow / disallow an address to call performUpdateQuantAMM
-    /// @param _weightRunner the target runner address
-    /// @param _allowed whether or not it is considered a quantamm owned address
-    function setQuantAMMWeightRunner(address _weightRunner, bool _allowed) public onlyOwner {
-        require(quantAMMWeightRunners[_weightRunner] != _allowed, "Already set");
-        quantAMMWeightRunners[_weightRunner] = _allowed;
-        emit QuantAMMWeightRunnerSet(_weightRunner, _allowed);
+            // emit event for easier tracking of updates and to allow for easier querying of updates
+            emit UpdatePerformed(msg.sender, _pool);
+        }
+        else{
+            revert("Pool not approved to perform update");
+        }
     }
 
     /// @notice Change the ETH/USD oracle
     /// @param _ethUsdOracle The new oracle address to use for ETH/USD
-    function setETHUSDOracle(address _ethUsdOracle) public onlyOwner {
+    function setETHUSDOracle(address _ethUsdOracle) public {
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
         ethOracle = OracleWrapper(_ethUsdOracle);
         emit ETHUSDOracleSet(_ethUsdOracle);
     }
@@ -247,14 +270,13 @@ contract UpdateWeightRunner is Ownable2Step {
     /// @param _poolAddress the target pool address
     /// @param _time the time to initialise the last update run to
     function InitialisePoolLastRunTime(address _poolAddress, uint40 _time) external {
-        uint256 MASK_POOL_DAO_WEIGHT_UPDATES = 32;
-        uint256 poolRegistryEntry = IQuantAMMWeightedPool(_poolAddress).poolRegistry(_poolAddress);
+        uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
 
         //current breakglass settings allow for dao or pool creator trigger. This is subject to review
         if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
             address daoRunner = QuantAMMBaseAdministration(quantammAdmin).daoRunner();
             require(msg.sender == daoRunner, "ONLYDAO");
-        } else {
+        } else if (poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0) {
             require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
         }
         poolRuleSettings[_poolAddress].timingSettings.lastPoolUpdateRun = _time;
@@ -272,7 +294,9 @@ contract UpdateWeightRunner is Ownable2Step {
 
     /// @notice Get the data for a pool from the oracles and return it in the same order as the assets in the pool
     /// @param _pool Pool to get data for
-    function getData(address _pool) public view returns (int256[] memory outputData) {
+    function getData(address _pool) public returns (int256[] memory outputData) {
+        bool internalCall = msg.sender != address(this);
+        require(internalCall || approvedPoolActions[_pool] & MASK_POOL_GET_DATA > 0, "Not allowed to get data");
         //optimised == happy path, optimised into a different array to save gas
         address[] memory optimisedOracles = poolOracles[_pool];
         uint oracleLength = optimisedOracles.length;
@@ -314,6 +338,10 @@ contract UpdateWeightRunner is Ownable2Step {
             unchecked {
                 ++i;
             }
+        }
+
+        if(!internalCall){
+            emit GetData(msg.sender, _pool);
         }
     }
 
@@ -437,16 +465,22 @@ contract UpdateWeightRunner is Ownable2Step {
         address _poolAddress,
         uint40 _lastInterpolationTimePossible
     ) external {
-        uint256 MASK_POOL_DAO_WEIGHT_UPDATES = 32;
-        uint256 poolRegistryEntry = IQuantAMMWeightedPool(_poolAddress).poolRegistry(_poolAddress);
+        uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
         if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
             address daoRunner = QuantAMMBaseAdministration(quantammAdmin).daoRunner();
             require(msg.sender == daoRunner, "ONLYDAO");
-        } else {
+        } else if(poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0){
             require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
+        }else if(poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0){
+            require(msg.sender == quantammAdmin, "ONLYADMIN");
+        }
+        else {
+            revert("No permission to set weight values");
         }
 
         IQuantAMMWeightedPool(_poolAddress).setWeights(_weights, _poolAddress, _lastInterpolationTimePossible);
+
+        emit SetWeightManual(msg.sender, _poolAddress, _weights, _lastInterpolationTimePossible);
     }
 
     /// @notice Breakglass function to allow the DAO or the pool manager to set the intermediate values of the rule manually
@@ -460,19 +494,26 @@ contract UpdateWeightRunner is Ownable2Step {
         int256[] memory _newParameters,
         uint _numberOfAssets
     ) external {
-        uint256 MASK_POOL_DAO_WEIGHT_UPDATES = 32;
-        uint256 poolRegistryEntry = IQuantAMMWeightedPool(_poolAddress).poolRegistry(_poolAddress);
+        uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
 
         //Who can trigger these very powerful breakglass features is under review
         if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
             address daoRunner = QuantAMMBaseAdministration(quantammAdmin).daoRunner();
             require(msg.sender == daoRunner, "ONLYDAO");
-        } else {
+        } else if(poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0){
             require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
+        } else if(poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0){
+            require(msg.sender == quantammAdmin, "ONLYADMIN");
         }
+        else {
+            revert("No permission to set intermediate values");
+        }
+
         IUpdateRule rule = rules[_poolAddress];
 
         // utilises the base function so that manual updates go through the standard process
         rule.initialisePoolRuleIntermediateValues(_poolAddress, _newMovingAverages, _newParameters, _numberOfAssets);
+
+        emit SetIntermediateValuesManually(msg.sender, _poolAddress, _newMovingAverages, _newParameters, _numberOfAssets);
     }
 }

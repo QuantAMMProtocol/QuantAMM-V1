@@ -100,6 +100,7 @@ contract QuantAMMWeightedPool is
         uint256 numTokens;
         string version;
         address updateWeightRunner;
+        uint256 poolRegistry;
     }
 
     ///@dev Emitted when the weights of the pool are updated
@@ -113,9 +114,6 @@ contract QuantAMMWeightedPool is
 
     /// @dev Indicates that the maximum allowed trade size has been exceeded.
     error maxTradeSizeRatioExceeded();
-
-    ///@dev How many base assets are included in the pool, between 0 and assets.length
-    uint numTotalAssets;
 
     ///@dev The parameters for the rule, validated in each rule separately during set rule
     int256[][] public ruleParameters;
@@ -137,6 +135,9 @@ contract QuantAMMWeightedPool is
 
     ///@dev the maximum amount of time that an oracle an be stale.
     uint oracleStalenessThreshold;
+
+    ///@dev the admin functionality enabled for this pool.
+    uint256 public poolRegistry;
 
     ///@dev The assets of the pool. If the pool is a composite pool, contains the LP tokens of those pools
     IERC20[] public assets;
@@ -558,14 +559,6 @@ contract QuantAMMWeightedPool is
         emit WeightsUpdated(_poolAddress, _weights);
     }
 
-    /// @inheritdoc IQuantAMMWeightedPool
-    function poolRegistry(address _poolAddress) external view override returns (uint256) {
-        if (_poolAddress == address(this)) {
-            return uint256(1);
-        }
-        return uint256(1);
-    }
-
     /// @notice the initialising function during registration of the pool with the vault to set the initial weights
     /// @param _weights the target weights
     function _setInitialWeights(int256[] memory _weights) internal {
@@ -628,7 +621,6 @@ contract QuantAMMWeightedPool is
         require(_poolSettings.assets.length > 0 && _poolSettings.assets.length == _initialWeights.length, "INVASSWEIG"); //Invalid assets / weights array
 
         assets = _poolSettings.assets;
-        numTotalAssets = _poolSettings.assets.length;
 
         oracleStalenessThreshold = _oracleStalenessThreshold;
 

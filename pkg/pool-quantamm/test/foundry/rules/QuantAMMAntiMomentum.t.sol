@@ -33,11 +33,10 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         // Simulate setting number of assets and calculating intermediate values
         mockPool.setNumberOfAssets(numAssets);
         rule.initialisePoolRuleIntermediateValues(address(mockPool), prevMovingAverages, previousAlphas, numAssets);
-        console.log("8");
+        
         // Run calculation for unguarded weights
         rule.CalculateUnguardedWeights(prevWeights, data, address(mockPool), parameters, lambdas, movingAverages);
-        console.log("9");
-
+        
         //does not throw.
     }
 

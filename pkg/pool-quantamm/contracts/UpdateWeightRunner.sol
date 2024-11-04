@@ -55,6 +55,7 @@ contract UpdateWeightRunner is Ownable2Step {
     event SetIntermediateValuesManually(address indexed caller, address indexed pool, int256[] newMovingAverages, int256[] newParameters, uint numberOfAssets);
     event UpdatePerformed(address indexed caller, address indexed pool);
     event UpdatePerformedQuantAMM(address indexed caller, address indexed pool);
+    event SetApprovedActionsForPool(address indexed caller, address indexed pool, uint256 actions);
     event ETHUSDOracleSet(address ethUsdOracle);
     event PoolRuleSet(
         address rule,
@@ -186,6 +187,7 @@ contract UpdateWeightRunner is Ownable2Step {
     function setApprovedActionsForPool(address _pool, uint256 _actions) external {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
         approvedPoolActions[_pool] = _actions;
+        emit SetApprovedActionsForPool(msg.sender, _pool, _actions);
     }
 
     /// @notice Set a rule for a pool, called by the pool

@@ -82,15 +82,6 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
-        console.log(Strings.toString(weights[0]));
-        console.log(Strings.toString(weights[1]));
-        console.log(Strings.toString(weights[2]));
-        console.log(Strings.toString(weights[3]));
-        console.log(Strings.toString(weights[4]));
-        console.log(Strings.toString(weights[5]));
-        console.log(Strings.toString(weights[6]));
-        console.log(Strings.toString(weights[7]));
-
         assert(weights[0] == 0.125e18);
         assert(weights[1] == 0.125e18);
         assert(weights[2] == 0.125e18);
@@ -226,7 +217,6 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
             uint256(1.2e18)
         );
 
-        console.log(Strings.toString(newBalance));
         assert(newBalance == expected);
     }
 
@@ -326,7 +316,6 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
 
-        console.log(Strings.toString(newBalance));
         assert(newBalance == expected);
     }
 
@@ -426,7 +415,6 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
 
-        console.log(Strings.toString(newBalance));
         assert(newBalance == expected);
     }
 

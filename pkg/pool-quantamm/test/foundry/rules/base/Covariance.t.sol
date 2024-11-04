@@ -71,7 +71,6 @@ contract QuantAMMVarianceTest is Test, QuantAMMTestUtils {
     ) internal pure {
         uint256 n = priceData[0].length;
         for (uint256 i = 0; i < res.length; i++) {
-            //console.log("[");
             for (uint256 j = 0; j < n; j++) {
                 for (uint256 k = 0; k < n; k++) {
                     assertEq(res[i][j][k], expectedRes[i][j][k], "Values are not the same");

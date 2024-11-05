@@ -47,11 +47,7 @@ interface IQuantAMMWeightedPool {
         address _poolAddress,
         uint40 _lastInterpolationTimePossible
     ) external;
-
-    /// @notice used to view the pool address for a given pool settings hash if the pool is registered with the quantammBase
-    /// @param _poolAddress the address of the pool to get the settings hash for
-    function poolRegistry(address _poolAddress) external view returns (uint256);
-
+    
     /// @notice the acceptable number of blocks behind the current that an oracle value can be
     function getOracleStalenessThreshold() external view returns (uint);
 }

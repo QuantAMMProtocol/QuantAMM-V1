@@ -28,6 +28,20 @@ contract MockIdentityRule is IUpdateRule {
 
     uint16 private constant REQUIRES_PREV_MAVG = 0;
 
+    int256[] public movingAverages;
+
+    int256[] public intermediateValues;
+
+    uint public numberOfAssets;
+
+    function getMovingAverages() external view returns (int256[] memory) {
+        return movingAverages;
+    }
+
+    function getIntermediateValues() external view returns (int256[] memory) {
+        return intermediateValues;
+    }
+
     function CalculateNewWeights(
         int256[] calldata prevWeights,
         int256[] calldata /*data*/,
@@ -42,11 +56,15 @@ contract MockIdentityRule is IUpdateRule {
     }
 
     function initialisePoolRuleIntermediateValues(
-        address poolAddress,
+        address /*pool*/,
         int256[] memory _newMovingAverages,
         int256[] memory _newParameters,
         uint _numberOfAssets
-    ) external override {}
+    ) external override {
+        movingAverages = _newMovingAverages;
+        intermediateValues = _newParameters;
+        numberOfAssets = _numberOfAssets;
+    }
 
     /// @notice Check if the given parameters are valid for the rule
     function validParameters(int256[][] calldata /*parameters*/) external pure override returns (bool) {

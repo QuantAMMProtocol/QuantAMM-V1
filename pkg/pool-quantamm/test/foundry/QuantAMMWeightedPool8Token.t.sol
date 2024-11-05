@@ -591,7 +591,8 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
             ),
             initialWeights,
             initialWeights,
-            3600
+            3600,
+            0
         );
     }
 }

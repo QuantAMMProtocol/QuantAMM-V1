@@ -46,7 +46,6 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     uint40 lastInterpolationTimePossible;
 
     uint numBaseAssets; // How many base assets are included in the pool, between 0 and assets.length
-    uint numTotalAssets;
 
     int256[][] public ruleParameters; // Arbitrary parameters that are passed to the rule
 
@@ -62,6 +61,8 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
 
     address poolAddress;
 
+    uint256 public poolRegistry;
+
     IERC20[] public assets; // The assets of the pool. If the pool is a composite pool, contains the LP tokens of those pools
 
     UpdateWeightRunner internal immutable updateWeightRunner;
@@ -75,8 +76,6 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
         lastInterpolationTimePossible = _lastInterpolationTimePossible;
         poolAddress = _poolAddress;
     }
-
-    function poolRegistry(address _poolAddress) external view override returns (uint256) {}
 
     function getMinimumSwapFeePercentage() external view override returns (uint256) {}
 
@@ -118,6 +117,11 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     function setRuleForPool(PoolSettings calldata _settings) external {
         UpdateWeightRunner(updateWeightRunner).setRuleForPool(_settings);
     }
+
+    function setPoolRegistry(uint256 _poolRegistry) external {
+        poolRegistry = _poolRegistry;
+    }
+    
     function getOracleStalenessThreshold() external view override returns (uint) {
         return oracleStalenessThreshold;
     }

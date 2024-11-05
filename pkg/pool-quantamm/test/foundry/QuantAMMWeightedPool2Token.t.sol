@@ -45,10 +45,9 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
     address internal addr2;
 
     function setUp() public override {
-
         int216 fixedValue = 1000;
         uint delay = 3600;
-        
+
         super.setUp();
         (address ownerLocal, address addr1Local, address addr2Local) = (vm.addr(1), vm.addr(2), vm.addr(3));
         owner = ownerLocal;
@@ -64,12 +63,17 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
 
         vm.stopPrank();
 
-        quantAMMWeightedPoolFactory = deployQuantAMMWeightedPoolFactory(IVault(address(vault)), 365 days, "Factory v1", "Pool v1", address(updateWeightRunner));
+        quantAMMWeightedPoolFactory = deployQuantAMMWeightedPoolFactory(
+            IVault(address(vault)),
+            365 days,
+            "Factory v1",
+            "Pool v1",
+            address(updateWeightRunner)
+        );
         vm.label(address(quantAMMWeightedPoolFactory), "quantamm weighted pool factory");
 
         (daiIdx, usdcIdx) = getSortedIndexes(address(dai), address(usdc));
     }
-
 
     function testQuantAMMWeightedPoolGetNormalizedWeightsInitial() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
@@ -96,10 +100,14 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[3] = 0e18;
 
         vm.prank(address(updateWeightRunner));
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
-        
+
         assert(weights[0] == 0.6e18);
         assert(weights[1] == 0.4e18);
     }
@@ -116,7 +124,11 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[2] = 0.001e18;
         newWeights[3] = 0.001e18;
 
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         vm.warp(block.timestamp + 2);
 
@@ -125,7 +137,6 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(weights[0] == 0.6e18 + 0.002e18);
         assert(weights[1] == 0.4e18 + 0.002e18);
     }
-
 
     function testQuantWeightedPoolGetNormalizedWeightSetWeightAfterLimit() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
@@ -139,7 +150,11 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[2] = 0.001e18;
         newWeights[3] = 0.001e18;
 
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         vm.warp(block.timestamp + 7);
 
@@ -161,14 +176,18 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[3] = 0e18;
 
         vm.prank(address(updateWeightRunner));
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         uint256[] memory balances = new uint256[](2);
         balances[0] = 1000e18;
         balances[1] = 2000e18;
 
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).computeBalance(balances, 0, uint256(1.2e18));
-        
+
         assert(newBalance == 1355.091881588694578000e18);
     }
 
@@ -184,7 +203,11 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[2] = 0.001e18;
         newWeights[3] = 0.001e18;
 
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         vm.warp(block.timestamp + 2);
 
@@ -193,10 +216,9 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         balances[1] = 2000e18;
 
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).computeBalance(balances, 0, uint256(1.2e18));
-        
+
         assert(newBalance == 1353.724562681596718000e18);
     }
-
 
     function testQuantWeightedPoolGetNormalizedWeightComputeBalanceAfterLimit() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
@@ -210,7 +232,11 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[2] = 0.001e18;
         newWeights[3] = 0.001e18;
 
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         vm.warp(block.timestamp + 7);
 
@@ -219,7 +245,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         balances[1] = 2000e18;
 
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).computeBalance(balances, 0, uint256(1.2e18));
-        
+
         assert(newBalance == 1351.693086891767401000e18);
     }
 
@@ -235,25 +261,28 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[3] = 0e18;
 
         vm.prank(address(updateWeightRunner));
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         uint256[] memory balances = new uint256[](2);
         balances[0] = 1000e18;
         balances[1] = 2000e18;
 
-        PoolSwapParams memory swapParams = PoolSwapParams(
-            {
-                kind: SwapKind.EXACT_IN,
-                amountGivenScaled18: 100e18,
-                balancesScaled18: balances,
-                indexIn: 0,
-                indexOut: 1,
-                router: address(router),
-                userData: abi.encode(0)
-            });
+        PoolSwapParams memory swapParams = PoolSwapParams({
+            kind: SwapKind.EXACT_IN,
+            amountGivenScaled18: 100e18,
+            balancesScaled18: balances,
+            indexIn: 0,
+            indexOut: 1,
+            router: address(router),
+            userData: abi.encode(0)
+        });
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
-        
+
         assert(newBalance == 266.431655917087542000e18);
     }
 
@@ -269,7 +298,11 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[2] = 0.001e18;
         newWeights[3] = 0.001e18;
 
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         vm.warp(block.timestamp + 2);
 
@@ -277,22 +310,20 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         balances[0] = 1000e18;
         balances[1] = 2000e18;
 
-        PoolSwapParams memory swapParams = PoolSwapParams(
-            {
-                kind: SwapKind.EXACT_IN,
-                amountGivenScaled18: 100e18,
-                balancesScaled18: balances,
-                indexIn: 0,
-                indexOut: 1,
-                router: address(router),
-                userData: abi.encode(0)
-            });
+        PoolSwapParams memory swapParams = PoolSwapParams({
+            kind: SwapKind.EXACT_IN,
+            amountGivenScaled18: 100e18,
+            balancesScaled18: balances,
+            indexIn: 0,
+            indexOut: 1,
+            router: address(router),
+            userData: abi.encode(0)
+        });
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
-        
+
         assert(newBalance == 266.020595471997916000e18);
     }
-
 
     function testQuantWeightedPoolGetNormalizedWeightOnSwapOutGivenInAfterLimit() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
@@ -306,7 +337,11 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[2] = 0.001e18;
         newWeights[3] = 0.001e18;
 
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         vm.warp(block.timestamp + 7);
 
@@ -314,19 +349,18 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         balances[0] = 1000e18;
         balances[1] = 2000e18;
 
-        PoolSwapParams memory swapParams = PoolSwapParams(
-            {
-                kind: SwapKind.EXACT_IN,
-                amountGivenScaled18: 100e18,
-                balancesScaled18: balances,
-                indexIn: 0,
-                indexOut: 1,
-                router: address(router),
-                userData: abi.encode(0)
-            });
+        PoolSwapParams memory swapParams = PoolSwapParams({
+            kind: SwapKind.EXACT_IN,
+            amountGivenScaled18: 100e18,
+            balancesScaled18: balances,
+            indexIn: 0,
+            indexOut: 1,
+            router: address(router),
+            userData: abi.encode(0)
+        });
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
-        
+
         assert(newBalance == 265.411437865277198000e18);
     }
 
@@ -342,25 +376,28 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[3] = 0e18;
 
         vm.prank(address(updateWeightRunner));
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         uint256[] memory balances = new uint256[](2);
         balances[0] = 1000e18;
         balances[1] = 2000e18;
 
-        PoolSwapParams memory swapParams = PoolSwapParams(
-            {
-                kind: SwapKind.EXACT_OUT,
-                amountGivenScaled18: 100e18,
-                balancesScaled18: balances,
-                indexIn: 0,
-                indexOut: 1,
-                router: address(router),
-                userData: abi.encode(0)
-            });
+        PoolSwapParams memory swapParams = PoolSwapParams({
+            kind: SwapKind.EXACT_OUT,
+            amountGivenScaled18: 100e18,
+            balancesScaled18: balances,
+            indexIn: 0,
+            indexOut: 1,
+            router: address(router),
+            userData: abi.encode(0)
+        });
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
-        
+
         assert(newBalance == 34.786918412177192000e18);
     }
 
@@ -376,7 +413,11 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[2] = 0.001e18;
         newWeights[3] = 0.001e18;
 
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         vm.warp(block.timestamp + 2);
 
@@ -384,22 +425,20 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         balances[0] = 1000e18;
         balances[1] = 2000e18;
 
-        PoolSwapParams memory swapParams = PoolSwapParams(
-            {
-                kind: SwapKind.EXACT_OUT,
-                amountGivenScaled18: 100e18,
-                balancesScaled18: balances,
-                indexIn: 0,
-                indexOut: 1,
-                router: address(router),
-                userData: abi.encode(0)
-            });
+        PoolSwapParams memory swapParams = PoolSwapParams({
+            kind: SwapKind.EXACT_OUT,
+            amountGivenScaled18: 100e18,
+            balancesScaled18: balances,
+            indexIn: 0,
+            indexOut: 1,
+            router: address(router),
+            userData: abi.encode(0)
+        });
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
-        
+
         assert(newBalance == 34.845699295402889000e18);
     }
-
 
     function testQuantWeightedPoolGetNormalizedWeightOnSwapInGivenOutAfterLimit() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
@@ -413,7 +452,11 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         newWeights[2] = 0.001e18;
         newWeights[3] = 0.001e18;
 
-        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(newWeights, quantAMMWeightedPool, uint40(block.timestamp + 5));
+        QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+            newWeights,
+            quantAMMWeightedPool,
+            uint40(block.timestamp + 5)
+        );
 
         vm.warp(block.timestamp + 7);
 
@@ -421,19 +464,18 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         balances[0] = 1000e18;
         balances[1] = 2000e18;
 
-        PoolSwapParams memory swapParams = PoolSwapParams(
-            {
-                kind: SwapKind.EXACT_OUT,
-                amountGivenScaled18: 100e18,
-                balancesScaled18: balances,
-                indexIn: 0,
-                indexOut: 1,
-                router: address(router),
-                userData: abi.encode(0)
-            });
+        PoolSwapParams memory swapParams = PoolSwapParams({
+            kind: SwapKind.EXACT_OUT,
+            amountGivenScaled18: 100e18,
+            balancesScaled18: balances,
+            indexIn: 0,
+            indexOut: 1,
+            router: address(router),
+            userData: abi.encode(0)
+        });
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
-        
+
         assert(newBalance == 34.933148109829107000e18);
     }
 
@@ -441,8 +483,8 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         MockChainlinkOracle oracle = new MockChainlinkOracle(fixedValue, delay);
         return oracle;
     }
-    
-    function _createPoolParams() internal returns(QuantAMMWeightedPoolFactory.NewPoolParams memory retParams){
+
+    function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
         PoolRoleAccounts memory roleAccounts;
         IERC20[] memory tokens = [address(dai), address(usdc)].toMemoryArray().asIERC20();
         MockMomentumRule momentumRule = new MockMomentumRule(owner);
@@ -456,7 +498,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         initialWeights[1] = 0.5e18;
         uint256[] memory initialWeightsUint = new uint256[](2);
         initialWeightsUint[0] = 0.5e18;
-        initialWeightsUint[1] = 0.5e18; 
+        initialWeightsUint[1] = 0.5e18;
 
         uint64[] memory lambdas = new uint64[](1);
         lambdas[0] = 0.2e18;
@@ -469,7 +511,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         oracles[0][0] = address(chainlinkOracle);
 
         retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
-            "Pool With Donation" ,
+            "Pool With Donation",
             "PwD",
             vault.buildTokenConfig(tokens),
             initialWeightsUint,
@@ -497,6 +539,6 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
             initialWeights,
             initialWeights,
             3600
-            );
+        );
     }
 }

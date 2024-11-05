@@ -27,19 +27,15 @@ contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
         int256[][] calldata _parameters, //[0]=Λ
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {
-
         _poolParameters.numberOfAssets = _prevWeights.length;
 
         //reuse of the newWeights array allows for saved gas in array initialisation
-        int256[] memory newWeights = _calculateQuantAMMVariance(
-            _data,
-            _poolParameters
-        );
+        int256[] memory newWeights = _calculateQuantAMMVariance(_data, _poolParameters);
 
         int256 divisionFactor;
         newWeightsConverted = new int256[](_prevWeights.length);
 
-        if(_parameters[0].length == 1){
+        if (_parameters[0].length == 1) {
             int256 mixingVariance = _parameters[0][0];
             // calculating (1 − Λ)*Σ^−1(t)
             int256 oneMinusLambda = ONE - mixingVariance;
@@ -55,20 +51,18 @@ contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
             // Divide precision vector by the sum of precisions and add Λw(t - 1)
             // (Λ * w(t − 1)) + ((1 − Λ)*Σ^−1(t)) / N,j=1∑ Σ^−1 j(t)
             for (uint i; i < _prevWeights.length; ) {
-                int256 res = mixingVariance.mul(int256(_prevWeights[i])) +
-                    newWeights[i].div(divisionFactor);
+                int256 res = mixingVariance.mul(int256(_prevWeights[i])) + newWeights[i].div(divisionFactor);
                 newWeightsConverted[i] = res;
                 unchecked {
                     ++i;
                 }
             }
-        }
-        else{
+        } else {
             // calculating (1 − Λ)*Σ^−1(t)
             for (uint i; i < _prevWeights.length; ) {
                 int256 mixingVariance = _parameters[0][i];
                 int256 oneMinusLambda = ONE - mixingVariance;
-                            int256 precision = ONE.div(newWeights[i]);
+                int256 precision = ONE.div(newWeights[i]);
                 divisionFactor += precision;
                 newWeights[i] = oneMinusLambda.mul(precision);
                 unchecked {
@@ -80,8 +74,7 @@ contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
             // (Λ * w(t − 1)) + ((1 − Λ)*Σ^−1(t)) / N,j=1∑ Σ^−1 j(t)
             for (uint i; i < _prevWeights.length; ) {
                 int256 mixingVariance = _parameters[0][i];
-                int256 res = mixingVariance.mul(int256(_prevWeights[i])) +
-                    newWeights[i].div(divisionFactor);
+                int256 res = mixingVariance.mul(int256(_prevWeights[i])) + newWeights[i].div(divisionFactor);
                 newWeightsConverted[i] = res;
                 unchecked {
                     ++i;
@@ -103,26 +96,19 @@ contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
         _setIntermediateVariance(_poolAddress, _initialValues, _numberOfAssets);
     }
 
-    function _requiresPrevMovingAverage()
-        internal
-        pure
-        override
-        returns (uint16)
-    {
+    function _requiresPrevMovingAverage() internal pure override returns (uint16) {
         return REQUIRES_PREV_MAVG;
     }
 
     /// @notice Check if the given parameters are valid for the rule
     /// @dev If parameters are not valid, either reverts or returns false
-    function validParameters(
-        int256[][] calldata _parameters
-    ) external pure override returns (bool) {
+    function validParameters(int256[][] calldata _parameters) external pure override returns (bool) {
         if (_parameters.length == 1 && _parameters[0].length >= 1) {
-            for(uint i; i < _parameters[0].length;){
-                if(_parameters[0][i] < 0 || _parameters[0][i] > ONE){
+            for (uint i; i < _parameters[0].length; ) {
+                if (_parameters[0][i] < 0 || _parameters[0][i] > ONE) {
                     return false;
                 }
-                unchecked{
+                unchecked {
                     ++i;
                 }
             }

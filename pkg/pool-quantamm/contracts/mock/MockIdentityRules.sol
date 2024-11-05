@@ -49,9 +49,7 @@ contract MockIdentityRule is IUpdateRule {
     ) external override {}
 
     /// @notice Check if the given parameters are valid for the rule
-    function validParameters(
-        int256[][] calldata /*parameters*/
-    ) external pure override returns (bool) {
+    function validParameters(int256[][] calldata /*parameters*/) external pure override returns (bool) {
         return true;
     }
 

@@ -19,13 +19,8 @@ contract MockChainlinkOracle is OracleWrapper {
         oracleTimestamp = _timestamp;
     }
 
-    function _getData()
-        internal
-        view
-        override
-        returns (int216 data, uint40 timestamp)
-    {
+    function _getData() internal view override returns (int216 data, uint40 timestamp) {
         data = fixedReply;
-        timestamp = uint40(block.timestamp - delay) ;
+        timestamp = uint40(block.timestamp - delay);
     }
 }

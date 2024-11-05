@@ -2,33 +2,19 @@
 pragma solidity ^0.8.24;
 import "../QuantAMMStorage.sol";
 
-
-
-contract MockQuantAMMStorage is
-    ScalarRuleQuantAMMStorage,
-    ScalarQuantAMMBaseStorage,
-    VectorRuleQuantAMMStorage
-{
+contract MockQuantAMMStorage is ScalarRuleQuantAMMStorage, ScalarQuantAMMBaseStorage, VectorRuleQuantAMMStorage {
     int256[] public mockQuantAMMMatrix;
     int256[][] public matrixResult;
 
-    function ExternalEncode(
-        int256 leftInt,
-        int256 rightInt
-    ) external pure returns (int256 result) {
+    function ExternalEncode(int256 leftInt, int256 rightInt) external pure returns (int256 result) {
         result = _quantAMMPackTwo128(leftInt, rightInt);
     }
 
-    function ExternalEncode(
-        int64 leftInt,
-        int128 rightInt
-    ) external pure returns (int256 result) {
+    function ExternalEncode(int64 leftInt, int128 rightInt) external pure returns (int256 result) {
         result = _quantAMMPackTwo128(leftInt, rightInt);
     }
 
-    function ExternalEncodeArray(
-        int256[] memory sourceArray
-    ) external pure returns (int256[] memory result) {
+    function ExternalEncodeArray(int256[] memory sourceArray) external pure returns (int256[] memory result) {
         result = _quantAMMPack128Array(sourceArray);
     }
 
@@ -51,16 +37,12 @@ contract MockQuantAMMStorage is
         result = result2;
     }
 
-    function ExternalEncodeDecodeMatrix(
-        int256[][] memory sourceMatrix
-    ) external {
+    function ExternalEncodeDecodeMatrix(int256[][] memory sourceMatrix) external {
         uint storageLength;
         if ((sourceMatrix.length * sourceMatrix.length) % 2 == 0) {
             storageLength = (sourceMatrix.length * sourceMatrix.length) / 2;
         } else {
-            storageLength =
-                ((sourceMatrix.length * sourceMatrix.length) - 1) /
-                2;
+            storageLength = ((sourceMatrix.length * sourceMatrix.length) - 1) / 2;
             ++storageLength;
         }
         mockQuantAMMMatrix = new int256[](storageLength);
@@ -72,10 +54,7 @@ contract MockQuantAMMStorage is
         return matrixResult;
     }
 
-    function ExternalSingleEncode(
-        int256 leftInt,
-        int256 rightInt
-    ) external pure returns (int256 result) {
+    function ExternalSingleEncode(int256 leftInt, int256 rightInt) external pure returns (int256 result) {
         result = _quantAMMPackTwo128(leftInt, rightInt);
     }
 
@@ -86,9 +65,7 @@ contract MockQuantAMMStorage is
         resultArray = _quantAMMUnpack128Array(sourceArray, resultArrayLength);
     }
 
-    function ExternalSingleDecode(
-        int256 leftInt
-    ) external pure returns (int256 result) {
+    function ExternalSingleDecode(int256 leftInt) external pure returns (int256 result) {
         result = leftInt;
     }
 }

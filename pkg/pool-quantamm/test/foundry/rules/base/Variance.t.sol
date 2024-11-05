@@ -4,9 +4,9 @@ pragma solidity ^0.8.26;
 import "forge-std/Test.sol";
 import "@prb/math/contracts/PRBMathSD59x18.sol";
 
-import {MockCalculationRule} from "../../../../contracts/mock/MockCalculationRule.sol";
-import {MockPool} from "../../../../contracts/mock/MockPool.sol";
-import {MockQuantAMMMathGuard} from "../../../../contracts/mock/MockQuantAMMMathGuard.sol";
+import { MockCalculationRule } from "../../../../contracts/mock/MockCalculationRule.sol";
+import { MockPool } from "../../../../contracts/mock/MockPool.sol";
+import { MockQuantAMMMathGuard } from "../../../../contracts/mock/MockQuantAMMMathGuard.sol";
 
 import { QuantAMMTestUtils } from "../../utils.t.sol";
 
@@ -44,7 +44,7 @@ contract QuantAMMVarianceTest is Test, QuantAMMTestUtils {
         mockCalculationRule.setPrevMovingAverage(movingAverages[0]);
 
         int256[][] memory results = new int256[][](movingAverages.length);
-        
+
         for (uint256 i = 0; i < movingAverages.length; ++i) {
             if (i > 0) {
                 mockCalculationRule.setPrevMovingAverage(movingAverages[i - 1]);
@@ -73,7 +73,7 @@ contract QuantAMMVarianceTest is Test, QuantAMMTestUtils {
         for (uint256 i = 0; i < priceData.length; i++) {
             for (uint256 j = 0; j < priceData[i].length; j++) {
                 assertEq(expectedRes[i][j], res[i][j]); // Compare for exact equality
-            }            
+            }
         }
     }
 
@@ -81,39 +81,65 @@ contract QuantAMMVarianceTest is Test, QuantAMMTestUtils {
     // 2 tokens
     function testVarianceCalculation2Tokens() public {
         mockPool.setNumberOfAssets(2);
-        int256[][] memory priceData = convert2DArrayToDynamic([
-            [PRBMathSD59x18.fromInt(1000), PRBMathSD59x18.fromInt(1000)],
-            [PRBMathSD59x18.fromInt(1100), PRBMathSD59x18.fromInt(1100)],
-            [PRBMathSD59x18.fromInt(1109), PRBMathSD59x18.fromInt(1106)],
-            [PRBMathSD59x18.fromInt(1095), PRBMathSD59x18.fromInt(1098)]
-        ]);
+        int256[][] memory priceData = convert2DArrayToDynamic(
+            [
+                [PRBMathSD59x18.fromInt(1000), PRBMathSD59x18.fromInt(1000)],
+                [PRBMathSD59x18.fromInt(1100), PRBMathSD59x18.fromInt(1100)],
+                [PRBMathSD59x18.fromInt(1109), PRBMathSD59x18.fromInt(1106)],
+                [PRBMathSD59x18.fromInt(1095), PRBMathSD59x18.fromInt(1098)]
+            ]
+        );
 
-        int256[][] memory priceDataBn = convert2DArrayToDynamic([
-            [PRBMathSD59x18.fromInt(1000), PRBMathSD59x18.fromInt(1000)],
-            [PRBMathSD59x18.fromInt(1100), PRBMathSD59x18.fromInt(1100)],
-            [PRBMathSD59x18.fromInt(1109), PRBMathSD59x18.fromInt(1106)],
-            [PRBMathSD59x18.fromInt(1095), PRBMathSD59x18.fromInt(1098)]
-        ]);
+        int256[][] memory priceDataBn = convert2DArrayToDynamic(
+            [
+                [PRBMathSD59x18.fromInt(1000), PRBMathSD59x18.fromInt(1000)],
+                [PRBMathSD59x18.fromInt(1100), PRBMathSD59x18.fromInt(1100)],
+                [PRBMathSD59x18.fromInt(1109), PRBMathSD59x18.fromInt(1106)],
+                [PRBMathSD59x18.fromInt(1095), PRBMathSD59x18.fromInt(1098)]
+            ]
+        );
 
-        int256[][] memory movingAverages = convert2DArrayToDynamic([
-            [PRBMathSD59x18.fromInt(1000), PRBMathSD59x18.fromInt(1000), PRBMathSD59x18.fromInt(1000), PRBMathSD59x18.fromInt(1000)],
-            [PRBMathSD59x18.fromInt(1050), PRBMathSD59x18.fromInt(1050), PRBMathSD59x18.fromInt(1000), PRBMathSD59x18.fromInt(1000)],
-            [PRBMathSD59x18.fromInt(1079) + 5e17, PRBMathSD59x18.fromInt(1078), PRBMathSD59x18.fromInt(1050), PRBMathSD59x18.fromInt(1050)],
-            [PRBMathSD59x18.fromInt(1087) + 25e16, PRBMathSD59x18.fromInt(1088), PRBMathSD59x18.fromInt(1079) + 5e17, PRBMathSD59x18.fromInt(1078)]
-        ]);
+        int256[][] memory movingAverages = convert2DArrayToDynamic(
+            [
+                [
+                    PRBMathSD59x18.fromInt(1000),
+                    PRBMathSD59x18.fromInt(1000),
+                    PRBMathSD59x18.fromInt(1000),
+                    PRBMathSD59x18.fromInt(1000)
+                ],
+                [
+                    PRBMathSD59x18.fromInt(1050),
+                    PRBMathSD59x18.fromInt(1050),
+                    PRBMathSD59x18.fromInt(1000),
+                    PRBMathSD59x18.fromInt(1000)
+                ],
+                [
+                    PRBMathSD59x18.fromInt(1079) + 5e17,
+                    PRBMathSD59x18.fromInt(1078),
+                    PRBMathSD59x18.fromInt(1050),
+                    PRBMathSD59x18.fromInt(1050)
+                ],
+                [
+                    PRBMathSD59x18.fromInt(1087) + 25e16,
+                    PRBMathSD59x18.fromInt(1088),
+                    PRBMathSD59x18.fromInt(1079) + 5e17,
+                    PRBMathSD59x18.fromInt(1078)
+                ]
+            ]
+        );
 
         int256[] memory initialVariance = new int256[](2);
         initialVariance[0] = 0;
         initialVariance[1] = 0;
-        
 
-
-        int256[][] memory expectedRes = convert2DArrayToDynamic([
-            [PRBMathSD59x18.fromInt(0), PRBMathSD59x18.fromInt(0)],
-            [PRBMathSD59x18.fromInt(2500), PRBMathSD59x18.fromInt(2500)],
-            [PRBMathSD59x18.fromInt(2120) + 0.25e18, PRBMathSD59x18.fromInt(2034)],
-            [PRBMathSD59x18.fromInt(1120) + 0.1875e18, PRBMathSD59x18.fromInt(1117)]
-        ]);
+        int256[][] memory expectedRes = convert2DArrayToDynamic(
+            [
+                [PRBMathSD59x18.fromInt(0), PRBMathSD59x18.fromInt(0)],
+                [PRBMathSD59x18.fromInt(2500), PRBMathSD59x18.fromInt(2500)],
+                [PRBMathSD59x18.fromInt(2120) + 0.25e18, PRBMathSD59x18.fromInt(2034)],
+                [PRBMathSD59x18.fromInt(1120) + 0.1875e18, PRBMathSD59x18.fromInt(1117)]
+            ]
+        );
 
         testVariance(priceData, priceDataBn, movingAverages, initialVariance, expectedRes);
     }

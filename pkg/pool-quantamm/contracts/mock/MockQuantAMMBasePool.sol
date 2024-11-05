@@ -12,7 +12,12 @@ import {
 } from "@balancer-labs/v3-interfaces/contracts/vault/IUnbalancedLiquidityInvariantRatioBounds.sol";
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
 import { IVaultErrors } from "@balancer-labs/v3-interfaces/contracts/vault/IVaultErrors.sol";
-import { SwapKind, PoolSwapParams, PoolConfig, Rounding } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
+import {
+    SwapKind,
+    PoolSwapParams,
+    PoolConfig,
+    Rounding
+} from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 import { IBasePool } from "@balancer-labs/v3-interfaces/contracts/vault/IBasePool.sol";
 
 import { BalancerPoolToken } from "@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol";
@@ -27,7 +32,6 @@ import { ScalarQuantAMMBaseStorage } from "../QuantAMMStorage.sol";
 import "../rules/IUpdateRule.sol";
 import "../UpdateWeightRunner.sol";
 
-
 contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     constructor(uint16 _updateInterval, address _updateWeightRunner) {
         updateInterval = _updateInterval;
@@ -39,6 +43,7 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     }
 
     int256[] weights;
+    uint40 lastInterpolationTimePossible;
 
     uint numBaseAssets; // How many base assets are included in the pool, between 0 and assets.length
     uint numTotalAssets;
@@ -55,6 +60,8 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
 
     uint oracleStalenessThreshold;
 
+    address poolAddress;
+
     IERC20[] public assets; // The assets of the pool. If the pool is a composite pool, contains the LP tokens of those pools
 
     UpdateWeightRunner internal immutable updateWeightRunner;
@@ -63,7 +70,11 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
         int256[] calldata _weights,
         address _poolAddress,
         uint40 _lastInterpolationTimePossible
-    ) external override {}
+    ) external override {
+        weights = _weights;
+        lastInterpolationTimePossible = _lastInterpolationTimePossible;
+        poolAddress = _poolAddress;
+    }
 
     function poolRegistry(address _poolAddress) external view override returns (uint256) {}
 
@@ -104,20 +115,10 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
         weights = _weights;
     }
 
-    function setRuleForPool(
-        PoolSettings calldata _settings
-    ) external {
-        UpdateWeightRunner(updateWeightRunner).setRuleForPool(
-            _settings
-        );
+    function setRuleForPool(PoolSettings calldata _settings) external {
+        UpdateWeightRunner(updateWeightRunner).setRuleForPool(_settings);
     }
-    function getOracleStalenessThreshold()
-        external
-        view
-        override
-        returns (uint)
-    {
+    function getOracleStalenessThreshold() external view override returns (uint) {
         return oracleStalenessThreshold;
     }
-    
 }

@@ -1,8 +1,8 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24;
 
-/// @title DaoOperations contract for QuantAMM DAO operations 
-/// @notice Contains the logic for only allowing the DAO to call certain functions 
+/// @title DaoOperations contract for QuantAMM DAO operations
+/// @notice Contains the logic for only allowing the DAO to call certain functions
 abstract contract DaoOperations {
     address public immutable daoRunner;
 

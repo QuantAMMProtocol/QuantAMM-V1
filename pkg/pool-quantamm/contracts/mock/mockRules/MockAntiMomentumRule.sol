@@ -2,26 +2,16 @@
 pragma solidity ^0.8.24;
 import "../../rules/AntimomentumUpdateRule.sol";
 
-
 contract MockAntiMomentumRule is AntiMomentumUpdateRule {
-    constructor(
-        address _updateWeightRunner
-    ) AntiMomentumUpdateRule(_updateWeightRunner) {}
+    constructor(address _updateWeightRunner) AntiMomentumUpdateRule(_updateWeightRunner) {}
 
     int256[] weights;
 
-    function GetResultWeights()
-        external
-        view
-        returns (int256[] memory results)
-    {
+    function GetResultWeights() external view returns (int256[] memory results) {
         return weights;
     }
 
-    function GetMovingAverages(
-        address poolAddress,
-        uint numAssets
-    ) external view returns (int256[] memory results) {
+    function GetMovingAverages(address poolAddress, uint numAssets) external view returns (int256[] memory results) {
         return _quantAMMUnpack128Array(movingAverages[poolAddress], numAssets);
     }
 
@@ -29,11 +19,7 @@ contract MockAntiMomentumRule is AntiMomentumUpdateRule {
         address poolAddress,
         uint numAssets
     ) external view returns (int256[] memory results) {
-        return
-            _quantAMMUnpack128Array(
-                intermediateGradientStates[poolAddress],
-                numAssets
-            );
+        return _quantAMMUnpack128Array(intermediateGradientStates[poolAddress], numAssets);
     }
 
     function CalculateUnguardedWeights(
@@ -48,12 +34,7 @@ contract MockAntiMomentumRule is AntiMomentumUpdateRule {
         poolParameters.lambda = lambda;
         poolParameters.movingAverage = _movingAverageData;
         poolParameters.pool = pool;
-        
-        weights = _getWeights(
-            prevWeights,
-            data,
-            _parameters,
-            poolParameters
-        );
+
+        weights = _getWeights(prevWeights, data, _parameters, poolParameters);
     }
 }

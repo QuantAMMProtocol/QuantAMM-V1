@@ -11,10 +11,18 @@ import "../utils.t.sol";
 contract MomentumRuleTest is Test, QuantAMMTestUtils {
     MockMomentumRule public rule;
     MockPool public mockPool;
+    address internal owner;
+    address internal addr1;
+    address internal addr2;
 
     function setUp() public {
+        (address ownerLocal, address addr1Local, address addr2Local) = (vm.addr(1), vm.addr(2), vm.addr(3));
+        owner = ownerLocal;
+        addr1 = addr1Local;
+        addr2 = addr2Local;
+
         // Deploying MockMomentumRule contract
-        rule = new MockMomentumRule(address(this));
+        rule = new MockMomentumRule(owner);
 
         // Deploy MockPool contract with some mock parameters
         mockPool = new MockPool(3600, 1 ether, address(rule));
@@ -33,10 +41,12 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
     ) internal {
         // Simulate setting number of assets and calculating intermediate values
         mockPool.setNumberOfAssets(numAssets);
+        vm.startPrank(owner);
         rule.initialisePoolRuleIntermediateValues(address(mockPool), prevMovingAverages, previousAlphas, numAssets);
 
         // Run calculation for unguarded weights
         rule.CalculateUnguardedWeights(prevWeights, data, address(mockPool), parameters, lambdas, movingAverages);
+        vm.stopPrank();
 
         // Check results against expected weights
         int256[] memory res = rule.GetResultWeights();

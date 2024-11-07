@@ -50,4 +50,7 @@ interface IQuantAMMWeightedPool {
     
     /// @notice the acceptable number of blocks behind the current that an oracle value can be
     function getOracleStalenessThreshold() external view returns (uint);
+
+    /// @notice this is to update the runner for the pool. This is for hotfixes and is timelock protected.
+    function setUpdateWeightRunnerAddress(address _updateWeightRunner) external;
 }

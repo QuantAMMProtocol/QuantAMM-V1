@@ -9,6 +9,7 @@ import "./IQuantAMMWeightedPool.sol";
 import "./DaoOperations.sol";
 import "./UpdateWeightRunner.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
+import "@openzeppelin/contracts/governance/TimelockController.sol";
 /*
 ARCHITECTURE DESIGN NOTES
 
@@ -32,58 +33,27 @@ While there is a small race condition possible during deployment, if someone doe
 /// @title QuantAMM base administration contract for low frequency, high impact admin calls to the base
 /// @notice Responsible for considerable critical setting management. Separated from the base contract due to contract size limits.
 contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage, Ownable2Step {
-    event TradingFeeSet(address indexed pool, uint16 tradingFee, address feeRecipient);
-    event ProtocolTradingFeeSet(uint16 tradingFee, address feeRecipient);
-    event MinMaxTradingFeesSet(uint16 minTradingFee, uint16 maxTradingFee);
-    event WithdrawalFixedFeeSet(address indexed pool, uint16 withdrawalFixedFee, address feeRecipient);
-    event ProtocolWithdrawalFixedFeeSet(uint16 withdrawalFixedFee, address feeRecipient);
-    event MinMaxFixedWithdrawalFeesSet(uint16 minBaseFee, uint16 maxBaseFee);
-    event PoolDiluted(address indexed poolAddress, uint256 gasInUSD);
-    event PoolRegistered(
-        address indexed targetPoolAddress,
-        bool isCompositePool,
-        address[] complianceCheckerTrade,
-        address[] complianceCheckerDeposit,
-        uint256 numAssets
-    );
-
-    address basePool;
-
+    event UpdateWeightRunnerUpdated(address indexed pool, address indexed newUpdateWeightRunner, address indexed caller);
+    
     /// @notice Address of the contract that will be allowed to update weights
     address public updateWeightRunner;
 
-    /// @notice Max and min trading fees in BPS, 100% = 10_000
-    uint16 public maxTradingFee = 10_000;
-
-    /// @notice Min trading fees in BPS, 100% = 10_000
-    uint16 public minTradingFee = 0;
-
-    /// @notice Max and min fixed withdrawal fees in BPS, 100% = 10_000
-    uint16 public maxFixedWithdrawalFee = 10_000;
-
-    /// @notice Min fixed withdrawal fees in BPS, 100% = 10_000
-    uint16 public minFixedWithdrawalFee = 0;
-
-    uint256 private constant MASK_POOL_ACTIVE = 1;
-    uint256 private constant MASK_POOL_COMPOSITE = 2;
-    uint256 private constant MASK_POOL_INDEX = 4;
-    uint256 private constant MASK_POOL_COMPLIANCE_TRADE = 8;
-    uint256 private constant MASK_POOL_COMPLIANCE_DEPOSIT = 16;
-    uint256 private constant MASK_POOL_DAO_WEIGHT_UPDATES = 32;
-
-    constructor(address _daoRunner) DaoOperations(_daoRunner) Ownable(msg.sender) {}
-
-    /// @notice one time only call during deployment to set the base pool address
-    /// @param _basePoolAddress the address of the base pool
-    function setBaseAddress(address _basePoolAddress) public {
-        //will be called during deployment
-        require(basePool == address(0), "Should never be changed");
-        basePool = _basePoolAddress;
+    TimelockController private timelock;
+    
+    constructor(
+        address _daoRunner,
+        uint256 minDelay,
+        address[] memory proposers,
+        address[] memory executors
+    ) DaoOperations(_daoRunner) Ownable(msg.sender) {
+        timelock = new TimelockController(minDelay, proposers, executors, msg.sender);
     }
+
 
     /// @notice one time only call during deployment to set the update weight runner address
     /// @param _updateWeightRunner the address of the update weight runner
-    function setUpdateWeightRunnerAddress(address _updateWeightRunner) public onlyOwner{
+    function setUpdateWeightRunnerAddress(address _updateWeightRunner) public {
+        require(msg.sender == address(timelock), "Only timelock can call");
         updateWeightRunner = _updateWeightRunner;
     }
 
@@ -95,8 +65,13 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
         int256[] calldata _weights,
         address _poolAddress,
         uint40 _lastInterpolationTimePossible
-    ) public onlyOwner {
-        UpdateWeightRunner(updateWeightRunner).setWeightsManually(_weights, _poolAddress, _lastInterpolationTimePossible);
+    ) public {
+        require(msg.sender == address(timelock), "Only timelock can call");
+        UpdateWeightRunner(updateWeightRunner).setWeightsManually(
+            _weights,
+            _poolAddress,
+            _lastInterpolationTimePossible
+        );
         //event emitted in the update weight runner
     }
 
@@ -105,8 +80,23 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
         int256[] calldata _intermediateValues,
         address _poolAddress,
         uint numberOfAssets
-    ) public onlyOwner {
-        UpdateWeightRunner(updateWeightRunner).setIntermediateValuesManually(_poolAddress, _movingAverages, _intermediateValues, numberOfAssets);
+    ) public {
+        require(msg.sender == address(timelock), "Only timelock can call");
+        UpdateWeightRunner(updateWeightRunner).setIntermediateValuesManually(
+            _poolAddress,
+            _movingAverages,
+            _intermediateValues,
+            numberOfAssets
+        );
+        //event emitted in the update weight runner
+    }
+
+    /// @notice set the updateweight runner manually as a break glass function
+    function setPoolUpdateWeightRunnerManually(address _poolAddress, address _newUpdateWeightRunner) public {
+        require(msg.sender == address(timelock), "Only timelock can call");
+        IQuantAMMWeightedPool(_poolAddress).setUpdateWeightRunnerAddress(_newUpdateWeightRunner);
+        updateWeightRunner = _newUpdateWeightRunner;
+        emit UpdateWeightRunnerUpdated(_poolAddress, _newUpdateWeightRunner, msg.sender);
         //event emitted in the update weight runner
     }
 }

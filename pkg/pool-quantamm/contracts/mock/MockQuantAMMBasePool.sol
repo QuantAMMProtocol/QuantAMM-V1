@@ -121,8 +121,10 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     function setPoolRegistry(uint256 _poolRegistry) external {
         poolRegistry = _poolRegistry;
     }
-    
+
     function getOracleStalenessThreshold() external view override returns (uint) {
         return oracleStalenessThreshold;
     }
+
+    function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {}
 }

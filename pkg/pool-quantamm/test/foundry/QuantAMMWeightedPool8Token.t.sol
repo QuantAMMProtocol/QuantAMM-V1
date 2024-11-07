@@ -585,8 +585,6 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
                 0.01e18,
                 0.01e18,
                 parameters,
-                new address[](0),
-                new address[](0),
                 address(0)
             ),
             initialWeights,

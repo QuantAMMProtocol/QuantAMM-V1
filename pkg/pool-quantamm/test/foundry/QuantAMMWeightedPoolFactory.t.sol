@@ -328,8 +328,6 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
                 0.2e18,
                 0.2e18,
                 parameters,
-                new address[](0),
-                new address[](0),
                 address(0)
             ),
             initialWeights,

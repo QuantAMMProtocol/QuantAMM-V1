@@ -19,32 +19,40 @@ contract UpdateRuleTest is Test, QuantAMMTestUtils {
         owner = ownerLocal;
         addr1 = addr1Local;
         addr2 = addr2Local;
-        updateRule = new MockUpdateRule(address(this));
+        updateRule = new MockUpdateRule(owner);
     }
 
-    function testUnAuthCalc() public {
+    function testUpdateRuleUnAuthCalc() public {
+        vm.expectRevert("UNAUTH_CALC");
+        updateRule.CalculateNewWeights(
+        new int256[](0),
+        new int256[](0),
+        address(mockPool),
+        new int256[][](0),
+        new uint64[](0),
+        uint64(1),
+        uint64(1));
+    }
+
+    function testUpdateRuleAuthCalc() public {
 
     }
 
-    function testAuthCalc() public {
+    function testUpdateRuleMovingAverageStorageWithoutPrev() public {}
 
-    }
+    function testUpdateRuleMovingAverageStorageWithPrev() public {}
 
-    function testMovingAverageStorageWithoutPrev() public {}
+    function testUpdateRuleGetWeights() public {}
 
-    function testMovingAverageStorageWithPrev() public {}
+    function testUpdateRuleGuardWights() public {}
 
-    function testGetWeights() public {}
+    function testUpdateRuleInitialisePoolUnAuth() public {}
 
-    function testGuardWights() public {}
+    function testUpdateRuleInitialisePoolPoolAuth() public {}
 
-    function testInitialisePoolUnAuth() public {}
+    function testUpdateRuleInitialisePoolUpdateWeightRunnerAuth() public {}
 
-    function testInitialisePoolPoolAuth() public {}
+    function testUpdateRuleInitialisePoolAvergesAdminAuth() public {}
 
-    function testInitialisePoolUpdateWeightRunnerAuth() public {}
-
-    function testInitialisePoolAvergesAdminAuth() public {}
-
-    function testInitialisePoolAveragesOwnerAuth() public {}
+    function testUpdateRuleInitialisePoolAveragesOwnerAuth() public {}
 }

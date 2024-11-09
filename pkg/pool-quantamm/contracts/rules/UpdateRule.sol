@@ -28,6 +28,12 @@ An inherited base contract approach created a good domain driven design where bo
 abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IUpdateRule {
     uint16 private constant REQUIRES_PREV_MAVG = 1;
     address private immutable updateWeightRunner;
+    
+    string public name;
+    string public description;
+    string public devNotes;
+    string public limitations;
+    string[] public parameterDescriptions;
 
     struct QuantAMMUpdateRuleLocals {
         uint i;

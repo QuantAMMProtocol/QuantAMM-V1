@@ -333,7 +333,8 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
             initialWeights,
             initialWeights,
             3600,
-            0
+            0,
+            new string[][](0)
         );
     }
 

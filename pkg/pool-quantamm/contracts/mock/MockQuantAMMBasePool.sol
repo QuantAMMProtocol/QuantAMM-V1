@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
 import {
     IWeightedPool,
@@ -43,21 +43,20 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
     }
 
     int256[] weights;
+    
     uint40 lastInterpolationTimePossible;
-
-    uint numBaseAssets; // How many base assets are included in the pool, between 0 and assets.length
 
     int256[][] public ruleParameters; // Arbitrary parameters that are passed to the rule
 
     uint64[] public lambda; // Decay parameter for exponentially-weighted moving average (0 < λ < 1), stored as SD59x18 number
 
-    uint64 public epsilonMax; // Maximum allowed delta for a weight update, stored as SD59x18 number
+    uint64 public immutable epsilonMax; // Maximum allowed delta for a weight update, stored as SD59x18 number
 
-    uint64 public absoluteWeightGuardRail; // Maximum allowed weight for a token, stored as SD59x18 number
+    uint64 public immutable absoluteWeightGuardRail; // Maximum allowed weight for a token, stored as SD59x18 number
 
-    uint64 public updateInterval; // Minimum amount of seconds between two updates
+    uint64 public immutable updateInterval; // Minimum amount of seconds between two updates
 
-    uint oracleStalenessThreshold;
+    uint immutable oracleStalenessThreshold;
 
     address poolAddress;
 
@@ -99,8 +98,9 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
     function onSwap(PoolSwapParams calldata params) external override returns (uint256 amountCalculatedScaled18) {}
 
     function getNormalizedWeights() external view override returns (uint256[] memory) {
-        uint256[] memory normalizedWeights = new uint256[](weights.length);
-        for (uint256 i = 0; i < weights.length; i++) {
+        uint256 weightLength = weights.length;
+        uint256[] memory normalizedWeights = new uint256[](weightLength);
+        for (uint256 i = 0; i < weightLength; i++) {
             normalizedWeights[i] = uint256(weights[i]);
         }
         return normalizedWeights;
@@ -122,14 +122,14 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
         return oracleStalenessThreshold;
     }
 
-    function getWeightedPoolDynamicData()
+    function getQuantAMMWeightedPoolDynamicData()
         external
         view
         override
         returns (QuantAMMWeightedPoolDynamicData memory data)
     {}
 
-    function getWeightedPoolImmutableData()
+    function getQuantAMMWeightedPoolImmutableData()
         external
         view
         override

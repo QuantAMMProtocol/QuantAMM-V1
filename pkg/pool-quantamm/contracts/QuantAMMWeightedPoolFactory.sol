@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
 import { IPoolVersion } from "@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IPoolVersion.sol";
@@ -58,7 +58,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
     }
 
     string private _poolVersion;
-    address private _updateWeightRunner;
+    address private immutable _updateWeightRunner;
 
     /// @param vault the balancer v3 valt
     /// @param pauseWindowDuration the pause duration
@@ -72,6 +72,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         string memory poolVersion,
         address updateWeightRunner
     ) BasePoolFactory(vault, pauseWindowDuration, type(QuantAMMWeightedPool).creationCode) Version(factoryVersion) {
+        require(updateWeightRunner != address(0), "update weight runner cannot be default address");
         _poolVersion = poolVersion;
         _updateWeightRunner = updateWeightRunner;
     }

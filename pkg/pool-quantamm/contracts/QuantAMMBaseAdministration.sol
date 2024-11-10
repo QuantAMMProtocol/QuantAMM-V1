@@ -53,23 +53,16 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
     address public updateWeightRunner;
 
     /// @notice Max and min trading fees in BPS, 100% = 10_000
-    uint16 public maxTradingFee = 10_000;
+    uint16 public constant maxTradingFee = 10_000;
 
     /// @notice Min trading fees in BPS, 100% = 10_000
-    uint16 public minTradingFee = 0;
+    uint16 public constant minTradingFee = 0;
 
     /// @notice Max and min fixed withdrawal fees in BPS, 100% = 10_000
-    uint16 public maxFixedWithdrawalFee = 10_000;
+    uint16 public constant maxFixedWithdrawalFee = 10_000;
 
     /// @notice Min fixed withdrawal fees in BPS, 100% = 10_000
-    uint16 public minFixedWithdrawalFee = 0;
-
-    uint256 private constant MASK_POOL_ACTIVE = 1;
-    uint256 private constant MASK_POOL_COMPOSITE = 2;
-    uint256 private constant MASK_POOL_INDEX = 4;
-    uint256 private constant MASK_POOL_COMPLIANCE_TRADE = 8;
-    uint256 private constant MASK_POOL_COMPLIANCE_DEPOSIT = 16;
-    uint256 private constant MASK_POOL_DAO_WEIGHT_UPDATES = 32;
+    uint16 public constant minFixedWithdrawalFee = 0;
 
     constructor(address _daoRunner) DaoOperations(_daoRunner) Ownable(msg.sender) {}
 
@@ -78,12 +71,15 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
     function setBaseAddress(address _basePoolAddress) public {
         //will be called during deployment
         require(basePool == address(0), "Should never be changed");
+        require(_basePoolAddress != address(0), "new base address cannot be default");
+
         basePool = _basePoolAddress;
     }
 
     /// @notice one time only call during deployment to set the update weight runner address
     /// @param _updateWeightRunner the address of the update weight runner
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) public onlyOwner{
+        require(_updateWeightRunner != address(0), "address cannot be default");
         updateWeightRunner = _updateWeightRunner;
     }
 

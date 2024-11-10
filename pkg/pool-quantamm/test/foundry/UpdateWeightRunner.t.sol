@@ -35,7 +35,7 @@ contract UpdateWeightRunnerTest is Test {
         addr2 = addr2Local;
         // Deploy UpdateWeightRunner contract
         vm.startPrank(owner);
-        updateWeightRunner = new MockUpdateWeightRunner(owner);
+        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2);
         
         vm.stopPrank();
         // Deploy Mock Rule and Pool

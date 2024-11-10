@@ -34,6 +34,12 @@ contract MockIdentityRule is IUpdateRule {
 
     uint public numberOfAssets;
 
+    int256[] weights;
+
+    function getWeights() external view returns (int256[] memory){
+        return weights;
+    }
+
     function getMovingAverages() external view returns (int256[] memory) {
         return movingAverages;
     }
@@ -52,7 +58,10 @@ contract MockIdentityRule is IUpdateRule {
         uint64 /* absoluteWeightGuardRail*/
     ) external override returns (int256[] memory /*updatedWeights*/) {
         CalculateNewWeightsCalled = true;
-        return new int256[](prevWeights.length);
+        if(weights.length == 0) {
+            return new int256[](prevWeights.length);
+        }
+        return weights;
     }
 
     function initialisePoolRuleIntermediateValues(
@@ -89,5 +98,9 @@ contract MockIdentityRule is IUpdateRule {
 
     function setQueryVariances(bool _queryVariances) public {
         queryVariances = _queryVariances;
+    }
+
+    function setWeights(int256[] memory newCalculatedWeights) public {
+        weights = newCalculatedWeights;
     }
 }

@@ -363,6 +363,7 @@ contract UpdateWeightRunner is Ownable2Step {
             _ruleSettings.epsilonMax,
             _ruleSettings.absoluteWeightGuardRail
         );
+
         poolRuleSettings[_pool].timingSettings.lastPoolUpdateRun = uint40(block.timestamp);
     }
 
@@ -373,39 +374,37 @@ contract UpdateWeightRunner is Ownable2Step {
         address _poolAddress,
         PoolRuleSettings memory _ruleSettings
     ) private returns (int256[] memory) {
-        uint256[] memory targetWeightsUnsigned = IWeightedPool(_poolAddress).getNormalizedWeights();
+        uint256[] memory currentWeightsUnsigned = IWeightedPool(_poolAddress).getNormalizedWeights();
+        int256[] memory currentWeights = new int256[](currentWeightsUnsigned.length);
 
-        int256[] memory targetWeights = new int256[](targetWeightsUnsigned.length);
-
-        for (uint i; i < targetWeightsUnsigned.length; ) {
-            targetWeights[i] = int256(targetWeightsUnsigned[i]);
+        for (uint i; i < currentWeights.length; ) {
+            currentWeights[i] = int256(currentWeightsUnsigned[i]);
 
             unchecked {
                 i++;
             }
         }
-
-        uint weightAndMultiplierLength = targetWeights.length * 2;
+        uint weightAndMultiplierLength = currentWeights.length * 2;
         (int256[] memory updatedWeights, int256[] memory data) = _getUpdatedWeightsAndOracleData(
             _poolAddress,
-            targetWeights,
+            currentWeights,
             _ruleSettings
         );
-
         // the base pool needs both the target weights and the per block multipler per asset
         int256[] memory targetWeightsAndBlockMultiplier = new int256[](weightAndMultiplierLength);
 
         int256 currentLastInterpolationPossible = type(int256).max;
         int256 updateInterval = int256(int40(_ruleSettings.timingSettings.updateInterval));
-
-        for (uint i; i < targetWeights.length; ) {
-            targetWeightsAndBlockMultiplier[i] = targetWeights[i];
+        for (uint i; i < currentWeights.length; ) {
+            targetWeightsAndBlockMultiplier[i] = currentWeights[i];
 
             // this would be the simple scenario if we did not have to worry about guard rails
-            int256 blockMultiplier = (updatedWeights[i] - targetWeights[i]) / updateInterval;
+            int256 blockMultiplier = (updatedWeights[i] - currentWeights[i]) / updateInterval;
 
-            targetWeightsAndBlockMultiplier[i + targetWeights.length] = blockMultiplier;
-
+            targetWeightsAndBlockMultiplier[i + currentWeights.length] = blockMultiplier;
+            int256 absGuardRail18 = int256(int64(_ruleSettings.absoluteWeightGuardRail));
+            int256 upperGuardRail = (PRBMathSD59x18.fromInt(1) - (PRBMathSD59x18.mul(PRBMathSD59x18.fromInt(int256(currentWeights.length - 1)), absGuardRail18)));
+            
             unchecked {
                 //This is your worst case scenario, usually you expect (and have DR) that at your next interval you
                 //get another update. However what if you don't. You can carry on interpolating until you hit a rail
@@ -415,16 +414,19 @@ contract UpdateWeightRunner is Ownable2Step {
                 int256 weightBetweenTargetAndMax;
                 int256 blockTimeUntilGuardRailHit;
                 if (blockMultiplier > int256(0)) {
-                    weightBetweenTargetAndMax = int256(int64(_ruleSettings.absoluteWeightGuardRail)) - targetWeights[i];
+                    weightBetweenTargetAndMax = upperGuardRail - currentWeights[i];
+                    //the updated weight should never be above guard rail. final check as block multiplier 
+                    //will be even worse if 
                     //not using .div so that the 18dp is removed
                     blockTimeUntilGuardRailHit = weightBetweenTargetAndMax / blockMultiplier;
                 } else if (blockMultiplier == int256(0)) {
                     blockTimeUntilGuardRailHit = type(int256).max;
                 } else {
-                    weightBetweenTargetAndMax = targetWeights[i] - int256(int64(_ruleSettings.absoluteWeightGuardRail));
-                    //not using .div so that the 18dp is removed
+                    weightBetweenTargetAndMax = currentWeights[i] - absGuardRail18;
 
-                    blockTimeUntilGuardRailHit = weightBetweenTargetAndMax / blockMultiplier;
+                    //not using .div so that the 18dp is removed
+                    //abs block multiplier
+                    blockTimeUntilGuardRailHit = weightBetweenTargetAndMax / int256(uint256(-1 * blockMultiplier));                    
                 }
 
                 if (blockTimeUntilGuardRailHit < currentLastInterpolationPossible) {
@@ -439,12 +441,10 @@ contract UpdateWeightRunner is Ownable2Step {
         uint40 lastTimestampThatInterpolationWorks = uint40(type(uint40).max);
 
         //next expected update + time beyond that
-        currentLastInterpolationPossible +=
-            int40(uint40(block.timestamp)) +
-            int40(_ruleSettings.timingSettings.updateInterval);
+        currentLastInterpolationPossible += int40(uint40(block.timestamp));
 
         //needed to prevent silent overflows
-        if (currentLastInterpolationPossible < int40(type(uint40).max)) {
+        if (currentLastInterpolationPossible < int256(type(int40).max)){
             lastTimestampThatInterpolationWorks = uint40(int40(currentLastInterpolationPossible));
         }
 

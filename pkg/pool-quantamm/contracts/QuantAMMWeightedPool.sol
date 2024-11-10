@@ -688,6 +688,7 @@ contract QuantAMMWeightedPool is
         ); //Invalid epsilonMax value
 
         //applied both as a max (1 - x) and a min, so it cant be more than 0.49 or less than 0.01
+        //all pool logic assumes that absolute guard rail is already stored as an 18dp int256
         require(
             int256(uint256(_poolSettings.absoluteWeightGuardRail)) <
                 PRBMathSD59x18.fromInt(1) / int256(uint256((_initialWeights.length))) &&

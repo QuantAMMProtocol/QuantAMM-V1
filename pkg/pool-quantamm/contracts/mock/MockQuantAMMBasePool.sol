@@ -42,8 +42,9 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
     }
 
-    int256[] weights;
-    uint40 lastInterpolationTimePossible;
+    int256[] public weights;
+    
+    uint40 public lastInterpolationTimePossible;
 
     uint numBaseAssets; // How many base assets are included in the pool, between 0 and assets.length
 
@@ -67,6 +68,10 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
 
     UpdateWeightRunner internal immutable updateWeightRunner;
 
+    function getWeights() external view returns (int256[] memory){
+        return weights;
+    }
+    
     function setWeights(
         int256[] calldata _weights,
         address _poolAddress,
@@ -99,8 +104,9 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     function onSwap(PoolSwapParams calldata params) external override returns (uint256 amountCalculatedScaled18) {}
 
     function getNormalizedWeights() external view override returns (uint256[] memory) {
-        uint256[] memory normalizedWeights = new uint256[](weights.length);
-        for (uint256 i = 0; i < weights.length; i++) {
+
+        uint256[] memory normalizedWeights = new uint256[](weights.length / 2);
+        for (uint256 i = 0; i < weights.length / 2; i++) {
             normalizedWeights[i] = uint256(weights[i]);
         }
         return normalizedWeights;

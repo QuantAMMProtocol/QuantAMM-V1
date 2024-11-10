@@ -166,8 +166,6 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                complianceCheckersTrade: new address[](0),
-                complianceCheckersDeposit: new address[](0),
                 poolManager: addr2
             })
         );
@@ -220,8 +218,6 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                complianceCheckersTrade: new address[](0),
-                complianceCheckersDeposit: new address[](0),
                 poolManager: addr2
             })
         );
@@ -308,8 +304,6 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                complianceCheckersTrade: new address[](0),
-                complianceCheckersDeposit: new address[](0),
                 poolManager: addr2
             })
         );
@@ -679,8 +673,6 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                complianceCheckersTrade: new address[](0),
-                complianceCheckersDeposit: new address[](0),
                 poolManager: addr2
             })
         );
@@ -761,8 +753,6 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                complianceCheckersTrade: new address[](0),
-                complianceCheckersDeposit: new address[](0),
                 poolManager: addr2
             })
         );
@@ -875,8 +865,6 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                complianceCheckersTrade: new address[](0),
-                complianceCheckersDeposit: new address[](0),
                 poolManager: addr2
             })
         );

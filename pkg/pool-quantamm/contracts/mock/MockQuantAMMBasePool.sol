@@ -32,7 +32,7 @@ import { ScalarQuantAMMBaseStorage } from "../QuantAMMStorage.sol";
 import "../rules/IUpdateRule.sol";
 import "../UpdateWeightRunner.sol";
 
-contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
+contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
     constructor(uint16 _updateInterval, address _updateWeightRunner) {
         updateInterval = _updateInterval;
         lambda = new uint64[](0);
@@ -112,10 +112,6 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
         return normalizedWeights;
     }
 
-    function getWeightedPoolDynamicData() external view override returns (WeightedPoolDynamicData memory data) {}
-
-    function getWeightedPoolImmutableData() external view override returns (WeightedPoolImmutableData memory data) {}
-
     function setInitialWeights(int256[] calldata _weights) external {
         weights = _weights;
     }
@@ -127,8 +123,22 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     function setPoolRegistry(uint256 _poolRegistry) external {
         poolRegistry = _poolRegistry;
     }
-    
+
     function getOracleStalenessThreshold() external view override returns (uint) {
         return oracleStalenessThreshold;
     }
+
+    function getWeightedPoolDynamicData()
+        external
+        view
+        override
+        returns (QuantAMMWeightedPoolDynamicData memory data)
+    {}
+
+    function getWeightedPoolImmutableData()
+        external
+        view
+        override
+        returns (QuantAMMWeightedPoolImmutableData memory data)
+    {}
 }

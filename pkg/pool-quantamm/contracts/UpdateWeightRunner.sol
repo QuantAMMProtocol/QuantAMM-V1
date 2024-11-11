@@ -108,7 +108,7 @@ contract UpdateWeightRunner is Ownable2Step {
         ethOracle = OracleWrapper(_ethOracle);
     }
 
-    address internal immutable quantammAdmin;
+    address public immutable quantammAdmin;
 
     /// @notice key is pool address, value is rule settings for running the pool
     mapping(address => PoolRuleSettings) public poolRuleSettings;

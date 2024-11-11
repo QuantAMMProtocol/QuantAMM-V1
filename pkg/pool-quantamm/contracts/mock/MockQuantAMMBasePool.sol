@@ -141,4 +141,6 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
         override
         returns (QuantAMMWeightedPoolImmutableData memory data)
     {}
+
+    function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {}
 }

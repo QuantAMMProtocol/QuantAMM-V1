@@ -90,7 +90,9 @@ contract QuantAMMWeightedPool is
     //packed: [weight5,weight6,weight7,weight8,multiplier5,multiplier6,multiplier7,multiplier8]
     int256 internal _normalizedSecondFourWeights;
 
-    UpdateWeightRunner internal immutable updateWeightRunner;
+    UpdateWeightRunner internal updateWeightRunner;
+
+    address internal immutable quantammAdmin;
 
     /// @notice the pool settings for getting weights and assets keyed by pool
     QuantAMMBaseGetWeightData poolSettings;
@@ -152,6 +154,7 @@ contract QuantAMMWeightedPool is
     ) BalancerPoolToken(vault, params.name, params.symbol) PoolInfo(vault) Version(params.version) {
         _totalTokens = params.numTokens;
         updateWeightRunner = UpdateWeightRunner(params.updateWeightRunner);
+        quantammAdmin = updateWeightRunner.quantammAdmin();
     }
 
     /// @inheritdoc IBasePool
@@ -772,4 +775,11 @@ contract QuantAMMWeightedPool is
     function getOracleStalenessThreshold() external view override returns (uint) {
         return oracleStalenessThreshold;
     }
+
+    /// @inheritdoc IQuantAMMWeightedPool
+    function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
+        updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
+    }
+
 }

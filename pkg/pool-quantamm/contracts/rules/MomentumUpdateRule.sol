@@ -8,7 +8,17 @@ import "./base/QuantammGradientBasedRule.sol";
 /// @title MomentumUpdateRule contract for QuantAMM momentum update rule
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the momentum update rule
 contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
-    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {}
+    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
+        name = "Momentum";
+        description = "TODO";
+        devNotes = "TODO";
+        limitations = "TODO";
+        
+        parameterDescriptions = new string[](3);
+        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change TODO";
+        parameterDescriptions[1] = "Use raw price: 0 = use moving average, 1 = use raw price";
+        parameterDescriptions[2] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
+    }
 
     using PRBMathSD59x18 for int256;
 

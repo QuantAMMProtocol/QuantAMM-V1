@@ -32,7 +32,7 @@ import { ScalarQuantAMMBaseStorage } from "../QuantAMMStorage.sol";
 import "../rules/IUpdateRule.sol";
 import "../UpdateWeightRunner.sol";
 
-contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
+contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
     constructor(uint16 _updateInterval, address _updateWeightRunner) {
         updateInterval = _updateInterval;
         lambda = new uint64[](0);
@@ -42,8 +42,9 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
     }
 
-    int256[] weights;
-    uint40 lastInterpolationTimePossible;
+    int256[] public weights;
+    
+    uint40 public lastInterpolationTimePossible;
 
     uint numBaseAssets; // How many base assets are included in the pool, between 0 and assets.length
 
@@ -67,6 +68,10 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
 
     UpdateWeightRunner internal immutable updateWeightRunner;
 
+    function getWeights() external view returns (int256[] memory){
+        return weights;
+    }
+    
     function setWeights(
         int256[] calldata _weights,
         address _poolAddress,
@@ -99,16 +104,13 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     function onSwap(PoolSwapParams calldata params) external override returns (uint256 amountCalculatedScaled18) {}
 
     function getNormalizedWeights() external view override returns (uint256[] memory) {
-        uint256[] memory normalizedWeights = new uint256[](weights.length);
-        for (uint256 i = 0; i < weights.length; i++) {
+
+        uint256[] memory normalizedWeights = new uint256[](weights.length / 2);
+        for (uint256 i = 0; i < weights.length / 2; i++) {
             normalizedWeights[i] = uint256(weights[i]);
         }
         return normalizedWeights;
     }
-
-    function getWeightedPoolDynamicData() external view override returns (WeightedPoolDynamicData memory data) {}
-
-    function getWeightedPoolImmutableData() external view override returns (WeightedPoolImmutableData memory data) {}
 
     function setInitialWeights(int256[] calldata _weights) external {
         weights = _weights;
@@ -125,6 +127,20 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     function getOracleStalenessThreshold() external view override returns (uint) {
         return oracleStalenessThreshold;
     }
+
+    function getWeightedPoolDynamicData()
+        external
+        view
+        override
+        returns (QuantAMMWeightedPoolDynamicData memory data)
+    {}
+
+    function getWeightedPoolImmutableData()
+        external
+        view
+        override
+        returns (QuantAMMWeightedPoolImmutableData memory data)
+    {}
 
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {}
 }

@@ -9,7 +9,7 @@ interface IUpdateRule {
     /// @param _parameters any parameters required by the rule apart from lambda
     /// @param _lambdaStore lambda values either 1 for all constituents or one per constituent
     /// @param _epsilonMax the maximum trade size possible for the pool
-    /// @param absoluteWeightGuardRail the maximum weight change possible for the pool
+    /// @param _absoluteWeightGuardRail the maximum weight change possible for the pool
     function CalculateNewWeights(
         int256[] calldata _prevWeights,
         int256[] calldata _data,
@@ -17,7 +17,7 @@ interface IUpdateRule {
         int256[][] calldata _parameters,
         uint64[] calldata _lambdaStore,
         uint64 _epsilonMax,
-        uint64 absoluteWeightGuardRail
+        uint64 _absoluteWeightGuardRail
     ) external returns (int256[] memory updatedWeights);
 
     /// @notice Called on pool creation to preset all the neccessary rule state

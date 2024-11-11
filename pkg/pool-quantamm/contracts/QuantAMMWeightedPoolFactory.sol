@@ -54,6 +54,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         int256[] _initialIntermediateValues;
         uint256 _oracleStalenessThreshold;
         uint256 poolRegistry;
+        string[][] poolDetails;
     }
 
     string private _poolVersion;
@@ -102,7 +103,8 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
                     numTokens: params.normalizedWeights.length,
                     version: "version",
                     updateWeightRunner: _updateWeightRunner,
-                    poolRegistry: params.poolRegistry
+                    poolRegistry: params.poolRegistry,
+                    poolDetails: params.poolDetails
                 }),
                 getVault()
             ),

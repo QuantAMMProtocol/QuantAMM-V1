@@ -21,6 +21,7 @@ import {
 } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 import { IBasePool } from "@balancer-labs/v3-interfaces/contracts/vault/IBasePool.sol";
 
+import { VaultGuard } from "@balancer-labs/v3-vault/contracts/VaultGuard.sol";
 import { BalancerPoolToken } from "@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol";
 import { PoolInfo } from "@balancer-labs/v3-pool-utils/contracts/PoolInfo.sol";
 import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol";
@@ -65,7 +66,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
  */
 contract QuantAMMWeightedPool is
     IQuantAMMWeightedPool,
-    IWeightedPool,
+    IBasePool,
     BalancerPoolToken,
     PoolInfo,
     Version,
@@ -103,6 +104,7 @@ contract QuantAMMWeightedPool is
         string version;
         address updateWeightRunner;
         uint256 poolRegistry;
+        string[][] poolDetails;
     }
 
     ///@dev Emitted when the weights of the pool are updated
@@ -143,6 +145,8 @@ contract QuantAMMWeightedPool is
 
     ///@dev The assets of the pool. If the pool is a composite pool, contains the LP tokens of those pools
     IERC20[] public assets;
+
+    string[][] public poolDetails;
 
     constructor(
         NewPoolParams memory params,
@@ -191,7 +195,7 @@ contract QuantAMMWeightedPool is
         return _upOrDown(_getNormalizedWeights(), balancesLiveScaled18);
     }
 
-    /// @inheritdoc IWeightedPool
+    /// @inheritdoc IQuantAMMWeightedPool
     function getNormalizedWeights() external view returns (uint256[] memory) {
         return _getNormalizedWeights();
     }
@@ -513,24 +517,49 @@ contract QuantAMMWeightedPool is
         return WeightedMath._MAX_INVARIANT_RATIO;
     }
 
-    /// @inheritdoc IWeightedPool
-    function getWeightedPoolDynamicData() external view returns (WeightedPoolDynamicData memory data) {
+    /// @inheritdoc IQuantAMMWeightedPool
+    function getWeightedPoolDynamicData() external view returns (QuantAMMWeightedPoolDynamicData memory data) {
         data.balancesLiveScaled18 = _vault.getCurrentLiveBalances(address(this));
         (, data.tokenRates) = _vault.getPoolTokenRates(address(this));
-        data.staticSwapFeePercentage = _vault.getStaticSwapFeePercentage((address(this)));
         data.totalSupply = totalSupply();
 
         PoolConfig memory poolConfig = _vault.getPoolConfig(address(this));
         data.isPoolInitialized = poolConfig.isPoolInitialized;
         data.isPoolPaused = poolConfig.isPoolPaused;
         data.isPoolInRecoveryMode = poolConfig.isPoolInRecoveryMode;
+
+        uint256 tokenCount = _totalTokens;
+        data.weightsAtLastUpdateInterval = new int256[](tokenCount);
+        data.weightBlockMultipliers = new int256[](tokenCount);
+        int256[] memory firstFourWeights = quantAMMUnpack32(_normalizedFirstFourWeights);
+        int256[] memory secondFourWeights = quantAMMUnpack32(_normalizedSecondFourWeights);
+
+        for (uint i; i < tokenCount; i++) {
+            if (i < 4) {
+                data.weightsAtLastUpdateInterval[i] = firstFourWeights[i];
+                data.weightBlockMultipliers[i] = firstFourWeights[i + 4];
+            } else {
+                data.weightsAtLastUpdateInterval[i] = secondFourWeights[i - 4];
+                data.weightBlockMultipliers[i] = secondFourWeights[i];
+            }
+        }
+        //just a get but still more efficient to do it here
+        QuantAMMBaseInterpolationVariables memory interpolationDetails = poolSettings.quantAMMBaseInterpolationDetails;
+        data.lastUpdateIntervalTime = interpolationDetails.lastUpdateIntervalTime;
+        data.lastInterpolationTimePossible = interpolationDetails.lastPossibleInterpolationTime;
     }
 
-    /// @inheritdoc IWeightedPool
-    function getWeightedPoolImmutableData() external view returns (WeightedPoolImmutableData memory data) {
+    /// @inheritdoc IQuantAMMWeightedPool
+    function getWeightedPoolImmutableData() external view returns (QuantAMMWeightedPoolImmutableData memory data) {
         data.tokens = _vault.getPoolTokens(address(this));
-        (data.decimalScalingFactors, ) = _vault.getPoolTokenRates(address(this));
-        data.normalizedWeights = _getNormalizedWeights();
+        data.oracleStalenessThreshold = oracleStalenessThreshold;
+        data.poolRegistry = poolRegistry;
+        data.ruleParameters = ruleParameters;
+        data.lambda = lambda;
+        data.epsilonMax = epsilonMax;
+        data.absoluteWeightGuardRail = absoluteWeightGuardRail;
+        data.maxTradeSizeRatio = maxTradeSizeRatio;
+        data.updateInterval = updateInterval;
     }
 
     /// @notice the main function to update target weights and multipliers from the update weight runner
@@ -624,6 +653,13 @@ contract QuantAMMWeightedPool is
         require(_poolSettings.assets.length > 0 && _poolSettings.assets.length == _initialWeights.length, "INVASSWEIG"); //Invalid assets / weights array
 
         assets = _poolSettings.assets;
+        poolSettings.assets = new address[](_poolSettings.assets.length);
+        for (uint i; i < _poolSettings.assets.length; ) {
+            poolSettings.assets[i] = address(_poolSettings.assets[i]);
+            unchecked {
+                ++i;
+            }
+        }
 
         oracleStalenessThreshold = _oracleStalenessThreshold;
 
@@ -691,6 +727,7 @@ contract QuantAMMWeightedPool is
         ); //Invalid epsilonMax value
 
         //applied both as a max (1 - x) and a min, so it cant be more than 0.49 or less than 0.01
+        //all pool logic assumes that absolute guard rail is already stored as an 18dp int256
         require(
             int256(uint256(_poolSettings.absoluteWeightGuardRail)) <
                 PRBMathSD59x18.fromInt(1) / int256(uint256((_initialWeights.length))) &&

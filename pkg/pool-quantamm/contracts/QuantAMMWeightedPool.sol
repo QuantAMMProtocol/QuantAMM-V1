@@ -102,6 +102,7 @@ contract QuantAMMWeightedPool is
         string version;
         address updateWeightRunner;
         uint256 poolRegistry;
+        string[][] poolDetails;
     }
 
     ///@dev Emitted when the weights of the pool are updated
@@ -142,6 +143,8 @@ contract QuantAMMWeightedPool is
 
     ///@dev The assets of the pool. If the pool is a composite pool, contains the LP tokens of those pools
     IERC20[] public assets;
+
+    string[][] public poolDetails;
 
     constructor(
         NewPoolParams memory params,

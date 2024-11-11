@@ -8,7 +8,15 @@ import "./UpdateRule.sol";
 /// @title MinimumVarianceUpdateRule contract for QuantAMM minimum variance update rule
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the minimum variance update rule and updating the weights of the QuantAMM pool
 contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
-    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {}
+    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
+        name = "MinimumVariance";
+        description = "TODO";
+        devNotes = "TODO";
+        limitations = "TODO";
+
+        parameterDescriptions = new string[](1);
+        parameterDescriptions[0] = "Mixing Variance: TODO";
+    }
 
     using PRBMathSD59x18 for int256;
 

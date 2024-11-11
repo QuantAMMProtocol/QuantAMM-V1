@@ -8,7 +8,18 @@ import "./UpdateRule.sol";
 /// @title PowerChannelUpdateRule contract for QuantAMM power channel update rule
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the power channel update rule
 contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
-    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {}
+    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
+        name = "PowerChannel";
+        description = "TODO";
+        devNotes = "TODO";
+        limitations = "TODO";
+
+        parameterDescriptions = new string[](4);
+        parameterDescriptions[0] = "Q: Q dictates the harshness of the channel boundry";
+        parameterDescriptions[1] = "Kappa: Kappa dictates the aggressiveness of response to a signal change";
+        parameterDescriptions[2] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
+        parameterDescriptions[3] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
+    }
 
     using PRBMathSD59x18 for int256;
 

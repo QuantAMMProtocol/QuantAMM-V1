@@ -10,7 +10,17 @@ import "./UpdateRule.sol";
 /// @title AntiMomentumUpdateRule contract for QuantAMM anti-momentum update rule implementation
 /// @notice Contains the logic for calculating the anti-momentum update rule and updating the weights of the QuantAMM pool
 contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
-    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {}
+    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
+        name = "AntiMomentum";
+        description = "TODO";
+        devNotes = "TODO";
+        limitations = "TODO";
+        
+        parameterDescriptions = new string[](3);
+        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change TODO";
+        parameterDescriptions[1] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
+        parameterDescriptions[2] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
+    }
 
     using PRBMathSD59x18 for int256;
 

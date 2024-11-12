@@ -29,6 +29,7 @@ abstract contract QuantAMMMathGuard {
         guardedNewWeights = _normalizeWeightUpdates(_prevWeights, _weights, _epsilonMax);
     }
 
+    /// @dev there are some edge cases where the clamping might result to break the guard rail. This is known and the last interpolation block logic in the update weight runner is an ultimate guard against this.
     /// @notice Applies guard rails (min value, max value) to weights and returns the normalized weights
     /// @param _weights Raw weights
     /// @return Clamped weights
@@ -68,6 +69,10 @@ abstract contract QuantAMMMathGuard {
         return _weights;
     }
 
+    ///@notice Normalizes the weights to ensure that the sum of the weights is equal to 1
+    ///@param _prevWeights Previous weights
+    ///@param _newWeights New weights
+    ///@param _epsilonMax Maximum allowed change in weights per update step (epsilon) in the QuantAMM whitepaper
     function _normalizeWeightUpdates(
         int256[] memory _prevWeights,
         int256[] memory _newWeights,

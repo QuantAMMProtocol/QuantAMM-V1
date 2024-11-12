@@ -90,7 +90,9 @@ contract QuantAMMWeightedPool is
     //packed: [weight5,weight6,weight7,weight8,multiplier5,multiplier6,multiplier7,multiplier8]
     int256 internal _normalizedSecondFourWeights;
 
-    UpdateWeightRunner internal immutable updateWeightRunner;
+    UpdateWeightRunner internal updateWeightRunner;
+
+    address internal immutable quantammAdmin;
 
     /// @notice the pool settings for getting weights and assets keyed by pool
     QuantAMMBaseGetWeightData poolSettings;
@@ -152,6 +154,7 @@ contract QuantAMMWeightedPool is
     ) BalancerPoolToken(vault, params.name, params.symbol) PoolInfo(vault) Version(params.version) {
         _totalTokens = params.numTokens;
         updateWeightRunner = UpdateWeightRunner(params.updateWeightRunner);
+        quantammAdmin = updateWeightRunner.quantammAdmin();
         poolRegistry = params.poolRegistry;
     }
 
@@ -725,6 +728,7 @@ contract QuantAMMWeightedPool is
         ); //Invalid epsilonMax value
 
         //applied both as a max (1 - x) and a min, so it cant be more than 0.49 or less than 0.01
+        //all pool logic assumes that absolute guard rail is already stored as an 18dp int256
         require(
             int256(uint256(_poolSettings.absoluteWeightGuardRail)) <
                 PRBMathSD59x18.fromInt(1) / int256(uint256((_initialWeights.length))) &&
@@ -772,4 +776,11 @@ contract QuantAMMWeightedPool is
     function getOracleStalenessThreshold() external view override returns (uint) {
         return oracleStalenessThreshold;
     }
+
+    /// @inheritdoc IQuantAMMWeightedPool
+    function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
+        updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
+    }
+
 }

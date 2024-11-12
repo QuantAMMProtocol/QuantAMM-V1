@@ -135,4 +135,7 @@ interface IQuantAMMWeightedPool {
      * @return data A struct containing all immutable weighted pool parameters
      */
     function getQuantAMMWeightedPoolImmutableData() external view returns (QuantAMMWeightedPoolImmutableData memory data);
+
+    /// @notice this is to update the runner for the pool. This is for hotfixes and is timelock protected.
+    function setUpdateWeightRunnerAddress(address _updateWeightRunner) external;
 }

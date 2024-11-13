@@ -1,0 +1,1353 @@
+Script started on 2024-11-10 14:18:33+00:00 [TERM="xterm-256color" TTY="/dev/pts/2" COLUMNS="129" LINES="19"]
+[33m[1mWarning:[22m[39m Contract code size is 26029 bytes and exceeds 24576 bytes (a limit introduced in Spurious Dragon). This contract may not be deployable on Mainnet. Consider enabling the optimizer (with a low "runs" value!), turning off revert strings, or using libraries.
+  --> contracts/QuantAMMWeightedPool.sol:67:1:
+   |
+67 | contract QuantAMMWeightedPool is
+   | ^ (Relevant source part starts here and spans across multiple lines).
+
+
+[33m[1mWarning:[22m[39m Contract code size is 25886 bytes and exceeds 24576 bytes (a limit introduced in Spurious Dragon). This contract may not be deployable on Mainnet. Consider enabling the optimizer (with a low "runs" value!), turning off revert strings, or using libraries.
+  --> contracts/mock/QuantAMMWeightedPoolMock.sol:12:1:
+   |
+12 | contract MockQuantAMMWeightedPool is QuantAMMWeightedPool {
+   | ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Generating typings for: 105 artifacts in dir: typechain-types for target: ethers-v6
+Successfully generated 264 typings!
+Compiled 106 Solidity files successfully (evm target: cancun).
+INFO:Detectors:[91m
+Math.mulDiv(uint256,uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#144-223) has bitwise-xor operator ^ instead of the exponentiation operator **: 
+	 - inverse = (3 * denominator) ^ 2 (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#205)
+PRBMath.mulDiv(uint256,uint256,uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#394-478) has bitwise-xor operator ^ instead of the exponentiation operator **: 
+	 - inverse = (3 * denominator) ^ 2 (../../node_modules/@prb/math/contracts/PRBMath.sol#460)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#incorrect-exponentiation[0m
+INFO:Detectors:[91m
+AntiMomentumUpdateRule.ONE (contracts/rules/AntimomentumUpdateRule.sol#27) shadows:
+	- QuantAMMMathMovingAverage.ONE (contracts/rules/base/QuantammMathMovingAverage.sol#12)
+	- QuantAMMGradientBasedRule.ONE (contracts/rules/base/QuantammGradientBasedRule.sol#14)
+	- QuantAMMMathGuard.ONE (contracts/rules/base/QuantammMathGuard.sol#11)
+MinimumVarianceUpdateRule.ONE (contracts/rules/MinimumVarianceUpdateRule.sol#23) shadows:
+	- QuantAMMMathMovingAverage.ONE (contracts/rules/base/QuantammMathMovingAverage.sol#12)
+	- QuantAMMVarianceBasedRule.ONE (contracts/rules/base/QuantammVarianceBasedRule.sol#14)
+	- QuantAMMMathGuard.ONE (contracts/rules/base/QuantammMathGuard.sol#11)
+MomentumUpdateRule.ONE (contracts/rules/MomentumUpdateRule.sol#25) shadows:
+	- QuantAMMMathMovingAverage.ONE (contracts/rules/base/QuantammMathMovingAverage.sol#12)
+	- QuantAMMGradientBasedRule.ONE (contracts/rules/base/QuantammGradientBasedRule.sol#14)
+	- QuantAMMMathGuard.ONE (contracts/rules/base/QuantammMathGuard.sol#11)
+PowerChannelUpdateRule.ONE (contracts/rules/PowerChannelUpdateRule.sol#26) shadows:
+	- QuantAMMMathMovingAverage.ONE (contracts/rules/base/QuantammMathMovingAverage.sol#12)
+	- QuantAMMGradientBasedRule.ONE (contracts/rules/base/QuantammGradientBasedRule.sol#14)
+	- QuantAMMMathGuard.ONE (contracts/rules/base/QuantammMathGuard.sol#11)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#state-variable-shadowing[0m
+INFO:Detectors:[93m
+LogExpMath.pow(uint256,uint256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#96-147) performs a multiplication on the result of a division:
+	- logx_times_y = ((ln_36_x / ONE_18) * y_int256 + ((ln_36_x % ONE_18) * y_int256) / ONE_18) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#134)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- term = ((term * x) / ONE_20) / 2 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#261)
+	- term = ((term * x) / ONE_20) / 3 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#264)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- term = ((term * x) / ONE_20) / 3 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#264)
+	- term = ((term * x) / ONE_20) / 4 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#267)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- term = ((term * x) / ONE_20) / 4 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#267)
+	- term = ((term * x) / ONE_20) / 5 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#270)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- term = ((term * x) / ONE_20) / 5 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#270)
+	- term = ((term * x) / ONE_20) / 6 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#273)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- term = ((term * x) / ONE_20) / 6 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#273)
+	- term = ((term * x) / ONE_20) / 7 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#276)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- term = ((term * x) / ONE_20) / 7 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#276)
+	- term = ((term * x) / ONE_20) / 8 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#279)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- term = ((term * x) / ONE_20) / 8 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#279)
+	- term = ((term * x) / ONE_20) / 9 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#282)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- term = ((term * x) / ONE_20) / 9 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#282)
+	- term = ((term * x) / ONE_20) / 10 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#285)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- term = ((term * x) / ONE_20) / 10 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#285)
+	- term = ((term * x) / ONE_20) / 11 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#288)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- term = ((term * x) / ONE_20) / 11 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#288)
+	- term = ((term * x) / ONE_20) / 12 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#291)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- result = (((product * seriesSum) / ONE_20) * firstAN) / 100 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#301)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- product = (product * a8) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#237)
+	- product = (product * a9) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#241)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- product = (product * a7) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#233)
+	- product = (product * a8) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#237)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- product = (product * a6) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#229)
+	- product = (product * a7) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#233)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- product = (product * a5) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#225)
+	- product = (product * a6) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#229)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- product = (product * a4) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#221)
+	- product = (product * a5) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#225)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- product = (product * a3) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#217)
+	- product = (product * a4) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#221)
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) performs a multiplication on the result of a division:
+	- product = (product * a2) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#213)
+	- product = (product * a3) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#217)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- z = ((a - ONE_20) * ONE_20) / (a + ONE_20) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#458)
+	- z_squared = (z * z) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#459)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- z = ((a - ONE_20) * ONE_20) / (a + ONE_20) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#458)
+	- z_squared = (z * z) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#459)
+	- num = z (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#462)
+	- num = (num * z_squared) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#468)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- z_squared = (z * z) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#459)
+	- num = (num * z_squared) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#468)
+	- num = (num * z_squared) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#471)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- z_squared = (z * z) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#459)
+	- num = (num * z_squared) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#471)
+	- num = (num * z_squared) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#474)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- z_squared = (z * z) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#459)
+	- num = (num * z_squared) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#474)
+	- num = (num * z_squared) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#477)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- z_squared = (z * z) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#459)
+	- num = (num * z_squared) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#477)
+	- num = (num * z_squared) / ONE_20 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#480)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- z = ((a - ONE_20) * ONE_20) / (a + ONE_20) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#458)
+	- num = z (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#462)
+	- seriesSum = num (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#465)
+	- seriesSum *= 2 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#486)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- a = (a * ONE_20) / a10 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#440)
+	- a = (a * ONE_20) / a11 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#445)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- a = (a * ONE_20) / a9 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#435)
+	- a = (a * ONE_20) / a10 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#440)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- a = (a * ONE_20) / a8 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#430)
+	- a = (a * ONE_20) / a9 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#435)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- a = (a * ONE_20) / a7 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#425)
+	- a = (a * ONE_20) / a8 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#430)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- a = (a * ONE_20) / a6 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#420)
+	- a = (a * ONE_20) / a7 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#425)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- a = (a * ONE_20) / a5 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#415)
+	- a = (a * ONE_20) / a6 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#420)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- a = (a * ONE_20) / a4 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#410)
+	- a = (a * ONE_20) / a5 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#415)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- a = (a * ONE_20) / a3 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#405)
+	- a = (a * ONE_20) / a4 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#410)
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) performs a multiplication on the result of a division:
+	- a = (a * ONE_20) / a2 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#400)
+	- a = (a * ONE_20) / a3 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#405)
+LogExpMath._ln_36(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#505-554) performs a multiplication on the result of a division:
+	- z = ((x - ONE_36) * ONE_36) / (x + ONE_36) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#518)
+	- z_squared = (z * z) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#519)
+LogExpMath._ln_36(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#505-554) performs a multiplication on the result of a division:
+	- z = ((x - ONE_36) * ONE_36) / (x + ONE_36) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#518)
+	- z_squared = (z * z) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#519)
+	- num = z (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#522)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#528)
+LogExpMath._ln_36(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#505-554) performs a multiplication on the result of a division:
+	- z_squared = (z * z) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#519)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#528)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#531)
+LogExpMath._ln_36(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#505-554) performs a multiplication on the result of a division:
+	- z_squared = (z * z) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#519)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#531)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#534)
+LogExpMath._ln_36(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#505-554) performs a multiplication on the result of a division:
+	- z_squared = (z * z) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#519)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#534)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#537)
+LogExpMath._ln_36(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#505-554) performs a multiplication on the result of a division:
+	- z_squared = (z * z) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#519)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#537)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#540)
+LogExpMath._ln_36(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#505-554) performs a multiplication on the result of a division:
+	- z_squared = (z * z) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#519)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#540)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#543)
+LogExpMath._ln_36(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#505-554) performs a multiplication on the result of a division:
+	- z_squared = (z * z) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#519)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#543)
+	- num = (num * z_squared) / ONE_36 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#546)
+LogExpMath._ln_36(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#505-554) performs a multiplication on the result of a division:
+	- z = ((x - ONE_36) * ONE_36) / (x + ONE_36) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#518)
+	- num = z (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#522)
+	- seriesSum = num (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#525)
+	- seriesSum * 2 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#552)
+Math.mulDiv(uint256,uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#144-223) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#190)
+	- inverse = (3 * denominator) ^ 2 (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#205)
+Math.mulDiv(uint256,uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#144-223) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#190)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#209)
+Math.mulDiv(uint256,uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#144-223) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#190)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#210)
+Math.mulDiv(uint256,uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#144-223) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#190)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#211)
+Math.mulDiv(uint256,uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#144-223) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#190)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#212)
+Math.mulDiv(uint256,uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#144-223) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#190)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#213)
+Math.mulDiv(uint256,uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#144-223) performs a multiplication on the result of a division:
+	- denominator = denominator / twos (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#190)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#214)
+Math.mulDiv(uint256,uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#144-223) performs a multiplication on the result of a division:
+	- prod0 = prod0 / twos (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#193)
+	- result = prod0 * inverse (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#220)
+Math.invMod(uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#243-289) performs a multiplication on the result of a division:
+	- quotient = gcd / remainder (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#265)
+	- (gcd,remainder) = (remainder,gcd - remainder * quotient) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#267-274)
+PRBMath.mulDiv(uint256,uint256,uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#394-478) performs a multiplication on the result of a division:
+	- denominator = denominator / lpotdod (../../node_modules/@prb/math/contracts/PRBMath.sol#445)
+	- inverse = (3 * denominator) ^ 2 (../../node_modules/@prb/math/contracts/PRBMath.sol#460)
+PRBMath.mulDiv(uint256,uint256,uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#394-478) performs a multiplication on the result of a division:
+	- denominator = denominator / lpotdod (../../node_modules/@prb/math/contracts/PRBMath.sol#445)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@prb/math/contracts/PRBMath.sol#464)
+PRBMath.mulDiv(uint256,uint256,uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#394-478) performs a multiplication on the result of a division:
+	- denominator = denominator / lpotdod (../../node_modules/@prb/math/contracts/PRBMath.sol#445)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@prb/math/contracts/PRBMath.sol#465)
+PRBMath.mulDiv(uint256,uint256,uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#394-478) performs a multiplication on the result of a division:
+	- denominator = denominator / lpotdod (../../node_modules/@prb/math/contracts/PRBMath.sol#445)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@prb/math/contracts/PRBMath.sol#466)
+PRBMath.mulDiv(uint256,uint256,uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#394-478) performs a multiplication on the result of a division:
+	- denominator = denominator / lpotdod (../../node_modules/@prb/math/contracts/PRBMath.sol#445)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@prb/math/contracts/PRBMath.sol#467)
+PRBMath.mulDiv(uint256,uint256,uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#394-478) performs a multiplication on the result of a division:
+	- denominator = denominator / lpotdod (../../node_modules/@prb/math/contracts/PRBMath.sol#445)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@prb/math/contracts/PRBMath.sol#468)
+PRBMath.mulDiv(uint256,uint256,uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#394-478) performs a multiplication on the result of a division:
+	- denominator = denominator / lpotdod (../../node_modules/@prb/math/contracts/PRBMath.sol#445)
+	- inverse *= 2 - denominator * inverse (../../node_modules/@prb/math/contracts/PRBMath.sol#469)
+PRBMath.mulDiv(uint256,uint256,uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#394-478) performs a multiplication on the result of a division:
+	- prod0 = prod0 / lpotdod (../../node_modules/@prb/math/contracts/PRBMath.sol#448)
+	- result = prod0 * inverse (../../node_modules/@prb/math/contracts/PRBMath.sol#475)
+MultiHopOracle._getData() (contracts/MultiHopOracle.sol#28-54) performs a multiplication on the result of a division:
+	- data = (data * 10 ** 18) / oracleRes (contracts/MultiHopOracle.sol#46)
+	- data = (data * oracleRes) / 10 ** 18 (contracts/MultiHopOracle.sol#48)
+EchidnaQuantAMMMathGuard.echidna_check_weights() (contracts/echidna/echidna_update_weight_runner.sol#56-70) performs a multiplication on the result of a division:
+	- lowerBound = int256((1e18 / 2) * weights.length) (contracts/echidna/echidna_update_weight_runner.sol#61)
+AntiMomentumUpdateRule._getWeights(int256[],int256[],int256[][],QuantAMMPoolParameters) (contracts/rules/AntimomentumUpdateRule.sol#46-117) performs a multiplication on the result of a division:
+	- locals.newWeights[locals.i] = ONE.div(locals.denominator).mul(int256(locals.newWeights[locals.i])) (contracts/rules/AntimomentumUpdateRule.sol#74)
+MinimumVarianceUpdateRule._getWeights(int256[],int256[],int256[][],QuantAMMPoolParameters) (contracts/rules/MinimumVarianceUpdateRule.sol#32-94) performs a multiplication on the result of a division:
+	- precision_scope_4 = ONE.div(newWeights[i_scope_1]) (contracts/rules/MinimumVarianceUpdateRule.sol#73)
+	- newWeights[i_scope_1] = oneMinusLambda_scope_3.mul(precision_scope_4) (contracts/rules/MinimumVarianceUpdateRule.sol#75)
+MinimumVarianceUpdateRule._getWeights(int256[],int256[],int256[][],QuantAMMPoolParameters) (contracts/rules/MinimumVarianceUpdateRule.sol#32-94) performs a multiplication on the result of a division:
+	- precision = ONE.div(newWeights[i]) (contracts/rules/MinimumVarianceUpdateRule.sol#51)
+	- newWeights[i] = oneMinusLambda.mul(precision) (contracts/rules/MinimumVarianceUpdateRule.sol#53)
+MomentumUpdateRule._getWeights(int256[],int256[],int256[][],QuantAMMPoolParameters) (contracts/rules/MomentumUpdateRule.sol#44-128) performs a multiplication on the result of a division:
+	- locals.newWeights[locals.i] = ONE.div(locals.denominator).mul(locals.newWeights[locals.i]) (contracts/rules/MomentumUpdateRule.sol#74)
+PowerChannelUpdateRule._getWeights(int256[],int256[],int256[][],QuantAMMPoolParameters) (contracts/rules/PowerChannelUpdateRule.sol#49-132) performs a multiplication on the result of a division:
+	- locals.intermediateRes = ONE.div(locals.denominator).mul(locals.newWeights[locals.i]) (contracts/rules/PowerChannelUpdateRule.sol#77)
+QuantAMMMathGuard._clampWeights(int256[],int256) (contracts/rules/base/QuantammMathGuard.sol#35-69) performs a multiplication on the result of a division:
+	- proportionalRemainder = sumRemainerWeight.div(sumOtherWeights) (contracts/rules/base/QuantammMathGuard.sol#60)
+	- _weights[i_scope_0] = _weights[i_scope_0].mul(proportionalRemainder) (contracts/rules/base/QuantammMathGuard.sol#63)
+QuantAMMMathGuard._normalizeWeightUpdates(int256[],int256[],int256) (contracts/rules/base/QuantammMathGuard.sol#71-107) performs a multiplication on the result of a division:
+	- rescaleFactor = _epsilonMax.div(maxAbsChange) (contracts/rules/base/QuantammMathGuard.sol#91)
+	- newDelta = (_newWeights[i_scope_0] - _prevWeights[i_scope_0]).mul(rescaleFactor) (contracts/rules/base/QuantammMathGuard.sol#93)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#divide-before-multiply[0m
+INFO:Detectors:[93m
+Reentrancy in QuantAMMWeightedPool.initialize(int256[],IQuantAMMWeightedPool.PoolSettings,int256[],int256[],uint256) (contracts/QuantAMMWeightedPool.sol#644-667):
+	External calls:
+	- _setRule(_initialWeights,_initialIntermediateValues,_initialMovingAverages,_poolSettings) (contracts/QuantAMMWeightedPool.sol#664)
+		- _poolSettings.rule.initialisePoolRuleIntermediateValues(address(this),_initialMovingAverages,_ruleIntermediateValues,_initialWeights.length) (contracts/QuantAMMWeightedPool.sol#761-766)
+		- updateWeightRunner.setRuleForPool(_poolSettings) (contracts/QuantAMMWeightedPool.sol#768)
+	State variables written after the call(s):
+	- _setInitialWeights(_initialWeights) (contracts/QuantAMMWeightedPool.sol#666)
+		- poolSettings.quantAMMBaseInterpolationDetails = QuantAMMBaseInterpolationVariables({lastPossibleInterpolationTime:uint40(block.timestamp),lastUpdateIntervalTime:uint40(block.timestamp)}) (contracts/QuantAMMWeightedPool.sol#630-633)
+	QuantAMMWeightedPool.poolSettings (contracts/QuantAMMWeightedPool.sol#96) can be used in cross function reentrancies:
+	- QuantAMMWeightedPool._getNormalizedWeights() (contracts/QuantAMMWeightedPool.sol#382-478)
+	- QuantAMMWeightedPool._setInitialWeights(int256[]) (contracts/QuantAMMWeightedPool.sol#594-636)
+	- QuantAMMWeightedPool.computeBalance(uint256[],uint256,uint256) (contracts/QuantAMMWeightedPool.sol#159-184)
+	- QuantAMMWeightedPool.getQuantAMMWeightedPoolDynamicData() (contracts/QuantAMMWeightedPool.sol#519-548)
+	- QuantAMMWeightedPool.initialize(int256[],IQuantAMMWeightedPool.PoolSettings,int256[],int256[],uint256) (contracts/QuantAMMWeightedPool.sol#644-667)
+	- QuantAMMWeightedPool.onSwap(PoolSwapParams) (contracts/QuantAMMWeightedPool.sol#202-273)
+	- QuantAMMWeightedPool.setWeights(int256[],address,uint40) (contracts/QuantAMMWeightedPool.sol#567-590)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-1[0m
+INFO:Detectors:[93m
+QuantAMMGradientBasedRule._calculateQuantAMMGradient(int256[],QuantAMMPoolParameters).locals (contracts/rules/base/QuantammGradientBasedRule.sol#36) is a local variable never initialized
+MockMinimumVarianceRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[]).poolParameters (contracts/mock/mockRules/MockMinimumVarianceRule.sol#33) is a local variable never initialized
+QuantAMMMathGuard._clampWeights(int256[],int256).sumOtherWeights (contracts/rules/base/QuantammMathGuard.sol#48) is a local variable never initialized
+MockCalculationRule.externalCalculateQuantAMMGradient(int256[],int256[],address,int128[],uint256).poolParameters (contracts/mock/MockCalculationRule.sol#63) is a local variable never initialized
+VectorRuleQuantAMMStorage._quantAMMUnpack128Matrix(int256[],uint256).targetRow (contracts/QuantAMMStorage.sol#446) is a local variable never initialized
+MockPool.setRuleForPool(IUpdateRule,address[][],uint64[],int256[][],uint64,uint64,uint40,address)._poolSettings (contracts/mock/MockPool.sol#63) is a local variable never initialized
+MockAntiMomentumRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[]).poolParameters (contracts/mock/mockRules/MockAntiMomentumRule.sol#33) is a local variable never initialized
+ScalarQuantAMMBaseStorage.quantAMMPack32Array(int256[]).nonStickySourceLength (contracts/QuantAMMStorage.sol#210) is a local variable never initialized
+MomentumUpdateRule._getWeights(int256[],int256[],int256[][],QuantAMMPoolParameters).locals (contracts/rules/MomentumUpdateRule.sol#50) is a local variable never initialized
+ScalarQuantAMMBaseStorage.quantAMMUnpack32Array(int256[],uint256).targetIndex (contracts/QuantAMMStorage.sol#132) is a local variable never initialized
+UpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64).poolParameters (contracts/rules/UpdateRule.sol#174) is a local variable never initialized
+VectorRuleQuantAMMStorage._quantAMMPack128Matrix(int256[][],int256[]).targetArrayIndex (contracts/QuantAMMStorage.sol#388) is a local variable never initialized
+MockPowerChannelRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[]).poolParameters (contracts/mock/mockRules/MockPowerChannelRule.sol#33) is a local variable never initialized
+ScalarQuantAMMBaseStorage.quantAMMPack32Array(int256[]).storageIndex (contracts/QuantAMMStorage.sol#209) is a local variable never initialized
+VectorRuleQuantAMMStorage._quantAMMPack128Matrix(int256[][],int256[]).right (contracts/QuantAMMStorage.sol#390) is a local variable never initialized
+VectorRuleQuantAMMStorage._quantAMMPack128Matrix(int256[][],int256[]).leftInt (contracts/QuantAMMStorage.sol#389) is a local variable never initialized
+AntiMomentumUpdateRule._getWeights(int256[],int256[],int256[][],QuantAMMPoolParameters).locals (contracts/rules/AntimomentumUpdateRule.sol#52) is a local variable never initialized
+MockCalculationRule.externalCalculateQuantAMMCovariance(int256[],int256[],address,int128[],uint256).poolParameters (contracts/mock/MockCalculationRule.sol#81) is a local variable never initialized
+ScalarQuantAMMBaseStorage.quantAMMUnpack32Array(int256[],uint256).stickyEndSourceElem (contracts/QuantAMMStorage.sol#135) is a local variable never initialized
+MockCalculationRule.externalCalculateQuantAMMVariance(int256[],int256[],address,int128[],uint256).poolParameters (contracts/mock/MockCalculationRule.sol#47) is a local variable never initialized
+UpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64).locals (contracts/rules/UpdateRule.sol#75) is a local variable never initialized
+QuantAMMCovarianceBasedRule._calculateQuantAMMCovariance(int256[],QuantAMMPoolParameters).locals (contracts/rules/base/QuantammCovarianceBasedRule.sol#39) is a local variable never initialized
+MockPool.callSetRuleForPool(UpdateWeightRunner,IUpdateRule,address[][],uint64[],int256[][],uint64,uint64)._poolSettings (contracts/mock/MockPool.sol#91) is a local variable never initialized
+QuantAMMVarianceBasedRule._calculateQuantAMMVariance(int256[],QuantAMMPoolParameters).locals (contracts/rules/base/QuantammVarianceBasedRule.sol#41) is a local variable never initialized
+ScalarQuantAMMBaseStorage.quantAMMPack32Array(int256[]).targetArrayLength (contracts/QuantAMMStorage.sol#208) is a local variable never initialized
+MockMomentumRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[]).poolParameters (contracts/mock/mockRules/MockMomentumRule.sol#33) is a local variable never initialized
+PowerChannelUpdateRule._getWeights(int256[],int256[],int256[][],QuantAMMPoolParameters).locals (contracts/rules/PowerChannelUpdateRule.sol#55) is a local variable never initialized
+VectorRuleQuantAMMStorage._quantAMMUnpack128Matrix(int256[],uint256).targetIndex (contracts/QuantAMMStorage.sol#445) is a local variable never initialized
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-local-variables[0m
+INFO:Detectors:[93m
+ChainlinkOracle._getData() (contracts/ChainlinkOracle.sol#26-32) ignores return value by (data,timestamp) = priceFeed.latestRoundData() (contracts/ChainlinkOracle.sol#27-28)
+QuantAMMWeightedPool.getQuantAMMWeightedPoolDynamicData() (contracts/QuantAMMWeightedPool.sol#519-548) ignores return value by (None,data.tokenRates) = _vault.getPoolTokenRates(address(this)) (contracts/QuantAMMWeightedPool.sol#521)
+PoolInfo.getTokenInfo() (../../node_modules/@balancer-labs/v3-pool-utils/contracts/PoolInfo.sol#24-35) ignores return value by _vault.getPoolTokenInfo(address(this)) (../../node_modules/@balancer-labs/v3-pool-utils/contracts/PoolInfo.sol#34)
+BalancerPoolToken.transfer(address,uint256) (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#82-86) ignores return value by _vault.transfer(msg.sender,to,amount) (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#84)
+BalancerPoolToken.approve(address,uint256) (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#94-98) ignores return value by _vault.approve(msg.sender,spender,amount) (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#96)
+BalancerPoolToken.transferFrom(address,address,uint256) (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#101-105) ignores return value by _vault.transferFrom(msg.sender,from,to,amount) (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#103)
+BalancerPoolToken.permit(address,address,uint256,uint256,uint8,bytes32,bytes32) (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#127-151) ignores return value by _vault.approve(owner,spender,amount) (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#150)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return[0m
+INFO:Detectors:[92m
+MockUpdateWeightRunner.constructor(address,address).ethOracle (contracts/mock/MockUpdateWeightRunner.sol#10) shadows:
+	- UpdateWeightRunner.ethOracle (contracts/UpdateWeightRunner.sol#98) (state variable)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#local-variable-shadowing[0m
+INFO:Detectors:[92m
+Ownable2Step.transferOwnership(address).newOwner (../../node_modules/@openzeppelin/contracts/access/Ownable2Step.sol#43) lacks a zero-check on :
+		- _pendingOwner = newOwner (../../node_modules/@openzeppelin/contracts/access/Ownable2Step.sol#44)
+MockPool.constructor(uint16,int256,address)._updateWeightRunner (contracts/mock/MockPool.sol#28) lacks a zero-check on :
+		- updateWeightRunner = _updateWeightRunner (contracts/mock/MockPool.sol#34)
+MockQuantAMMBasePool.setWeights(int256[],address,uint40)._poolAddress (contracts/mock/MockQuantAMMBasePool.sol#71) lacks a zero-check on :
+		- poolAddress = _poolAddress (contracts/mock/MockQuantAMMBasePool.sol#76)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#missing-zero-address-validation[0m
+INFO:Detectors:[92m
+UpdateWeightRunner._getOracleData(OracleWrapper) (contracts/UpdateWeightRunner.sol#293-298) has external calls inside a loop: (data,timestamp) = _oracle.getData() (contracts/UpdateWeightRunner.sol#295)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation/#calls-inside-a-loop[0m
+INFO:Detectors:[92m
+Reentrancy in BasePoolFactory._create(bytes,bytes32) (../../node_modules/@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol#98-102):
+	External calls:
+	- pool = CREATE3.deploy(_computeFinalSalt(salt),abi.encodePacked(_creationCode,constructorArgs),0) (../../node_modules/@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol#99)
+	State variables written after the call(s):
+	- _registerPoolWithFactory(pool) (../../node_modules/@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol#101)
+		- _isPoolFromFactory[pool] = true (../../node_modules/@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol#84)
+Reentrancy in UpdateWeightRunner._getUpdatedWeightsAndOracleData(address,int256[],UpdateWeightRunner.PoolRuleSettings) (contracts/UpdateWeightRunner.sol#353-370):
+	External calls:
+	- updatedWeights = rules[_pool].CalculateNewWeights(_currentWeights,data,_pool,_ruleSettings.ruleParameters,_ruleSettings.lambda,_ruleSettings.epsilonMax,_ruleSettings.absoluteWeightGuardRail) (contracts/UpdateWeightRunner.sol#360-368)
+	State variables written after the call(s):
+	- poolRuleSettings[_pool].timingSettings.lastPoolUpdateRun = uint40(block.timestamp) (contracts/UpdateWeightRunner.sol#369)
+Reentrancy in QuantAMMWeightedPool.initialize(int256[],IQuantAMMWeightedPool.PoolSettings,int256[],int256[],uint256) (contracts/QuantAMMWeightedPool.sol#644-667):
+	External calls:
+	- _setRule(_initialWeights,_initialIntermediateValues,_initialMovingAverages,_poolSettings) (contracts/QuantAMMWeightedPool.sol#664)
+		- _poolSettings.rule.initialisePoolRuleIntermediateValues(address(this),_initialMovingAverages,_ruleIntermediateValues,_initialWeights.length) (contracts/QuantAMMWeightedPool.sol#761-766)
+		- updateWeightRunner.setRuleForPool(_poolSettings) (contracts/QuantAMMWeightedPool.sol#768)
+	State variables written after the call(s):
+	- _setInitialWeights(_initialWeights) (contracts/QuantAMMWeightedPool.sol#666)
+		- _normalizedFirstFourWeights = quantAMMPack32Array(splitWeights[0])[0] (contracts/QuantAMMWeightedPool.sol#623)
+		- _normalizedFirstFourWeights = quantAMMPack32Array(_weightsAndBlockMultiplier)[0] (contracts/QuantAMMWeightedPool.sol#626)
+	- _setInitialWeights(_initialWeights) (contracts/QuantAMMWeightedPool.sol#666)
+		- _normalizedSecondFourWeights = quantAMMPack32Array(splitWeights[1])[0] (contracts/QuantAMMWeightedPool.sol#624)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2[0m
+INFO:Detectors:[92m
+Reentrancy in BasePoolFactory._create(bytes,bytes32) (../../node_modules/@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol#98-102):
+	External calls:
+	- pool = CREATE3.deploy(_computeFinalSalt(salt),abi.encodePacked(_creationCode,constructorArgs),0) (../../node_modules/@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol#99)
+	Event emitted after the call(s):
+	- PoolCreated(pool) (../../node_modules/@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol#86)
+		- _registerPoolWithFactory(pool) (../../node_modules/@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol#101)
+Reentrancy in QuantAMMWeightedPool.initialize(int256[],IQuantAMMWeightedPool.PoolSettings,int256[],int256[],uint256) (contracts/QuantAMMWeightedPool.sol#644-667):
+	External calls:
+	- _setRule(_initialWeights,_initialIntermediateValues,_initialMovingAverages,_poolSettings) (contracts/QuantAMMWeightedPool.sol#664)
+		- _poolSettings.rule.initialisePoolRuleIntermediateValues(address(this),_initialMovingAverages,_ruleIntermediateValues,_initialWeights.length) (contracts/QuantAMMWeightedPool.sol#761-766)
+		- updateWeightRunner.setRuleForPool(_poolSettings) (contracts/QuantAMMWeightedPool.sol#768)
+	Event emitted after the call(s):
+	- WeightsUpdated(address(this),_weights) (contracts/QuantAMMWeightedPool.sol#635)
+		- _setInitialWeights(_initialWeights) (contracts/QuantAMMWeightedPool.sol#666)
+Reentrancy in UpdateWeightRunner.performUpdate(address) (contracts/UpdateWeightRunner.sol#242-264):
+	External calls:
+	- _performUpdateAndGetData(_pool,settings) (contracts/UpdateWeightRunner.sol#256)
+		- updatedWeights = rules[_pool].CalculateNewWeights(_currentWeights,data,_pool,_ruleSettings.ruleParameters,_ruleSettings.lambda,_ruleSettings.epsilonMax,_ruleSettings.absoluteWeightGuardRail) (contracts/UpdateWeightRunner.sol#360-368)
+		- IQuantAMMWeightedPool(_poolAddress).setWeights(targetWeightsAndBlockMultiplier,_poolAddress,lastTimestampThatInterpolationWorks) (contracts/UpdateWeightRunner.sol#455-459)
+	Event emitted after the call(s):
+	- UpdatePerformed(msg.sender,_pool) (contracts/UpdateWeightRunner.sol#259)
+Reentrancy in UpdateWeightRunner.setIntermediateValuesManually(address,int256[],int256[],uint256) (contracts/UpdateWeightRunner.sol#496-523):
+	External calls:
+	- rule.initialisePoolRuleIntermediateValues(_poolAddress,_newMovingAverages,_newParameters,_numberOfAssets) (contracts/UpdateWeightRunner.sol#520)
+	Event emitted after the call(s):
+	- SetIntermediateValuesManually(msg.sender,_poolAddress,_newMovingAverages,_newParameters,_numberOfAssets) (contracts/UpdateWeightRunner.sol#522)
+Reentrancy in UpdateWeightRunner.setWeightsManually(int256[],address,uint40) (contracts/UpdateWeightRunner.sol#468-489):
+	External calls:
+	- IQuantAMMWeightedPool(_poolAddress).setWeights(_weights,_poolAddress,_lastInterpolationTimePossible) (contracts/UpdateWeightRunner.sol#486)
+	Event emitted after the call(s):
+	- SetWeightManual(msg.sender,_poolAddress,_weights,_lastInterpolationTimePossible) (contracts/UpdateWeightRunner.sol#488)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-3[0m
+INFO:Detectors:[92m
+FactoryWidePauseWindow.constructor(uint32) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/FactoryWidePauseWindow.sol#31-42) uses timestamp for comparisons
+	Dangerous comparisons:
+	- pauseWindowEndTime > _MAX_TIMESTAMP (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/FactoryWidePauseWindow.sol#34)
+FactoryWidePauseWindow.getNewPoolPauseWindowEndTime() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/FactoryWidePauseWindow.sol#68-72) uses timestamp for comparisons
+	Dangerous comparisons:
+	- (block.timestamp < _poolsPauseWindowEndTime) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/FactoryWidePauseWindow.sol#71)
+BalancerPoolToken.permit(address,address,uint256,uint256,uint8,bytes32,bytes32) (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#127-151) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp > deadline (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#137)
+QuantAMMWeightedPool.computeBalance(uint256[],uint256,uint256) (contracts/QuantAMMWeightedPool.sol#159-184) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= lastInterpolationTime (contracts/QuantAMMWeightedPool.sol#167)
+QuantAMMWeightedPool.onSwap(PoolSwapParams) (contracts/QuantAMMWeightedPool.sol#202-273) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= variables.lastPossibleInterpolationTime (contracts/QuantAMMWeightedPool.sol#210)
+QuantAMMWeightedPool._getNormalizedWeights() (contracts/QuantAMMWeightedPool.sol#382-478) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= lastInterpolationTime (contracts/QuantAMMWeightedPool.sol#389)
+UpdateWeightRunner.performUpdate(address) (contracts/UpdateWeightRunner.sol#242-264) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(block.timestamp - settings.timingSettings.lastPoolUpdateRun >= settings.timingSettings.updateInterval,Update not allowed) (contracts/UpdateWeightRunner.sol#249-252)
+UpdateWeightRunner.getData(address) (contracts/UpdateWeightRunner.sol#302-351) uses timestamp for comparisons
+	Dangerous comparisons:
+	- oracleResult.timestamp > block.timestamp - oracleStalenessThreshold (contracts/UpdateWeightRunner.sol#316)
+	- oracleResult.timestamp > block.timestamp - oracleStalenessThreshold (contracts/UpdateWeightRunner.sol#328)
+UpdateWeightRunner._performUpdateAndGetData(address,UpdateWeightRunner.PoolRuleSettings) (contracts/UpdateWeightRunner.sol#375-462) uses timestamp for comparisons
+	Dangerous comparisons:
+	- blockTimeUntilGuardRailHit < currentLastInterpolationPossible (contracts/UpdateWeightRunner.sol#433)
+	- currentLastInterpolationPossible < int40(type()(uint40).max) (contracts/UpdateWeightRunner.sol#450)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp[0m
+INFO:Detectors:[92m
+CastingHelpers.asIERC20(address[]) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/CastingHelpers.sol#24-29) uses assembly
+	- INLINE ASM (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/CastingHelpers.sol#26-28)
+CastingHelpers.asAddress(IERC20[]) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/CastingHelpers.sol#32-37) uses assembly
+	- INLINE ASM (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/CastingHelpers.sol#34-36)
+FixedPoint.mulUp(uint256,uint256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol#27-36) uses assembly
+	- INLINE ASM (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol#33-35)
+FixedPoint.mulDivUp(uint256,uint256,uint256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol#51-71) uses assembly
+	- INLINE ASM (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol#68-70)
+FixedPoint.divUpRaw(uint256,uint256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol#79-90) uses assembly
+	- INLINE ASM (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol#87-89)
+FixedPoint.complement(uint256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol#148-154) uses assembly
+	- INLINE ASM (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol#151-153)
+CREATE3.deploy(bytes32,bytes,uint256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/solmate/CREATE3.sol#43-58) uses assembly
+	- INLINE ASM (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/solmate/CREATE3.sol#48-52)
+Initializable._getInitializableStorage() (../../node_modules/@openzeppelin/contracts/proxy/utils/Initializable.sol#223-227) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/proxy/utils/Initializable.sol#224-226)
+SafeERC20._callOptionalReturn(IERC20,bytes) (../../node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#160-178) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#163-173)
+SafeERC20._callOptionalReturnBool(IERC20,bytes) (../../node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#188-198) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#192-196)
+Address._revert(bytes) (../../node_modules/@openzeppelin/contracts/utils/Address.sol#138-149) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/Address.sol#142-145)
+Panic.panic(uint256) (../../node_modules/@openzeppelin/contracts/utils/Panic.sol#50-56) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/Panic.sol#51-55)
+ShortStrings.toString(ShortString) (../../node_modules/@openzeppelin/contracts/utils/ShortStrings.sol#63-72) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/ShortStrings.sol#67-70)
+StorageSlot.getAddressSlot(bytes32) (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#66-70) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#67-69)
+StorageSlot.getBooleanSlot(bytes32) (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#75-79) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#76-78)
+StorageSlot.getBytes32Slot(bytes32) (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#84-88) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#85-87)
+StorageSlot.getUint256Slot(bytes32) (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#93-97) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#94-96)
+StorageSlot.getInt256Slot(bytes32) (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#102-106) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#103-105)
+StorageSlot.getStringSlot(bytes32) (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#111-115) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#112-114)
+StorageSlot.getStringSlot(string) (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#120-124) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#121-123)
+StorageSlot.getBytesSlot(bytes32) (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#129-133) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#130-132)
+StorageSlot.getBytesSlot(bytes) (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#138-142) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#139-141)
+Strings.toString(uint256) (../../node_modules/@openzeppelin/contracts/utils/Strings.sol#24-42) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/Strings.sol#29-31)
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/Strings.sol#34-36)
+Strings.toChecksumHexString(address) (../../node_modules/@openzeppelin/contracts/utils/Strings.sol#90-108) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/Strings.sol#95-97)
+ECDSA.tryRecover(bytes32,bytes) (../../node_modules/@openzeppelin/contracts/utils/cryptography/ECDSA.sol#56-75) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/cryptography/ECDSA.sol#66-70)
+MessageHashUtils.toEthSignedMessageHash(bytes32) (../../node_modules/@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol#30-36) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol#31-35)
+MessageHashUtils.toTypedDataHash(bytes32,bytes32) (../../node_modules/@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol#75-83) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol#76-82)
+Math.mulDiv(uint256,uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#144-223) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#151-154)
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#175-182)
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#188-197)
+Math.tryModExp(uint256,uint256,uint256) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#337-361) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#339-360)
+Math.tryModExp(bytes,bytes,bytes) (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#377-399) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#389-398)
+SafeCast.toUint(bool) (../../node_modules/@openzeppelin/contracts/utils/math/SafeCast.sol#1157-1161) uses assembly
+	- INLINE ASM (../../node_modules/@openzeppelin/contracts/utils/math/SafeCast.sol#1158-1160)
+PRBMath.mulDiv(uint256,uint256,uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#394-478) uses assembly
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMath.sol#404-408)
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMath.sol#429-436)
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMath.sol#443-452)
+PRBMath.mulDivFixedPoint(uint256,uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#498-537) uses assembly
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMath.sol#501-505)
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMath.sol#513-516)
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMath.sol#525-536)
+PRBMath.mulDivSigned(int256,int256,int256) (../../node_modules/@prb/math/contracts/PRBMath.sol#551-589) uses assembly
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMath.sol#580-584)
+PRBMathSD59x18.avg(int256,int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#60-76) uses assembly
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#67-69)
+PRBMathSD59x18.div(int256,int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#122-152) uses assembly
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#144-147)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses assembly
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#379-461)
+PRBMathSD59x18.log2(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#484-532) uses assembly
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#496-498)
+PRBMathSD59x18.mul(int256,int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#551-575) uses assembly
+	- INLINE ASM (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#569-572)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#assembly-usage[0m
+INFO:Detectors:[92m
+Different versions of Solidity are used:
+	- Version used: ['>=0.8.20', '>=0.8.24', '>=0.8.4', '^0.8.0', '^0.8.20', '^0.8.24']
+	- >=0.8.20 (contracts/ChainlinkOracle.sol#2)
+	- >=0.8.24 (contracts/DaoOperations.sol#2)
+	- >=0.8.24 (contracts/IQuantAMMWeightedPool.sol#2)
+	- >=0.8.24 (contracts/MultiHopOracle.sol#2)
+	- >=0.8.24 (contracts/OracleWrapper.sol#2)
+	- >=0.8.24 (contracts/QuantAMMBaseAdministration.sol#2)
+	- >=0.8.24 (contracts/QuantAMMStorage.sol#2)
+	- >=0.8.24 (contracts/QuantAMMWeightedPool.sol#3)
+	- >=0.8.24 (contracts/QuantAMMWeightedPoolFactory.sol#3)
+	- >=0.8.24 (contracts/UpdateWeightRunner.sol#2)
+	- >=0.8.24 (contracts/mock/MockCalculationRule.sol#2)
+	- >=0.8.24 (contracts/mock/MockChainlinkOracles.sol#2)
+	- >=0.8.24 (contracts/mock/MockIdentityRules.sol#2)
+	- >=0.8.24 (contracts/mock/MockPool.sol#2)
+	- >=0.8.24 (contracts/mock/MockQuantAMMBasePool.sol#2)
+	- >=0.8.24 (contracts/mock/MockQuantAMMMathGuard.sol#2)
+	- >=0.8.24 (contracts/mock/MockQuantAMMStorage.sol#2)
+	- >=0.8.24 (contracts/mock/MockRuleInvoker.sol#2)
+	- >=0.8.24 (contracts/mock/MockUpdateWeightRunner.sol#2)
+	- >=0.8.24 (contracts/mock/mockRules/MockAntiMomentumRule.sol#2)
+	- >=0.8.24 (contracts/mock/mockRules/MockMinimumVarianceRule.sol#2)
+	- >=0.8.24 (contracts/mock/mockRules/MockMomentumRule.sol#2)
+	- >=0.8.24 (contracts/mock/mockRules/MockPowerChannelRule.sol#2)
+	- >=0.8.24 (contracts/rules/AntimomentumUpdateRule.sol#2)
+	- >=0.8.24 (contracts/rules/IUpdateRule.sol#2)
+	- >=0.8.24 (contracts/rules/MinimumVarianceUpdateRule.sol#2)
+	- >=0.8.24 (contracts/rules/MomentumUpdateRule.sol#2)
+	- >=0.8.24 (contracts/rules/PowerChannelUpdateRule.sol#2)
+	- >=0.8.24 (contracts/rules/UpdateRule.sol#2)
+	- >=0.8.24 (contracts/rules/base/QuantammBasedRuleHelpers.sol#2)
+	- >=0.8.24 (contracts/rules/base/QuantammCovarianceBasedRule.sol#2)
+	- >=0.8.24 (contracts/rules/base/QuantammGradientBasedRule.sol#2)
+	- >=0.8.24 (contracts/rules/base/QuantammMathGuard.sol#2)
+	- >=0.8.24 (contracts/rules/base/QuantammMathMovingAverage.sol#2)
+	- >=0.8.24 (contracts/rules/base/QuantammVarianceBasedRule.sol#2)
+	- >=0.8.4 (../../node_modules/@prb/math/contracts/PRBMath.sol#2)
+	- >=0.8.4 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#2)
+	- ^0.8.0 (contracts/AggregatorV3Interface.sol#2)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/access/Ownable.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/access/Ownable2Step.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/interfaces/IERC1363.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/interfaces/IERC165.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/interfaces/IERC20.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/interfaces/IERC4626.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/interfaces/IERC5267.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/proxy/utils/Initializable.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Address.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Context.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Errors.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Nonces.sol#3)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Panic.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/ShortStrings.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#5)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Strings.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/cryptography/ECDSA.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/cryptography/EIP712.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/introspection/ERC165.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/introspection/IERC165.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#4)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/math/SafeCast.sol#5)
+	- ^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/math/SignedMath.sol#4)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/pool-utils/IPoolInfo.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/pool-weighted/IWeightedPool.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IAuthentication.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IPoolVersion.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IRateProvider.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IVersion.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IAuthorizer.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IBasePool.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IBasePoolFactory.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IHooks.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IProtocolFeeController.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/ISwapFeePercentageBounds.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IUnbalancedLiquidityInvariantRatioBounds.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVault.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVaultAdmin.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVaultErrors.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVaultEvents.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVaultExtension.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVaultMain.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-pool-utils/contracts/PoolInfo.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/Authentication.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/CastingHelpers.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/FactoryWidePauseWindow.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/InputHelpers.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/Version.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/WeightedMath.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/solmate/Bytes32AddressLib.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/solmate/CREATE3.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-vault/contracts/SingletonAuthentication.sol#3)
+	- ^0.8.24 (../../node_modules/@balancer-labs/v3-vault/contracts/VaultGuard.sol#3)
+	- ^0.8.24 (contracts/echidna/echidna_moving_average.sol#2)
+	- ^0.8.24 (contracts/echidna/echidna_storage_pack.sol#2)
+	- ^0.8.24 (contracts/echidna/echidna_update_weight_runner.sol#2)
+	- ^0.8.24 (contracts/mock/QuantAMMWeightedMathMock.sol#3)
+	- ^0.8.24 (contracts/mock/QuantAMMWeightedPoolMock.sol#3)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#different-pragma-directives-are-used[0m
+INFO:Detectors:[92m
+LogExpMath.exp(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#154-306) has a high cyclomatic complexity (13).
+LogExpMath._ln(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#353-497) has a high cyclomatic complexity (14).
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) has a high cyclomatic complexity (65).
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) has a high cyclomatic complexity (80).
+UpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64) (contracts/rules/UpdateRule.sol#66-189) has a high cyclomatic complexity (12).
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#cyclomatic-complexity[0m
+INFO:Detectors:[92m
+OracleWrapper._getData() (contracts/OracleWrapper.sol#21) is never used and should be removed
+QuantAMMWeightedPool._getNormalizedWeight(uint256,uint256,uint256) (contracts/QuantAMMWeightedPool.sol#349-379) is never used and should be removed
+QuantAMMWeightedPool._getNormalizedWeights() (contracts/QuantAMMWeightedPool.sol#382-478) is never used and should be removed
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dead-code[0m
+INFO:Detectors:[92m
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/pool-utils/IPoolInfo.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/pool-weighted/IWeightedPool.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IAuthentication.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IPoolVersion.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IRateProvider.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IVersion.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IAuthorizer.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IBasePool.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IBasePoolFactory.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IHooks.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IProtocolFeeController.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/ISwapFeePercentageBounds.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IUnbalancedLiquidityInvariantRatioBounds.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVault.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVaultAdmin.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVaultErrors.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVaultEvents.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVaultExtension.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/IVaultMain.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-pool-utils/contracts/PoolInfo.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/Authentication.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/CastingHelpers.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/FactoryWidePauseWindow.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/InputHelpers.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/helpers/Version.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/WeightedMath.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/solmate/Bytes32AddressLib.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/solmate/CREATE3.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-vault/contracts/SingletonAuthentication.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (../../node_modules/@balancer-labs/v3-vault/contracts/VaultGuard.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/access/Ownable.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/access/Ownable2Step.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/interfaces/IERC1363.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/interfaces/IERC165.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/interfaces/IERC20.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/interfaces/IERC4626.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/interfaces/IERC5267.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/proxy/utils/Initializable.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Address.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Context.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Errors.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Nonces.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Panic.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/ShortStrings.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/StorageSlot.sol#5) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/Strings.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/cryptography/ECDSA.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/cryptography/EIP712.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/introspection/ERC165.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/introspection/IERC165.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/math/Math.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/math/SafeCast.sol#5) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.20 (../../node_modules/@openzeppelin/contracts/utils/math/SignedMath.sol#4) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.4 (../../node_modules/@prb/math/contracts/PRBMath.sol#2) allows old versions
+Pragma version>=0.8.4 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#2) allows old versions
+Pragma version^0.8.0 (contracts/AggregatorV3Interface.sol#2) allows old versions
+Pragma version>=0.8.20 (contracts/ChainlinkOracle.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/DaoOperations.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/IQuantAMMWeightedPool.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/MultiHopOracle.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/OracleWrapper.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/QuantAMMBaseAdministration.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/QuantAMMStorage.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/QuantAMMWeightedPool.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/QuantAMMWeightedPoolFactory.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/UpdateWeightRunner.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (contracts/echidna/echidna_moving_average.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (contracts/echidna/echidna_storage_pack.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (contracts/echidna/echidna_update_weight_runner.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/MockCalculationRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/MockChainlinkOracles.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/MockIdentityRules.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/MockPool.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/MockQuantAMMBasePool.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/MockQuantAMMMathGuard.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/MockQuantAMMStorage.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/MockRuleInvoker.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/MockUpdateWeightRunner.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (contracts/mock/QuantAMMWeightedMathMock.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version^0.8.24 (contracts/mock/QuantAMMWeightedPoolMock.sol#3) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/mockRules/MockAntiMomentumRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/mockRules/MockMinimumVarianceRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/mockRules/MockMomentumRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/mock/mockRules/MockPowerChannelRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/AntimomentumUpdateRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/IUpdateRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/MinimumVarianceUpdateRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/MomentumUpdateRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/PowerChannelUpdateRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/UpdateRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/base/QuantammBasedRuleHelpers.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/base/QuantammCovarianceBasedRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/base/QuantammGradientBasedRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/base/QuantammMathGuard.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/base/QuantammMathMovingAverage.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+Pragma version>=0.8.24 (contracts/rules/base/QuantammVarianceBasedRule.sol#2) necessitates a version too recent to be trusted. Consider deploying with 0.8.18.
+solc-0.8.26 is not recommended for deployment
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#incorrect-versions-of-solidity[0m
+INFO:Detectors:[92m
+Low level call in CREATE3.deploy(bytes32,bytes,uint256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/solmate/CREATE3.sol#43-58):
+	- (success) = proxy.call{value: value}(creationCode) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/solmate/CREATE3.sol#56)
+Low level call in Address.sendValue(address,uint256) (../../node_modules/@openzeppelin/contracts/utils/Address.sol#33-42):
+	- (success) = recipient.call{value: amount}() (../../node_modules/@openzeppelin/contracts/utils/Address.sol#38)
+Low level call in Address.functionCallWithValue(address,bytes,uint256) (../../node_modules/@openzeppelin/contracts/utils/Address.sol#75-81):
+	- (success,returndata) = target.call{value: value}(data) (../../node_modules/@openzeppelin/contracts/utils/Address.sol#79)
+Low level call in Address.functionStaticCall(address,bytes) (../../node_modules/@openzeppelin/contracts/utils/Address.sol#87-90):
+	- (success,returndata) = target.staticcall(data) (../../node_modules/@openzeppelin/contracts/utils/Address.sol#88)
+Low level call in Address.functionDelegateCall(address,bytes) (../../node_modules/@openzeppelin/contracts/utils/Address.sol#96-99):
+	- (success,returndata) = target.delegatecall(data) (../../node_modules/@openzeppelin/contracts/utils/Address.sol#97)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#low-level-calls[0m
+INFO:Detectors:[92m
+Function LogExpMath._ln_36(int256) (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#505-554) is not in mixedCase
+Constant LogExpMath.x0 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#64) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a0 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#65) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.x1 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#66) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a1 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#67) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.x2 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#70) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a2 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#71) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.x3 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#72) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a3 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#73) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.x4 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#74) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a4 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#75) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.x5 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#76) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a5 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#77) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.x6 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#78) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a6 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#79) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.x7 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#80) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a7 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#81) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.x8 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#82) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a8 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#83) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.x9 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#84) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a9 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#85) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.x10 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#86) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a10 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#87) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.x11 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#88) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant LogExpMath.a11 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#89) is not in UPPER_CASE_WITH_UNDERSCORES
+Function BalancerPoolToken.DOMAIN_SEPARATOR() (../../node_modules/@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol#165-167) is not in mixedCase
+Function IERC20Permit.DOMAIN_SEPARATOR() (../../node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol#89) is not in mixedCase
+Function EIP712._EIP712Name() (../../node_modules/@openzeppelin/contracts/utils/cryptography/EIP712.sol#146-148) is not in mixedCase
+Function EIP712._EIP712Version() (../../node_modules/@openzeppelin/contracts/utils/cryptography/EIP712.sol#157-159) is not in mixedCase
+Constant PRBMathSD59x18.MAX_SD59x18 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#20-21) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant PRBMathSD59x18.MAX_WHOLE_SD59x18 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#24-25) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant PRBMathSD59x18.MIN_SD59x18 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#28-29) is not in UPPER_CASE_WITH_UNDERSCORES
+Constant PRBMathSD59x18.MIN_WHOLE_SD59x18 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#32-33) is not in UPPER_CASE_WITH_UNDERSCORES
+Parameter QuantAMMBaseAdministration.setBaseAddress(address)._basePoolAddress (contracts/QuantAMMBaseAdministration.sol#71) is not in mixedCase
+Parameter QuantAMMBaseAdministration.setUpdateWeightRunnerAddress(address)._updateWeightRunner (contracts/QuantAMMBaseAdministration.sol#81) is not in mixedCase
+Parameter QuantAMMBaseAdministration.setWeightsManually(int256[],address,uint40)._weights (contracts/QuantAMMBaseAdministration.sol#91) is not in mixedCase
+Parameter QuantAMMBaseAdministration.setWeightsManually(int256[],address,uint40)._poolAddress (contracts/QuantAMMBaseAdministration.sol#92) is not in mixedCase
+Parameter QuantAMMBaseAdministration.setWeightsManually(int256[],address,uint40)._lastInterpolationTimePossible (contracts/QuantAMMBaseAdministration.sol#93) is not in mixedCase
+Parameter QuantAMMBaseAdministration.setIntermediateValuesManually(int256[],int256[],address,uint256)._movingAverages (contracts/QuantAMMBaseAdministration.sol#100) is not in mixedCase
+Parameter QuantAMMBaseAdministration.setIntermediateValuesManually(int256[],int256[],address,uint256)._intermediateValues (contracts/QuantAMMBaseAdministration.sol#101) is not in mixedCase
+Parameter QuantAMMBaseAdministration.setIntermediateValuesManually(int256[],int256[],address,uint256)._poolAddress (contracts/QuantAMMBaseAdministration.sol#102) is not in mixedCase
+Parameter ScalarQuantAMMBaseStorage.quantAMMPackEight32(int256,int256,int256,int256,int256,int256,int256,int256)._firstInt (contracts/QuantAMMStorage.sol#58) is not in mixedCase
+Parameter ScalarQuantAMMBaseStorage.quantAMMPackEight32(int256,int256,int256,int256,int256,int256,int256,int256)._secondInt (contracts/QuantAMMStorage.sol#59) is not in mixedCase
+Parameter ScalarQuantAMMBaseStorage.quantAMMPackEight32(int256,int256,int256,int256,int256,int256,int256,int256)._thirdInt (contracts/QuantAMMStorage.sol#60) is not in mixedCase
+Parameter ScalarQuantAMMBaseStorage.quantAMMPackEight32(int256,int256,int256,int256,int256,int256,int256,int256)._fourthInt (contracts/QuantAMMStorage.sol#61) is not in mixedCase
+Parameter ScalarQuantAMMBaseStorage.quantAMMPackEight32(int256,int256,int256,int256,int256,int256,int256,int256)._fifthInt (contracts/QuantAMMStorage.sol#62) is not in mixedCase
+Parameter ScalarQuantAMMBaseStorage.quantAMMPackEight32(int256,int256,int256,int256,int256,int256,int256,int256)._sixthInt (contracts/QuantAMMStorage.sol#63) is not in mixedCase
+Parameter ScalarQuantAMMBaseStorage.quantAMMPackEight32(int256,int256,int256,int256,int256,int256,int256,int256)._seventhInt (contracts/QuantAMMStorage.sol#64) is not in mixedCase
+Parameter ScalarQuantAMMBaseStorage.quantAMMPackEight32(int256,int256,int256,int256,int256,int256,int256,int256)._eighthInt (contracts/QuantAMMStorage.sol#65) is not in mixedCase
+Parameter ScalarQuantAMMBaseStorage.quantAMMUnpack32Array(int256[],uint256)._sourceArray (contracts/QuantAMMStorage.sol#127) is not in mixedCase
+Parameter ScalarQuantAMMBaseStorage.quantAMMUnpack32Array(int256[],uint256)._targetArrayLength (contracts/QuantAMMStorage.sol#128) is not in mixedCase
+Parameter ScalarQuantAMMBaseStorage.quantAMMPack32Array(int256[])._sourceArray (contracts/QuantAMMStorage.sol#207) is not in mixedCase
+Parameter QuantAMMWeightedPool.setWeights(int256[],address,uint40)._weights (contracts/QuantAMMWeightedPool.sol#568) is not in mixedCase
+Parameter QuantAMMWeightedPool.setWeights(int256[],address,uint40)._poolAddress (contracts/QuantAMMWeightedPool.sol#569) is not in mixedCase
+Parameter QuantAMMWeightedPool.setWeights(int256[],address,uint40)._lastInterpolationTimePossible (contracts/QuantAMMWeightedPool.sol#570) is not in mixedCase
+Parameter QuantAMMWeightedPool.initialize(int256[],IQuantAMMWeightedPool.PoolSettings,int256[],int256[],uint256)._initialWeights (contracts/QuantAMMWeightedPool.sol#645) is not in mixedCase
+Parameter QuantAMMWeightedPool.initialize(int256[],IQuantAMMWeightedPool.PoolSettings,int256[],int256[],uint256)._poolSettings (contracts/QuantAMMWeightedPool.sol#646) is not in mixedCase
+Parameter QuantAMMWeightedPool.initialize(int256[],IQuantAMMWeightedPool.PoolSettings,int256[],int256[],uint256)._initialMovingAverages (contracts/QuantAMMWeightedPool.sol#647) is not in mixedCase
+Parameter QuantAMMWeightedPool.initialize(int256[],IQuantAMMWeightedPool.PoolSettings,int256[],int256[],uint256)._initialIntermediateValues (contracts/QuantAMMWeightedPool.sol#648) is not in mixedCase
+Parameter QuantAMMWeightedPool.initialize(int256[],IQuantAMMWeightedPool.PoolSettings,int256[],int256[],uint256)._oracleStalenessThreshold (contracts/QuantAMMWeightedPool.sol#649) is not in mixedCase
+Parameter UpdateWeightRunner.getOptimisedPoolOracle(address)._poolAddress (contracts/UpdateWeightRunner.sol#127) is not in mixedCase
+Parameter UpdateWeightRunner.getPoolOracleAndBackups(address)._poolAddress (contracts/UpdateWeightRunner.sol#133) is not in mixedCase
+Parameter UpdateWeightRunner.getPoolRuleSettings(address)._poolAddress (contracts/UpdateWeightRunner.sol#139) is not in mixedCase
+Parameter UpdateWeightRunner.getPoolApprovedActions(address)._poolAddress (contracts/UpdateWeightRunner.sol#145) is not in mixedCase
+Parameter UpdateWeightRunner.getPoolRule(address)._poolAddress (contracts/UpdateWeightRunner.sol#163) is not in mixedCase
+Parameter UpdateWeightRunner.addOracle(OracleWrapper)._oracle (contracts/UpdateWeightRunner.sol#169) is not in mixedCase
+Parameter UpdateWeightRunner.removeOracle(OracleWrapper)._oracleToRemove (contracts/UpdateWeightRunner.sol#184) is not in mixedCase
+Parameter UpdateWeightRunner.setApprovedActionsForPool(address,uint256)._pool (contracts/UpdateWeightRunner.sol#190) is not in mixedCase
+Parameter UpdateWeightRunner.setApprovedActionsForPool(address,uint256)._actions (contracts/UpdateWeightRunner.sol#190) is not in mixedCase
+Parameter UpdateWeightRunner.setRuleForPool(IQuantAMMWeightedPool.PoolSettings)._poolSettings (contracts/UpdateWeightRunner.sol#198) is not in mixedCase
+Parameter UpdateWeightRunner.performUpdate(address)._pool (contracts/UpdateWeightRunner.sol#242) is not in mixedCase
+Parameter UpdateWeightRunner.setETHUSDOracle(address)._ethUsdOracle (contracts/UpdateWeightRunner.sol#268) is not in mixedCase
+Function UpdateWeightRunner.InitialisePoolLastRunTime(address,uint40) (contracts/UpdateWeightRunner.sol#277-289) is not in mixedCase
+Parameter UpdateWeightRunner.InitialisePoolLastRunTime(address,uint40)._poolAddress (contracts/UpdateWeightRunner.sol#277) is not in mixedCase
+Parameter UpdateWeightRunner.InitialisePoolLastRunTime(address,uint40)._time (contracts/UpdateWeightRunner.sol#277) is not in mixedCase
+Parameter UpdateWeightRunner.getData(address)._pool (contracts/UpdateWeightRunner.sol#302) is not in mixedCase
+Parameter UpdateWeightRunner.setWeightsManually(int256[],address,uint40)._weights (contracts/UpdateWeightRunner.sol#469) is not in mixedCase
+Parameter UpdateWeightRunner.setWeightsManually(int256[],address,uint40)._poolAddress (contracts/UpdateWeightRunner.sol#470) is not in mixedCase
+Parameter UpdateWeightRunner.setWeightsManually(int256[],address,uint40)._lastInterpolationTimePossible (contracts/UpdateWeightRunner.sol#471) is not in mixedCase
+Parameter UpdateWeightRunner.setIntermediateValuesManually(address,int256[],int256[],uint256)._poolAddress (contracts/UpdateWeightRunner.sol#497) is not in mixedCase
+Parameter UpdateWeightRunner.setIntermediateValuesManually(address,int256[],int256[],uint256)._newMovingAverages (contracts/UpdateWeightRunner.sol#498) is not in mixedCase
+Parameter UpdateWeightRunner.setIntermediateValuesManually(address,int256[],int256[],uint256)._newParameters (contracts/UpdateWeightRunner.sol#499) is not in mixedCase
+Parameter UpdateWeightRunner.setIntermediateValuesManually(address,int256[],int256[],uint256)._numberOfAssets (contracts/UpdateWeightRunner.sol#500) is not in mixedCase
+Function EchidnaMovingAverage.calculate_moving_average(int256[]) (contracts/echidna/echidna_moving_average.sol#19-26) is not in mixedCase
+Parameter EchidnaMovingAverage.calculate_moving_average(int256[])._newData (contracts/echidna/echidna_moving_average.sol#19) is not in mixedCase
+Function EchidnaStoragePack.r_packUnpack32Array(int256[]) (contracts/echidna/echidna_storage_pack.sol#14-25) is not in mixedCase
+Function EchidnaStoragePack.r_packUnpack128Array(int256[]) (contracts/echidna/echidna_storage_pack.sol#27-35) is not in mixedCase
+Function EchidnaStoragePack.r_packUnpack128Matrix(int256[][]) (contracts/echidna/echidna_storage_pack.sol#37-67) is not in mixedCase
+Function EchidnaQuantAMMMathGuard.weight_update_two_tokens(uint8,uint8) (contracts/echidna/echidna_update_weight_runner.sol#11-26) is not in mixedCase
+Function EchidnaQuantAMMMathGuard.weight_update_multiple_tokens(uint8,uint8,uint8) (contracts/echidna/echidna_update_weight_runner.sol#28-54) is not in mixedCase
+Parameter MockCalculationRule.setPrevMovingAverage(int256[])._prevMovingAverage (contracts/mock/MockCalculationRule.sol#20) is not in mixedCase
+Parameter MockCalculationRule.externalCalculateQuantAMMVariance(int256[],int256[],address,int128[],uint256)._newData (contracts/mock/MockCalculationRule.sol#41) is not in mixedCase
+Parameter MockCalculationRule.externalCalculateQuantAMMVariance(int256[],int256[],address,int128[],uint256)._movingAverage (contracts/mock/MockCalculationRule.sol#42) is not in mixedCase
+Parameter MockCalculationRule.externalCalculateQuantAMMVariance(int256[],int256[],address,int128[],uint256)._lambda (contracts/mock/MockCalculationRule.sol#44) is not in mixedCase
+Parameter MockCalculationRule.externalCalculateQuantAMMGradient(int256[],int256[],address,int128[],uint256)._newData (contracts/mock/MockCalculationRule.sol#57) is not in mixedCase
+Parameter MockCalculationRule.externalCalculateQuantAMMGradient(int256[],int256[],address,int128[],uint256)._movingAverage (contracts/mock/MockCalculationRule.sol#58) is not in mixedCase
+Parameter MockCalculationRule.externalCalculateQuantAMMCovariance(int256[],int256[],address,int128[],uint256)._newData (contracts/mock/MockCalculationRule.sol#75) is not in mixedCase
+Parameter MockCalculationRule.externalCalculateQuantAMMCovariance(int256[],int256[],address,int128[],uint256)._movingAverage (contracts/mock/MockCalculationRule.sol#76) is not in mixedCase
+Parameter MockCalculationRule.externalCalculateQuantAMMCovariance(int256[],int256[],address,int128[],uint256)._lambda (contracts/mock/MockCalculationRule.sol#78) is not in mixedCase
+Parameter MockCalculationRule.setInitialGradient(address,int256[],uint256)._initialValues (contracts/mock/MockCalculationRule.sol#90) is not in mixedCase
+Parameter MockCalculationRule.setInitialGradient(address,int256[],uint256)._numberOfAssets (contracts/mock/MockCalculationRule.sol#90) is not in mixedCase
+Parameter MockCalculationRule.setInitialVariance(address,int256[],uint256)._initialValues (contracts/mock/MockCalculationRule.sol#94) is not in mixedCase
+Parameter MockCalculationRule.setInitialVariance(address,int256[],uint256)._numberOfAssets (contracts/mock/MockCalculationRule.sol#94) is not in mixedCase
+Parameter MockCalculationRule.setInitialCovariance(address,int256[][],uint256)._initialValues (contracts/mock/MockCalculationRule.sol#100) is not in mixedCase
+Parameter MockCalculationRule.setInitialCovariance(address,int256[][],uint256)._numberOfAssets (contracts/mock/MockCalculationRule.sol#101) is not in mixedCase
+Function MockCalculationRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64) (contracts/mock/MockCalculationRule.sol#106-114) is not in mixedCase
+Parameter MockChainlinkOracle.updateData(int216,uint40)._fixedReply (contracts/mock/MockChainlinkOracles.sol#17) is not in mixedCase
+Parameter MockChainlinkOracle.updateData(int216,uint40)._timestamp (contracts/mock/MockChainlinkOracles.sol#17) is not in mixedCase
+Function MockIdentityRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64) (contracts/mock/MockIdentityRules.sol#35-46) is not in mixedCase
+Parameter MockIdentityRule.initialisePoolRuleIntermediateValues(address,int256[],int256[],uint256)._newMovingAverages (contracts/mock/MockIdentityRules.sol#50) is not in mixedCase
+Parameter MockIdentityRule.initialisePoolRuleIntermediateValues(address,int256[],int256[],uint256)._newParameters (contracts/mock/MockIdentityRules.sol#51) is not in mixedCase
+Parameter MockIdentityRule.initialisePoolRuleIntermediateValues(address,int256[],int256[],uint256)._numberOfAssets (contracts/mock/MockIdentityRules.sol#52) is not in mixedCase
+Function MockIdentityRule.SetCalculateNewWeightsCalled(bool) (contracts/mock/MockIdentityRules.sol#64-66) is not in mixedCase
+Parameter MockIdentityRule.setQueryGradient(bool)._queryGradient (contracts/mock/MockIdentityRules.sol#68) is not in mixedCase
+Parameter MockIdentityRule.setQueryCovariances(bool)._queryCovariances (contracts/mock/MockIdentityRules.sol#72) is not in mixedCase
+Parameter MockIdentityRule.setQueryPrecision(bool)._queryPrecision (contracts/mock/MockIdentityRules.sol#76) is not in mixedCase
+Parameter MockIdentityRule.setQueryVariances(bool)._queryVariances (contracts/mock/MockIdentityRules.sol#80) is not in mixedCase
+Variable MockIdentityRule.CalculateNewWeightsCalled (contracts/mock/MockIdentityRules.sol#19) is not in mixedCase
+Parameter MockPool.setRuleForPool(IUpdateRule,address[][],uint64[],int256[][],uint64,uint64,uint40,address)._rule (contracts/mock/MockPool.sol#54) is not in mixedCase
+Parameter MockPool.setRuleForPool(IUpdateRule,address[][],uint64[],int256[][],uint64,uint64,uint40,address)._poolOracles (contracts/mock/MockPool.sol#55) is not in mixedCase
+Parameter MockPool.setRuleForPool(IUpdateRule,address[][],uint64[],int256[][],uint64,uint64,uint40,address)._lambda (contracts/mock/MockPool.sol#56) is not in mixedCase
+Parameter MockPool.setRuleForPool(IUpdateRule,address[][],uint64[],int256[][],uint64,uint64,uint40,address)._ruleParameters (contracts/mock/MockPool.sol#57) is not in mixedCase
+Parameter MockPool.setRuleForPool(IUpdateRule,address[][],uint64[],int256[][],uint64,uint64,uint40,address)._epsilonMax (contracts/mock/MockPool.sol#58) is not in mixedCase
+Parameter MockPool.setRuleForPool(IUpdateRule,address[][],uint64[],int256[][],uint64,uint64,uint40,address)._absoluteWeightGuardRail (contracts/mock/MockPool.sol#59) is not in mixedCase
+Parameter MockPool.setRuleForPool(IUpdateRule,address[][],uint64[],int256[][],uint64,uint64,uint40,address)._updateInterval (contracts/mock/MockPool.sol#60) is not in mixedCase
+Parameter MockPool.setRuleForPool(IUpdateRule,address[][],uint64[],int256[][],uint64,uint64,uint40,address)._poolManager (contracts/mock/MockPool.sol#61) is not in mixedCase
+Parameter MockPool.setNumberOfAssets(uint256)._numberOfAssets (contracts/mock/MockPool.sol#76) is not in mixedCase
+Parameter MockPool.callSetRuleForPool(UpdateWeightRunner,IUpdateRule,address[][],uint64[],int256[][],uint64,uint64)._updateWeightRunner (contracts/mock/MockPool.sol#83) is not in mixedCase
+Parameter MockPool.callSetRuleForPool(UpdateWeightRunner,IUpdateRule,address[][],uint64[],int256[][],uint64,uint64)._rule (contracts/mock/MockPool.sol#84) is not in mixedCase
+Parameter MockPool.callSetRuleForPool(UpdateWeightRunner,IUpdateRule,address[][],uint64[],int256[][],uint64,uint64)._poolOracles (contracts/mock/MockPool.sol#85) is not in mixedCase
+Parameter MockPool.callSetRuleForPool(UpdateWeightRunner,IUpdateRule,address[][],uint64[],int256[][],uint64,uint64)._lambda (contracts/mock/MockPool.sol#86) is not in mixedCase
+Parameter MockPool.callSetRuleForPool(UpdateWeightRunner,IUpdateRule,address[][],uint64[],int256[][],uint64,uint64)._ruleParameters (contracts/mock/MockPool.sol#87) is not in mixedCase
+Parameter MockPool.callSetRuleForPool(UpdateWeightRunner,IUpdateRule,address[][],uint64[],int256[][],uint64,uint64)._epsilonMax (contracts/mock/MockPool.sol#88) is not in mixedCase
+Parameter MockPool.callSetRuleForPool(UpdateWeightRunner,IUpdateRule,address[][],uint64[],int256[][],uint64,uint64)._absoluteWeightGuardRail (contracts/mock/MockPool.sol#89) is not in mixedCase
+Parameter MockPool.setLambda(int256)._lambda (contracts/mock/MockPool.sol#105) is not in mixedCase
+Parameter MockPool.setEpsilonMax(int256)._epsilonMax (contracts/mock/MockPool.sol#109) is not in mixedCase
+Parameter MockPool.setAbsoluteWeightGuardRail(int256)._absoluteWeightGuardRail (contracts/mock/MockPool.sol#113) is not in mixedCase
+Parameter MockPool.setInvariant(uint256)._invariant (contracts/mock/MockPool.sol#117) is not in mixedCase
+Parameter MockPool.setPoolLPTokenValue(uint256)._poolLPTokenValue (contracts/mock/MockPool.sol#129) is not in mixedCase
+Parameter MockQuantAMMBasePool.setWeights(int256[],address,uint40)._weights (contracts/mock/MockQuantAMMBasePool.sol#70) is not in mixedCase
+Parameter MockQuantAMMBasePool.setWeights(int256[],address,uint40)._poolAddress (contracts/mock/MockQuantAMMBasePool.sol#71) is not in mixedCase
+Parameter MockQuantAMMBasePool.setWeights(int256[],address,uint40)._lastInterpolationTimePossible (contracts/mock/MockQuantAMMBasePool.sol#72) is not in mixedCase
+Parameter MockQuantAMMBasePool.setInitialWeights(int256[])._weights (contracts/mock/MockQuantAMMBasePool.sol#109) is not in mixedCase
+Parameter MockQuantAMMBasePool.setRuleForPool(IQuantAMMWeightedPool.PoolSettings)._settings (contracts/mock/MockQuantAMMBasePool.sol#113) is not in mixedCase
+Parameter MockQuantAMMBasePool.setPoolRegistry(uint256)._poolRegistry (contracts/mock/MockQuantAMMBasePool.sol#117) is not in mixedCase
+Parameter MockQuantAMMMathGuard.mockGuardQuantAMMWeights(int256[],int256[],int256,int256)._weights (contracts/mock/MockQuantAMMMathGuard.sol#8) is not in mixedCase
+Parameter MockQuantAMMMathGuard.mockGuardQuantAMMWeights(int256[],int256[],int256,int256)._prevWeights (contracts/mock/MockQuantAMMMathGuard.sol#9) is not in mixedCase
+Parameter MockQuantAMMMathGuard.mockGuardQuantAMMWeights(int256[],int256[],int256,int256)._epsilonMax (contracts/mock/MockQuantAMMMathGuard.sol#10) is not in mixedCase
+Parameter MockQuantAMMMathGuard.mockGuardQuantAMMWeights(int256[],int256[],int256,int256)._absoluteWeightGuardRail (contracts/mock/MockQuantAMMMathGuard.sol#11) is not in mixedCase
+Function MockQuantAMMStorage.ExternalEncode(int256,int256) (contracts/mock/MockQuantAMMStorage.sol#9-11) is not in mixedCase
+Function MockQuantAMMStorage.ExternalEncode(int64,int128) (contracts/mock/MockQuantAMMStorage.sol#13-15) is not in mixedCase
+Function MockQuantAMMStorage.ExternalEncodeArray(int256[]) (contracts/mock/MockQuantAMMStorage.sol#17-19) is not in mixedCase
+Function MockQuantAMMStorage.ExternalEncodeDecode128Array(int256[],uint256) (contracts/mock/MockQuantAMMStorage.sol#21-29) is not in mixedCase
+Function MockQuantAMMStorage.ExternalEncodeDecode32Array(int256[],uint256) (contracts/mock/MockQuantAMMStorage.sol#31-38) is not in mixedCase
+Function MockQuantAMMStorage.ExternalEncodeDecodeMatrix(int256[][]) (contracts/mock/MockQuantAMMStorage.sol#40-51) is not in mixedCase
+Function MockQuantAMMStorage.GetMatrixResult() (contracts/mock/MockQuantAMMStorage.sol#53-55) is not in mixedCase
+Function MockQuantAMMStorage.ExternalSingleEncode(int256,int256) (contracts/mock/MockQuantAMMStorage.sol#57-59) is not in mixedCase
+Function MockQuantAMMStorage.ExternalDecode128(int256[],uint256) (contracts/mock/MockQuantAMMStorage.sol#61-66) is not in mixedCase
+Function MockQuantAMMStorage.ExternalSingleDecode(int256) (contracts/mock/MockQuantAMMStorage.sol#68-70) is not in mixedCase
+Parameter MockRuleInvoker.invokeRule(UpdateRule,int256[],int256[],address,int256[][],uint64[],uint64,uint64)._rule (contracts/mock/MockRuleInvoker.sol#18) is not in mixedCase
+Parameter MockUpdateWeightRunner.performFirstUpdate(address)._pool (contracts/mock/MockUpdateWeightRunner.sol#13) is not in mixedCase
+Function MockAntiMomentumRule.GetResultWeights() (contracts/mock/mockRules/MockAntiMomentumRule.sol#10-12) is not in mixedCase
+Function MockAntiMomentumRule.GetMovingAverages(address,uint256) (contracts/mock/mockRules/MockAntiMomentumRule.sol#14-16) is not in mixedCase
+Function MockAntiMomentumRule.GetIntermediateValues(address,uint256) (contracts/mock/mockRules/MockAntiMomentumRule.sol#18-23) is not in mixedCase
+Function MockAntiMomentumRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[]) (contracts/mock/mockRules/MockAntiMomentumRule.sol#25-39) is not in mixedCase
+Parameter MockAntiMomentumRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._parameters (contracts/mock/mockRules/MockAntiMomentumRule.sol#29) is not in mixedCase
+Parameter MockAntiMomentumRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._movingAverageData (contracts/mock/mockRules/MockAntiMomentumRule.sol#31) is not in mixedCase
+Function MockMinimumVarianceRule.GetResultWeights() (contracts/mock/mockRules/MockMinimumVarianceRule.sol#10-12) is not in mixedCase
+Function MockMinimumVarianceRule.GetMovingAverages(address,uint256) (contracts/mock/mockRules/MockMinimumVarianceRule.sol#14-16) is not in mixedCase
+Function MockMinimumVarianceRule.GetIntermediateValues(address,uint256) (contracts/mock/mockRules/MockMinimumVarianceRule.sol#18-23) is not in mixedCase
+Function MockMinimumVarianceRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[]) (contracts/mock/mockRules/MockMinimumVarianceRule.sol#25-39) is not in mixedCase
+Parameter MockMinimumVarianceRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._parameters (contracts/mock/mockRules/MockMinimumVarianceRule.sol#29) is not in mixedCase
+Parameter MockMinimumVarianceRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._movingAverageData (contracts/mock/mockRules/MockMinimumVarianceRule.sol#31) is not in mixedCase
+Function MockMomentumRule.GetResultWeights() (contracts/mock/mockRules/MockMomentumRule.sol#10-12) is not in mixedCase
+Function MockMomentumRule.GetMovingAverages(address,uint256) (contracts/mock/mockRules/MockMomentumRule.sol#14-16) is not in mixedCase
+Function MockMomentumRule.GetIntermediateValues(address,uint256) (contracts/mock/mockRules/MockMomentumRule.sol#18-23) is not in mixedCase
+Function MockMomentumRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[]) (contracts/mock/mockRules/MockMomentumRule.sol#25-39) is not in mixedCase
+Parameter MockMomentumRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._parameters (contracts/mock/mockRules/MockMomentumRule.sol#29) is not in mixedCase
+Parameter MockMomentumRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._movingAverageData (contracts/mock/mockRules/MockMomentumRule.sol#31) is not in mixedCase
+Function MockPowerChannelRule.GetResultWeights() (contracts/mock/mockRules/MockPowerChannelRule.sol#10-12) is not in mixedCase
+Function MockPowerChannelRule.GetMovingAverages(address,uint256) (contracts/mock/mockRules/MockPowerChannelRule.sol#14-16) is not in mixedCase
+Function MockPowerChannelRule.GetIntermediateValues(address,uint256) (contracts/mock/mockRules/MockPowerChannelRule.sol#18-23) is not in mixedCase
+Function MockPowerChannelRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[]) (contracts/mock/mockRules/MockPowerChannelRule.sol#25-39) is not in mixedCase
+Parameter MockPowerChannelRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._prevWeights (contracts/mock/mockRules/MockPowerChannelRule.sol#26) is not in mixedCase
+Parameter MockPowerChannelRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._data (contracts/mock/mockRules/MockPowerChannelRule.sol#27) is not in mixedCase
+Parameter MockPowerChannelRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._pool (contracts/mock/mockRules/MockPowerChannelRule.sol#28) is not in mixedCase
+Parameter MockPowerChannelRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._parameters (contracts/mock/mockRules/MockPowerChannelRule.sol#29) is not in mixedCase
+Parameter MockPowerChannelRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._lambda (contracts/mock/mockRules/MockPowerChannelRule.sol#30) is not in mixedCase
+Parameter MockPowerChannelRule.CalculateUnguardedWeights(int256[],int256[],address,int256[][],int128[],int256[])._movingAverageData (contracts/mock/mockRules/MockPowerChannelRule.sol#31) is not in mixedCase
+Parameter AntiMomentumUpdateRule.validParameters(int256[][])._parameters (contracts/rules/AntimomentumUpdateRule.sol#136) is not in mixedCase
+Function IUpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64) (contracts/rules/IUpdateRule.sol#13-21) is not in mixedCase
+Parameter MinimumVarianceUpdateRule.validParameters(int256[][])._parameters (contracts/rules/MinimumVarianceUpdateRule.sol#113) is not in mixedCase
+Parameter MomentumUpdateRule.validParameters(int256[][])._parameters (contracts/rules/MomentumUpdateRule.sol#147) is not in mixedCase
+Function UpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64) (contracts/rules/UpdateRule.sol#66-189) is not in mixedCase
+Parameter UpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64)._prevWeights (contracts/rules/UpdateRule.sol#67) is not in mixedCase
+Parameter UpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64)._data (contracts/rules/UpdateRule.sol#68) is not in mixedCase
+Parameter UpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64)._pool (contracts/rules/UpdateRule.sol#69) is not in mixedCase
+Parameter UpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64)._parameters (contracts/rules/UpdateRule.sol#70) is not in mixedCase
+Parameter UpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64)._lambdaStore (contracts/rules/UpdateRule.sol#71) is not in mixedCase
+Parameter UpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64)._epsilonMax (contracts/rules/UpdateRule.sol#72) is not in mixedCase
+Parameter UpdateRule.CalculateNewWeights(int256[],int256[],address,int256[][],uint64[],uint64,uint64)._absoluteWeightGuardRail (contracts/rules/UpdateRule.sol#73) is not in mixedCase
+Parameter UpdateRule.initialisePoolRuleIntermediateValues(address,int256[],int256[],uint256)._poolAddress (contracts/rules/UpdateRule.sol#221) is not in mixedCase
+Parameter UpdateRule.initialisePoolRuleIntermediateValues(address,int256[],int256[],uint256)._newMovingAverages (contracts/rules/UpdateRule.sol#222) is not in mixedCase
+Parameter UpdateRule.initialisePoolRuleIntermediateValues(address,int256[],int256[],uint256)._newInitialValues (contracts/rules/UpdateRule.sol#223) is not in mixedCase
+Parameter UpdateRule.initialisePoolRuleIntermediateValues(address,int256[],int256[],uint256)._numberOfAssets (contracts/rules/UpdateRule.sol#224) is not in mixedCase
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#conformance-to-solidity-naming-conventions[0m
+INFO:Detectors:[92m
+Variable QuantAMMBaseAdministration.maxFixedWithdrawalFee (contracts/QuantAMMBaseAdministration.sol#62) is too similar to QuantAMMBaseAdministration.minFixedWithdrawalFee (contracts/QuantAMMBaseAdministration.sol#65)
+Variable ScalarRuleQuantAMMStorage._quantAMMUnpack128Array(int256[],uint256).sourceArrayLengthMinusOne (contracts/QuantAMMStorage.sol#342) is too similar to ScalarRuleQuantAMMStorage._quantAMMPack128Array(int256[]).sourceArrayLengthMinusTwo (contracts/QuantAMMStorage.sol#320)
+Variable QuantAMMWeightedPool._MAX_SWAP_FEE_PERCENTAGE (contracts/QuantAMMWeightedPool.sol#83) is too similar to QuantAMMWeightedPool._MIN_SWAP_FEE_PERCENTAGE (contracts/QuantAMMWeightedPool.sol#82)
+Variable QuantAMMMathMovingAverage._calculateQuantAMMMovingAverage(int256[],int256[],int128[],uint256).movingAverageI (contracts/rules/base/QuantammMathMovingAverage.sol#34) is too similar to QuantAMMMathMovingAverage.movingAverages (contracts/rules/base/QuantammMathMovingAverage.sol#14)
+Variable ScalarQuantAMMBaseStorage.quantAMMUnpack32Array(int256[],uint256).sourceArrayLengthMinusOne (contracts/QuantAMMStorage.sol#133) is too similar to ScalarRuleQuantAMMStorage._quantAMMPack128Array(int256[]).sourceArrayLengthMinusTwo (contracts/QuantAMMStorage.sol#320)
+Variable MinimumVarianceUpdateRule._getWeights(int256[],int256[],int256[][],QuantAMMPoolParameters).mixingVariance_scope_2 (contracts/rules/MinimumVarianceUpdateRule.sol#71) is too similar to MinimumVarianceUpdateRule._getWeights(int256[],int256[],int256[][],QuantAMMPoolParameters).mixingVariance_scope_6 (contracts/rules/MinimumVarianceUpdateRule.sol#84)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#variable-names-too-similar[0m
+INFO:Detectors:[92m
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x0 = 128000000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#64)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- a0 = 38877084059945950922200000000000000000000000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#65)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x1 = 64000000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#66)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- a1 = 6235149080811616882910000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#67)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x2 = 3200000000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#70)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- a2 = 7896296018268069516100000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#71)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x3 = 1600000000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#72)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- a3 = 888611052050787263676000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#73)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x4 = 800000000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#74)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x5 = 400000000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#76)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x6 = 200000000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#78)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x7 = 100000000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#80)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x8 = 50000000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#82)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x9 = 25000000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#84)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x10 = 12500000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#86)
+LogExpMath.slitherConstructorConstantVariables() (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#19-555) uses literals with too many digits:
+	- x11 = 6250000000000000000 (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/LogExpMath.sol#88)
+ShortStrings.slitherConstructorConstantVariables() (../../node_modules/@openzeppelin/contracts/utils/ShortStrings.sol#40-122) uses literals with too many digits:
+	- FALLBACK_SENTINEL = 0x00000000000000000000000000000000000000000000000000000000000000FF (../../node_modules/@openzeppelin/contracts/utils/ShortStrings.sol#42)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = 0x800000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMath.sol#130)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x8000000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#134)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x4000000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#137)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x2000000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#140)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x1000000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#143)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x800000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#146)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x400000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#149)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x200000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#152)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x100000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#155)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x80000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#158)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x40000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#161)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x20000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#164)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x10000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#167)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x8000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#170)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x4000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#173)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x2000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#176)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x1000000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#179)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x800000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#182)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x400000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#185)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x200000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#188)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x100000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#191)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000B1721BCFC9A) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#192)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x80000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#194)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000058B90CF1E6E) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#195)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x40000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#197)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000002C5C863B73F) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#198)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x20000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#200)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000162E430E5A2) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#201)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x10000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#203)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000B172183551) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#204)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x8000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#206)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000058B90C0B49) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#207)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x4000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#209)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000002C5C8601CC) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#210)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x2000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#212)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000162E42FFF0) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#213)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x1000000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#215)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000B17217FBB) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#216)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x800000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#218)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000058B90BFCE) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#219)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x400000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#221)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000002C5C85FE3) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#222)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x200000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#224)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000162E42FF1) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#225)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x100000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#227)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000000B17217F8) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#228)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x80000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#230)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000058B90BFC) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#231)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x40000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#233)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000002C5C85FE) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#234)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x20000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#236)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000000162E42FF) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#237)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x10000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#239)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000000B17217F) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#240)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x8000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#242)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000000058B90C0) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#243)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x4000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#245)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000002C5C860) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#246)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x2000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#248)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000000162E430) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#249)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x1000000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#251)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000B17218) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#252)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x800000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#254)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000000058B90C) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#255)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x400000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#257)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000000002C5C86) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#258)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x200000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#260)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000162E43) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#261)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- x & 0x100000 > 0 (../../node_modules/@prb/math/contracts/PRBMath.sol#263)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000000000B1721) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#264)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000058B91) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#267)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000000002C5C8) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#270)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000000000162E4) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#273)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000000000B172) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#276)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000000000058B9) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#279)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000002C5D) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#282)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000000000162E) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#285)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000000B17) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#288)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000000000058C) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#291)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000000000002C6) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#294)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000000163) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#297)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x100000000000000B1) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#300)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000000059) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#303)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000000000002C) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#306)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000000016) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#309)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x1000000000000000B) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#312)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000000006) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#315)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000000003) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#318)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000000001) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#321)
+PRBMath.exp2(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#127-338) uses literals with too many digits:
+	- result = (result * 0x10000000000000001) >> 64 (../../node_modules/@prb/math/contracts/PRBMath.sol#324)
+PRBMath.sqrt(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#599-647) uses literals with too many digits:
+	- xAux >= 0x100000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMath.sol#607)
+PRBMath.sqrt(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#599-647) uses literals with too many digits:
+	- xAux >= 0x10000000000000000 (../../node_modules/@prb/math/contracts/PRBMath.sol#611)
+PRBMath.sqrt(uint256) (../../node_modules/@prb/math/contracts/PRBMath.sol#599-647) uses literals with too many digits:
+	- xAux >= 0x100000000 (../../node_modules/@prb/math/contracts/PRBMath.sol#615)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#386)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#387)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#388)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#389)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#390)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#391)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#392)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#393)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#394)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#395)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#396)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#397)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#398)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#399)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#400)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#401)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#402)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#403)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#404)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#405)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#406)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#407)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#408)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#409)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#410)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#411)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#412)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#413)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#414)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#415)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#416)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#417)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#418)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#419)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#421)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#422)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#423)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#424)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#425)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#426)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#427)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#428)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#429)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#430)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#431)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#432)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#433)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#434)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#435)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#436)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#437)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#438)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#439)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#440)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#441)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#442)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#443)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#444)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#445)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#446)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#447)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#448)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#449)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#450)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#451)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#452)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#453)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#454)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 100000000000000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#455)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 1000000000000000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#456)
+PRBMathSD59x18.log10(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#372-469) uses literals with too many digits:
+	- switch_expr_15660_6826_64_log10_asm_0 == 10000000000000000000000000000000000000000000000000000000000000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#457)
+PRBMathSD59x18.log2(int256) (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#484-532) uses literals with too many digits:
+	- x = 1000000000000000000000000000000000000 / x (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#497)
+PRBMathSD59x18.slitherConstructorConstantVariables() (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#12-684) uses literals with too many digits:
+	- MAX_WHOLE_SD59x18 = 57896044618658097711785492504343953926634992332820282019728_000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#24-25)
+PRBMathSD59x18.slitherConstructorConstantVariables() (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#12-684) uses literals with too many digits:
+	- MIN_WHOLE_SD59x18 = - 57896044618658097711785492504343953926634992332820282019728_000000000000000000 (../../node_modules/@prb/math/contracts/PRBMathSD59x18.sol#32-33)
+QuantAMMWeightedPoolFactory.constructor(IVault,uint32,string,string,address) (contracts/QuantAMMWeightedPoolFactory.sol#68-78) uses literals with too many digits:
+	- BasePoolFactory(vault,pauseWindowDuration,type()(QuantAMMWeightedPool).creationCode) (contracts/QuantAMMWeightedPoolFactory.sol#74)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#too-many-digits[0m
+INFO:Detectors:[92m
+WeightedMath._MAX_INVARIANT_RATIO (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/WeightedMath.sol#56) is never used in WeightedMath (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/WeightedMath.sol#15-253)
+WeightedMath._MIN_INVARIANT_RATIO (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/WeightedMath.sol#58) is never used in WeightedMath (../../node_modules/@balancer-labs/v3-solidity-utils/contracts/math/WeightedMath.sol#15-253)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-state-variable[0m
+INFO:Detectors:[92m
+Loop condition i < weights.length (contracts/echidna/echidna_update_weight_runner.sol#63) should use cached array length instead of referencing `length` member of the storage array.
+ Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#cache-array-length[0m
+INFO:Slither:. analyzed (105 contracts with 94 detectors), 693 result(s) found
+
+Script done on 2024-11-10 14:19:52+00:00 [COMMAND_EXIT_CODE="255"]

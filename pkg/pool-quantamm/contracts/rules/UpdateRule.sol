@@ -26,7 +26,7 @@ An inherited base contract approach created a good domain driven design where bo
 /// @title QuantAMMUpdateRule base contract for QuantAMM update rules
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool and protections, must be implemented by all rules used in quantAMM
 abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IUpdateRule {
-    uint16 private constant REQUIRES_PREV_MAVG = 1;
+    uint16 private constant REQ_PREV_MAVG_VAL = 1;
     address private immutable updateWeightRunner;
     
     string public name;
@@ -85,7 +85,7 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
             }
         }
 
-        locals.requiresPrevAverage = _requiresPrevMovingAverage() == REQUIRES_PREV_MAVG;
+        locals.requiresPrevAverage = _requiresPrevMovingAverage() == REQ_PREV_MAVG_VAL;
         locals.intermediateMovingAverageStateLength = locals.numberOfAssets;
 
         if (locals.requiresPrevAverage) {

@@ -71,6 +71,7 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
     /// @param _updateWeightRunner the address of the update weight runner
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) public onlyExecutor() {
         require(updateWeightRunner == address(0), "Update weight runner already set");
+        require(_updateWeightRunner != address(0), "address cannot be default");
         updateWeightRunner = _updateWeightRunner;
         emit UpdateWeightRunnerAddressUpdated(address(0), _updateWeightRunner);
     }

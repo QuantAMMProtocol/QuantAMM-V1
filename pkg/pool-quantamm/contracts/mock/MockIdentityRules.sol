@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
 import "../rules/IUpdateRule.sol";
 import "../rules/UpdateRule.sol";
@@ -17,16 +17,6 @@ contract MockIdentityRule is IUpdateRule {
     bool queryVariances;
 
     bool public CalculateNewWeightsCalled;
-
-    bytes public gradient;
-
-    bytes public variances;
-
-    bytes public covariances;
-
-    bytes public precision;
-
-    uint16 private constant REQUIRES_PREV_MAVG = 0;
 
     int256[] public movingAverages;
 

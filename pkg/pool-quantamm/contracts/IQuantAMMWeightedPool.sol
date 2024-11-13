@@ -128,13 +128,13 @@ interface IQuantAMMWeightedPool {
      * @notice Get dynamic pool data relevant to swap/add/remove calculations.
      * @return data A struct containing all dynamic QuantAMM weighted pool parameters
      */
-    function getWeightedPoolDynamicData() external view returns (QuantAMMWeightedPoolDynamicData memory data);
+    function getQuantAMMWeightedPoolDynamicData() external view returns (QuantAMMWeightedPoolDynamicData memory data);
 
     /**
      * @notice Get immutable pool data relevant to swap/add/remove calculations.
      * @return data A struct containing all immutable weighted pool parameters
      */
-    function getWeightedPoolImmutableData() external view returns (QuantAMMWeightedPoolImmutableData memory data);
+    function getQuantAMMWeightedPoolImmutableData() external view returns (QuantAMMWeightedPoolImmutableData memory data);
 
     /// @notice this is to update the runner for the pool. This is for hotfixes and is timelock protected.
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) external;

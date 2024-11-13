@@ -55,7 +55,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         addr2 = addr2Local;
         // Deploy UpdateWeightRunner contract
         vm.startPrank(owner);
-        updateWeightRunner = new MockUpdateWeightRunner(owner);
+        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2);
 
         chainlinkOracle = _deployOracle(fixedValue, delay);
 

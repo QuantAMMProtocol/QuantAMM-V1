@@ -36,7 +36,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         addr2 = addr2Local;
         // Deploy UpdateWeightRunner contract
         vm.startPrank(owner);
-        updateWeightRunner = new MockUpdateWeightRunner(owner);
+        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2);
         
         vm.stopPrank();
         // Deploy Mock Rule and Pool
@@ -389,8 +389,6 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                complianceCheckersTrade: new address[](0),
-                complianceCheckersDeposit: new address[](0),
                 poolManager: addr2
             })
         );
@@ -484,8 +482,6 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                complianceCheckersTrade: new address[](0),
-                complianceCheckersDeposit: new address[](0),
                 poolManager: addr2
             })
         );
@@ -579,8 +575,6 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.35e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                complianceCheckersTrade: new address[](0),
-                complianceCheckersDeposit: new address[](0),
                 poolManager: addr2
             })
         );

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
 import {
     IWeightedPool,
@@ -141,7 +141,7 @@ contract QuantAMMWeightedPool is
     uint oracleStalenessThreshold;
 
     ///@dev the admin functionality enabled for this pool.
-    uint256 public poolRegistry;
+    uint256 public immutable poolRegistry;
 
     ///@dev The assets of the pool. If the pool is a composite pool, contains the LP tokens of those pools
     IERC20[] public assets;
@@ -155,6 +155,7 @@ contract QuantAMMWeightedPool is
         _totalTokens = params.numTokens;
         updateWeightRunner = UpdateWeightRunner(params.updateWeightRunner);
         quantammAdmin = updateWeightRunner.quantammAdmin();
+        poolRegistry = params.poolRegistry;
     }
 
     /// @inheritdoc IBasePool
@@ -518,7 +519,7 @@ contract QuantAMMWeightedPool is
     }
 
     /// @inheritdoc IQuantAMMWeightedPool
-    function getWeightedPoolDynamicData() external view returns (QuantAMMWeightedPoolDynamicData memory data) {
+    function getQuantAMMWeightedPoolDynamicData() external view returns (QuantAMMWeightedPoolDynamicData memory data) {
         data.balancesLiveScaled18 = _vault.getCurrentLiveBalances(address(this));
         (, data.tokenRates) = _vault.getPoolTokenRates(address(this));
         data.totalSupply = totalSupply();
@@ -550,7 +551,7 @@ contract QuantAMMWeightedPool is
     }
 
     /// @inheritdoc IQuantAMMWeightedPool
-    function getWeightedPoolImmutableData() external view returns (QuantAMMWeightedPoolImmutableData memory data) {
+    function getQuantAMMWeightedPoolImmutableData() external view returns (QuantAMMWeightedPoolImmutableData memory data) {
         data.tokens = _vault.getPoolTokens(address(this));
         data.oracleStalenessThreshold = oracleStalenessThreshold;
         data.poolRegistry = poolRegistry;
@@ -662,7 +663,7 @@ contract QuantAMMWeightedPool is
         }
 
         oracleStalenessThreshold = _oracleStalenessThreshold;
-
+        updateInterval = _poolSettings.updateInterval;
         _setRule(_initialWeights, _initialIntermediateValues, _initialMovingAverages, _poolSettings);
 
         _setInitialWeights(_initialWeights);

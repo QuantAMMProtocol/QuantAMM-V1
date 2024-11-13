@@ -104,6 +104,9 @@ contract UpdateWeightRunner is Ownable2Step {
     uint256 private constant MASK_POOL_QUANTAMM_ADMIN_UPDATES = 16;
 
     constructor(address _quantammAdmin, address _ethOracle) Ownable(msg.sender) {
+        require(_quantammAdmin != address(0), "Admin cannot be default address");
+        require(_ethOracle != address(0), "eth oracle cannot be default address");
+        
         quantammAdmin = _quantammAdmin;
         ethOracle = OracleWrapper(_ethOracle);
     }

@@ -26,6 +26,20 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     int256 private constant ONE = 1 * 1e18; // Result of PRBMathSD59x18.fromInt(1), store as constant to avoid recalculation every time
     uint16 private constant REQUIRES_PREV_MAVG = 0;
 
+    /// @dev struct to avoid stack too deep issues
+    /// @notice Struct to store local variables for the power channel calculation
+    /// @param kappa array of kappa value parameters
+    /// @param newWeights array of new weights
+    /// @param normalizationFactor normalization factor for the weights
+    /// @param prevWeightsLength length of the previous weights
+    /// @param useRawPrice boolean to determine if raw price should be used or average
+    /// @param i index for looping
+    /// @param q Q value
+    /// @param denominator denominator for the weights
+    /// @param sumKappa sum of all kappa values
+    /// @param res result of the calculation
+    /// @param sign sign of the calculation
+    /// @param intermediateRes intermediate result of the calculation
     struct QuantAMMPowerChannelLocals {
         int256[] kappa;
         int256[] newWeights;
@@ -41,11 +55,11 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         int256 intermediateRes;
     }
 
+    /// @notice w(t) = w(t − 1) + κ · ( sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q − ℓp(t) ) where ℓp(t) = 1/N * ∑(sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q)
     /// @param _prevWeights the previous weights retrieved from the vault
     /// @param _data the latest data from the signal, usually price
     /// @param _parameters the parameters of the rule that are not lambda
     /// @param _poolParameters pool parameters
-    /// @notice w(t) = w(t − 1) + κ · ( sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q − ℓp(t) ) where ℓp(t) = 1/N * ∑(sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q)
     function _getWeights(
         int256[] calldata _prevWeights,
         int256[] calldata _data,
@@ -131,10 +145,12 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         return newWeightsConverted;
     }
 
+    /// @notice Get the number of assets required for the rule
     function _requiresPrevMovingAverage() internal pure override returns (uint16) {
         return REQUIRES_PREV_MAVG;
     }
 
+    /// @notice Set the initial intermediate values for the rule, in this case the gradient
     /// @param _poolAddress address of pool being initialised
     /// @param _initialValues the initial intermediate values provided
     /// @param _numberOfAssets number of assets in the pool

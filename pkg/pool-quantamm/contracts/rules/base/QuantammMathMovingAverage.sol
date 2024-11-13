@@ -11,6 +11,7 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
 
     int256 private constant ONE = 1 * 1e18; // Result of PRBMathSD59x18.fromInt(1), store as constant to avoid recalculation every time
 
+    // this can be just the moving averages per token, or if prev moving average is true then it is [...moving averages, ...prev moving averages]
     mapping(address => int256[]) public movingAverages;
 
     /// @notice Calculates the new moving average value, i.e. p̅(t) = p̅(t - 1) + (1 - λ)(p(t) - p̅(t - 1))

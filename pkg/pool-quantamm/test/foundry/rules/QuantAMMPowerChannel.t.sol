@@ -37,6 +37,18 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
+    function testPowerChannelVectorKappaZeroQGreaterThanOneShouldNotBeAccepted() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(0); // kappa = 1
+        parameters[1] = new int256[](1);
+        parameters[1][0] = PRBMathSD59x18.fromInt(2); // q > 1
+
+        bool valid = rule.validParameters(parameters);
+        assertFalse(valid);
+    }
+
+
     function testFuzz_PowerChannelKappaZeroQGreaterThanOneShouldNotBeAccepted(int256 q) public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
@@ -48,15 +60,60 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
+
+    function testFuzz_PowerChannelVectorKappaZeroQGreaterThanOneShouldNotBeAccepted(int256 vectorParams, int256 q) public view {
+        int256[][] memory parameters = new int256[][](2);
+        uint256 paramCount = uint256(bound(vectorParams, 2, 10));
+        parameters[0] = new int256[](paramCount);
+        parameters[1] = new int256[](paramCount);
+        for(uint i = 0; i < paramCount; i++) {
+            if(i == 0) {
+                parameters[0][i] = PRBMathSD59x18.fromInt(1); // kappa = 1
+            } else {
+                parameters[0][i] = PRBMathSD59x18.fromInt(0); // kappa = 1
+            }
+            parameters[1][i] = PRBMathSD59x18.fromInt(bound(q, 1, maxScaledFixedPoint18())); // q > 1
+        }
+
+        bool valid = rule.validParameters(parameters);
+        assertFalse(valid);
+    }
+
     function testPowerChannelKappaGreaterThanZeroQGreaterThanOneShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(1); // kappa > 0
         parameters[1] = new int256[](1);
-        parameters[1][0] = PRBMathSD59x18.fromInt(2); // q > 1
+        parameters[1][0] = 2e18; // q > 1
 
         bool valid = rule.validParameters(parameters);
         assertTrue(valid);
+    }
+
+
+    function testPowerChannelVectorKappaGreaterThanZeroQGreaterThanOneShouldBeAccepted() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(1); // kappa > 0
+        parameters[0][1] = PRBMathSD59x18.fromInt(1); // kappa > 0
+        parameters[1] = new int256[](2);
+        parameters[1][0] = 2e18; // q > 1
+        parameters[1][1] = 2e18; // q > 1
+
+        bool valid = rule.validParameters(parameters);
+        assertTrue(valid);
+    }
+
+    function testPowerChannelVectorKappaQDifferentLengthsShouldNotBeAccepted() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(1); // kappa > 0
+        parameters[0][1] = PRBMathSD59x18.fromInt(1); // kappa > 0
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 2e18; // q > 1
+
+        bool valid = rule.validParameters(parameters);
+        assertFalse(valid);
     }
 
     function testPowerChannelKappaGreaterThanZeroQEqualToOneShouldNotBeAccepted() public view {

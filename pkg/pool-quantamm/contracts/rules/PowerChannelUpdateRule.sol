@@ -34,6 +34,7 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         bool useRawPrice;
         uint i;
         int256 q;
+        int256[] vectorQ;
         int256 denominator;
         int256 sumKappa;
         int256 res;
@@ -60,7 +61,6 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         locals.newWeights = _calculateQuantAMMGradient(_data, _poolParameters);
 
         locals.kappa = _parameters[0];
-        locals.q = _parameters[1][0];
 
         locals.useRawPrice = false;
 
@@ -69,8 +69,15 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             locals.useRawPrice = _parameters[2][0] == ONE;
         }
 
+        bool scalarQ = _parameters[1].length == 1;
+        locals.q = _parameters[1][0];
+        
         for (locals.i = 0; locals.i < locals.prevWeightsLength; ) {
             locals.denominator = _poolParameters.movingAverage[locals.i];
+            if(!scalarQ){
+                locals.q = _parameters[1][locals.i];
+            }
+
             if (locals.useRawPrice) {
                 locals.denominator = _data[locals.i];
             }
@@ -149,12 +156,13 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     /// @notice Check if the given parameters are valid for the rule
     /// @dev If parameters are not valid, either reverts or returns false
     function validParameters(int256[][] calldata parameters) external pure override returns (bool valid) {
-        valid = true;
         if (
             (parameters.length == 2 || (parameters.length == 3 && parameters[2].length == 1)) &&
             (parameters[0].length > 0) &&
-            parameters[1].length == 1
+            (parameters[0].length == 1 && parameters[1].length == 1 
+            || parameters[1].length == parameters[0].length)
         ) {
+            valid = true;
             for (uint i; i < parameters[0].length; ) {
                 if (!(parameters[0][i] > 0)) {
                     valid = false;
@@ -164,8 +172,17 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                     ++i;
                 }
             }
-            bool validQ = parameters[1][0] > ONE;
-            return validQ && valid;
+
+            for (uint i; i < parameters[1].length; ) {
+                if(parameters[1][i] <= ONE){
+                    valid = false;
+                    break;
+                }
+                unchecked {
+                    ++i;
+                }
+            }
+            return valid;   
         }
         return false;
     }

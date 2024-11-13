@@ -5,6 +5,25 @@ import "forge-std/Test.sol";
 import "@prb/math/contracts/PRBMathSD59x18.sol";
 
 abstract contract QuantAMMTestUtils is Test{
+    
+    
+    int256 internal SCALE18 = 1e18;
+    /// @dev The maximum value a signed 59.18-decimal fixed-point number can have.
+    int256 internal MAX_SD59x18 =
+        57896044618658097711785492504343953926634992332820282019728_792003956564819967;
+
+    /// @dev The minimum value a signed 59.18-decimal fixed-point number can have.
+    int256 internal MIN_SD59x18 =
+        -57896044618658097711785492504343953926634992332820282019728_792003956564819968;
+
+    function maxScaledFixedPoint18() internal view returns (int256){
+        return MAX_SD59x18 / SCALE18;
+    }
+    
+    function minScaledFixedPoint18() internal view returns (int256){
+        return MIN_SD59x18 / SCALE18;
+    }
+
 
     function checkResult(int256[] memory res, int256[] memory expectedRes) internal pure {
         for (uint256 i = 0; i < expectedRes.length; i++) {

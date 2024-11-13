@@ -18,7 +18,6 @@ contract MultiHopOracleTest is Test {
         uint delay2,
         bool[] memory invert
     ) internal returns (MultiHopOracle) {
-
         chainlinkOracle1 = new MockChainlinkOracle(fixedValue1, delay1);
         chainlinkOracle2 = new MockChainlinkOracle(fixedValue2, delay2);
 
@@ -30,14 +29,8 @@ contract MultiHopOracleTest is Test {
         invertFlags[1] = invert[1];
 
         MultiHopOracle.HopConfig[] memory hops = new MultiHopOracle.HopConfig[](2);
-        hops[0] = MultiHopOracle.HopConfig({
-            oracle: OracleWrapper(address(chainlinkOracle1)),
-            invert: invert[0]
-        });
-        hops[1] = MultiHopOracle.HopConfig({
-            oracle: OracleWrapper(address(chainlinkOracle2)),
-            invert: invert[1]
-        });
+        hops[0] = MultiHopOracle.HopConfig({ oracle: OracleWrapper(address(chainlinkOracle1)), invert: invert[0] });
+        hops[1] = MultiHopOracle.HopConfig({ oracle: OracleWrapper(address(chainlinkOracle2)), invert: invert[1] });
 
         multiHopOracle = new MultiHopOracle(hops);
         return multiHopOracle;
@@ -63,12 +56,12 @@ contract MultiHopOracleTest is Test {
         uint40 nowTimestamp = uint40(block.timestamp);
 
         assertEq(timestamp, nowTimestamp - delay1);
-        assertEq(data, 1);  // 1000 * 0.001 = 1
+        assertEq(data, 1); // 1000 * 0.001 = 1
     }
 
     // Test 2: With second oracle inverted
     function testMultiHopOracleShouldReturnMultipliedDataWithSecondInverted() public {
-        int216 fixedValue1 = 10e18;//this tests the invert conversion
+        int216 fixedValue1 = 10e18; //this tests the invert conversion
         int216 fixedValue2 = 100;
         uint delay1 = 3600;
         uint delay2 = 3600;
@@ -86,7 +79,7 @@ contract MultiHopOracleTest is Test {
         uint40 nowTimestamp = uint40(block.timestamp);
 
         assertEq(timestamp, nowTimestamp - delay1);
-        assertEq(data, 10);  // 1000 / 100 = 10
+        assertEq(data, 10); // 1000 / 100 = 10
     }
 
     // Test 3: With first oracle inverted
@@ -109,7 +102,7 @@ contract MultiHopOracleTest is Test {
         uint40 nowTimestamp = uint40(block.timestamp);
 
         assertEq(timestamp, nowTimestamp - delay1);
-        assertEq(data, 100);  // 1000 / 10 = 100
+        assertEq(data, 100); // 1000 / 10 = 100
     }
 
     // Test 4: Should return lower timestamp (the second delay is greater)
@@ -132,6 +125,6 @@ contract MultiHopOracleTest is Test {
         uint40 nowTimestamp = uint40(block.timestamp);
 
         assertEq(timestamp, nowTimestamp - delay2);
-        assertEq(data, 1);  // 1000 * 0.001 = 1
+        assertEq(data, 1); // 1000 * 0.001 = 1
     }
 }

@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
 import "../rules/base/QuantammMathGuard.sol";
 
@@ -10,11 +10,6 @@ contract MockQuantAMMMathGuard is QuantAMMMathGuard {
         int256 _epsilonMax,
         int256 _absoluteWeightGuardRail
     ) external pure returns (int256[] memory guardedNewWeights) {
-        guardedNewWeights = _guardQuantAMMWeights(
-            _weights,
-            _prevWeights,
-            _epsilonMax,
-            _absoluteWeightGuardRail
-        );
+        guardedNewWeights = _guardQuantAMMWeights(_weights, _prevWeights, _epsilonMax, _absoluteWeightGuardRail);
     }
 }

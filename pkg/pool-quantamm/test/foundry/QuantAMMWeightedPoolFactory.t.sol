@@ -43,10 +43,9 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
     address internal addr2;
 
     function setUp() public override {
-
         int216 fixedValue = 1000;
         uint delay = 3600;
-        
+
         super.setUp();
         (address ownerLocal, address addr1Local, address addr2Local) = (vm.addr(1), vm.addr(2), vm.addr(3));
         owner = ownerLocal;
@@ -54,7 +53,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         addr2 = addr2Local;
         // Deploy UpdateWeightRunner contract
         vm.startPrank(owner);
-        updateWeightRunner = new MockUpdateWeightRunner(owner);
+        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2);
 
         chainlinkOracle = _deployOracle(fixedValue, delay);
 
@@ -62,7 +61,13 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
 
         vm.stopPrank();
 
-        quantAMMWeightedPoolFactory = deployQuantAMMWeightedPoolFactory(IVault(address(vault)), 365 days, "Factory v1", "Pool v1", address(updateWeightRunner));
+        quantAMMWeightedPoolFactory = deployQuantAMMWeightedPoolFactory(
+            IVault(address(vault)),
+            365 days,
+            "Factory v1",
+            "Pool v1",
+            address(updateWeightRunner)
+        );
         vm.label(address(quantAMMWeightedPoolFactory), "quantamm weighted pool factory");
 
         (daiIdx, usdcIdx) = getSortedIndexes(address(dai), address(usdc));
@@ -77,10 +82,9 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         params._poolSettings.oracles = new address[][](0);
-        
+
         vm.expectRevert("NOPROVORC");
         quantAMMWeightedPoolFactory.create(params);
-
     }
 
     function testQuantAMMWeightedFactoryEmptyOracleArrayMixed() public {
@@ -150,7 +154,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
 
     function testQuantAMMWeightedFactoryLambdaInvalidEmpty2D() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
-        params._poolSettings.lambda = new uint64[](1);        
+        params._poolSettings.lambda = new uint64[](1);
         vm.expectRevert("INVLAM");
         quantAMMWeightedPoolFactory.create(params);
     }
@@ -166,7 +170,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
     function testQuantAMMWeightedFactoryLambdaInvalidBelow() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](1);
-        params._poolSettings.lambda[0] = 0e18;        
+        params._poolSettings.lambda[0] = 0e18;
         vm.expectRevert("INVLAM");
         quantAMMWeightedPoolFactory.create(params);
     }
@@ -195,7 +199,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
 
     function testQuantAMMWeightedFactoryAbsoluteToleranceInvalidBelow() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
-        params._poolSettings.absoluteWeightGuardRail = 0e18;        
+        params._poolSettings.absoluteWeightGuardRail = 0e18;
         vm.expectRevert("INV_ABSWGT");
         quantAMMWeightedPoolFactory.create(params);
     }
@@ -269,14 +273,13 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         assertEq(vars.vault.daiAfter - vars.vault.daiBefore, amountToDonate, "Vault DAI balance is wrong");
         assertEq(vars.vault.usdcAfter - vars.vault.usdcBefore, amountToDonate, "Vault USDC balance is wrong");
     }
-    
 
     function _deployOracle(int216 fixedValue, uint delay) internal returns (MockChainlinkOracle) {
         MockChainlinkOracle oracle = new MockChainlinkOracle(fixedValue, delay);
         return oracle;
     }
-    
-    function _createPoolParams() internal returns(QuantAMMWeightedPoolFactory.NewPoolParams memory retParams){
+
+    function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
         PoolRoleAccounts memory roleAccounts;
         IERC20[] memory tokens = [address(dai), address(usdc)].toMemoryArray().asIERC20();
         MockMomentumRule momentumRule = new MockMomentumRule(owner);
@@ -290,7 +293,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         initialWeights[1] = 0.5e18;
         uint256[] memory initialWeightsUint = new uint256[](2);
         initialWeightsUint[0] = 0.5e18;
-        initialWeightsUint[1] = 0.5e18; 
+        initialWeightsUint[1] = 0.5e18;
 
         uint64[] memory lambdas = new uint64[](1);
         lambdas[0] = 0.2e18;
@@ -303,7 +306,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         oracles[0][0] = address(chainlinkOracle);
 
         retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
-            "Pool With Donation" ,
+            "Pool With Donation",
             "PwD",
             vault.buildTokenConfig(tokens),
             initialWeightsUint,
@@ -324,14 +327,14 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
                 0.2e18,
                 0.2e18,
                 parameters,
-                new address[](0),
-                new address[](0),
                 address(0)
             ),
             initialWeights,
             initialWeights,
-            3600
-            );
+            3600,
+            0,
+            new string[][](0)
+        );
     }
 
     function _deployAndInitializeQuantAMMWeightedPool(bool supportsDonation) private returns (address) {
@@ -341,13 +344,18 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         params.name = supportsDonation ? "Pool With Donation" : "Pool Without Donation";
         params.symbol = supportsDonation ? "PwD" : "PwoD";
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(
-            params
-        );
+        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
 
         // Initialize pool.
         vm.prank(lp);
-        router.initialize(quantAMMWeightedPool, tokens, [poolInitAmount, poolInitAmount].toMemoryArray(), 0, false, bytes(""));
+        router.initialize(
+            quantAMMWeightedPool,
+            tokens,
+            [poolInitAmount, poolInitAmount].toMemoryArray(),
+            0,
+            false,
+            bytes("")
+        );
 
         return quantAMMWeightedPool;
     }

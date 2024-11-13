@@ -9,11 +9,9 @@ import "./QuantAMMBaseAdministration.sol";
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "./rules/UpdateRule.sol";
 
-import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateWeightRunner.sol";
+import "./QuantAMMWeightedPool.sol";
 
-import {
-    IWeightedPool
-} from "@balancer-labs/v3-interfaces/contracts/pool-weighted/IWeightedPool.sol";
+import { IWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-weighted/IWeightedPool.sol";
 /*
 ARCHITECTURE DESIGN NOTES
 
@@ -48,16 +46,17 @@ updates and guard rails.
 
  */
 
-
 /// @title UpdateWeightRunner singleton contract that is responsible for running all weight updates
-
 
 contract UpdateWeightRunner is Ownable2Step {
     event OracleAdded(address indexed oracleAddress);
     event OracleRemved(address indexed oracleAddress);
+    event GetData(address indexed caller, address indexed pool);
+    event SetWeightManual(address indexed caller, address indexed pool, int256[] weights, uint40 lastInterpolationTimePossible);
+    event SetIntermediateValuesManually(address indexed caller, address indexed pool, int256[] newMovingAverages, int256[] newParameters, uint numberOfAssets);
     event UpdatePerformed(address indexed caller, address indexed pool);
     event UpdatePerformedQuantAMM(address indexed caller, address indexed pool);
-    event QuantAMMWeightRunnerSet(address indexed weightRunner, bool allowed);
+    event SetApprovedActionsForPool(address indexed caller, address indexed pool, uint256 actions);
     event ETHUSDOracleSet(address ethUsdOracle);
     event PoolRuleSet(
         address rule,
@@ -99,12 +98,21 @@ contract UpdateWeightRunner is Ownable2Step {
 
     OracleWrapper private ethOracle;
 
+    uint256 private constant MASK_POOL_PERFORM_UPDATE = 1;
+    uint256 private constant MASK_POOL_GET_DATA = 2;
+    uint256 private constant MASK_POOL_DAO_WEIGHT_UPDATES = 4;
+    uint256 private constant MASK_POOL_OWNER_UPDATES = 8;
+    uint256 private constant MASK_POOL_QUANTAMM_ADMIN_UPDATES = 16;
+
     constructor(address _quantammAdmin, address _ethOracle) Ownable(msg.sender) {
+        require(_quantammAdmin != address(0), "Admin cannot be default address");
+        require(_ethOracle != address(0), "eth oracle cannot be default address");
+        
         quantammAdmin = _quantammAdmin;
         ethOracle = OracleWrapper(_ethOracle);
     }
 
-    address internal immutable quantammAdmin;
+    address public immutable quantammAdmin;
 
     /// @notice key is pool address, value is rule settings for running the pool
     mapping(address => PoolRuleSettings) public poolRuleSettings;
@@ -115,37 +123,37 @@ contract UpdateWeightRunner is Ownable2Step {
     /// @notice Mapping of pool backup oracles keyed by pool address for each asset in the pool (in order of priority)
     mapping(address => address[][]) public poolBackupOracles;
 
-    /// @notice Mapping of external addresses that are owned by the protocol and can call performUpdateQuantAMM
-    mapping(address => bool) public quantAMMWeightRunners;
-
     /// @notice Get the happy path primary oracles for the constituents of a pool
     /// @param _poolAddress Address of the pool
-    function getOptimisedPoolOracle(
-        address _poolAddress
-    ) public view returns (address[] memory oracles) {
+    function getOptimisedPoolOracle(address _poolAddress) public view returns (address[] memory oracles) {
         return poolOracles[_poolAddress];
     }
 
     /// @notice Get the backup oracles for the constituents of a pool
     /// @param _poolAddress Address of the pool
-    function getPoolOracleAndBackups(
-        address _poolAddress
-    ) public view returns (address[][] memory oracles) {
+    function getPoolOracleAndBackups(address _poolAddress) public view returns (address[][] memory oracles) {
         return poolBackupOracles[_poolAddress];
     }
 
     /// @notice Get the rule settings for a pool
     /// @param _poolAddress Address of the pool
-    function getPoolRuleSettings(
-        address _poolAddress
-    ) public view returns (PoolRuleSettings memory oracles) {
+    function getPoolRuleSettings(address _poolAddress) public view returns (PoolRuleSettings memory oracles) {
         return poolRuleSettings[_poolAddress];
     }
 
-    /// @notice List of approved oracles that can be used for updating weights. 
+    /// @notice Get the actions a pool has been approved for
+    /// @param _poolAddress Address of the pool
+    function getPoolApprovedActions(address _poolAddress) public view returns (uint256) {
+        return approvedPoolActions[_poolAddress];
+    }
+
+    /// @notice List of approved oracles that can be used for updating weights.
     mapping(address => bool) public approvedOracles;
 
-    /// @notice mapping keyed of oracle address to staleness threshold in seconds. Created for gas efficincy. 
+    /// @notice Mapping of actions approved for a pool by the QuantAMM protocol team.
+    mapping(address => uint256) public approvedPoolActions;
+
+    /// @notice mapping keyed of oracle address to staleness threshold in seconds. Created for gas efficincy.
     mapping(address => uint) public ruleOracleStalenessThreshold;
 
     /// @notice Mapping of pools to rules
@@ -153,17 +161,17 @@ contract UpdateWeightRunner is Ownable2Step {
 
     /// @notice Get the rule for a pool
     /// @param _poolAddress Address of the pool
-    function getPoolRule(
-        address _poolAddress
-    ) public view returns (IUpdateRule rule) {
+    function getPoolRule(address _poolAddress) public view returns (IUpdateRule rule) {
         return rules[_poolAddress];
     }
 
     /// @notice Add a new oracle to the available oracles
     /// @param _oracle Oracle to add
-    function addOracle(OracleWrapper _oracle) external onlyOwner {
+    function addOracle(OracleWrapper _oracle) external {
         address oracleAddress = address(_oracle);
         require(oracleAddress != address(0), "Invalid oracle address");
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
+
         if (!approvedOracles[oracleAddress]) {
             approvedOracles[oracleAddress] = true;
         } else {
@@ -174,16 +182,21 @@ contract UpdateWeightRunner is Ownable2Step {
 
     /// @notice Removes an existing oracle from the approved oracles
     /// @param _oracleToRemove The oracle to remove
-    function removeOracle(OracleWrapper _oracleToRemove) external onlyOwner {
+    function removeOracle(OracleWrapper _oracleToRemove) external {
         approvedOracles[address(_oracleToRemove)] = false;
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
         emit OracleRemved(address(_oracleToRemove));
+    }
+
+    function setApprovedActionsForPool(address _pool, uint256 _actions) external {
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
+        approvedPoolActions[_pool] = _actions;
+        emit SetApprovedActionsForPool(msg.sender, _pool, _actions);
     }
 
     /// @notice Set a rule for a pool, called by the pool
     /// @param _poolSettings Settings for the pool
-    function setRuleForPool(
-        IQuantAMMWeightedPool.PoolSettings memory _poolSettings
-    ) external {
+    function setRuleForPool(IQuantAMMWeightedPool.PoolSettings memory _poolSettings) external {
         require(address(rules[msg.sender]) == address(0), "Rule already set");
         require(_poolSettings.oracles.length > 0, "Empty oracles array");
         require(poolOracles[msg.sender].length == 0, "pool rule already set");
@@ -197,9 +210,7 @@ contract UpdateWeightRunner is Ownable2Step {
             }
         }
 
-        address[] memory optimisedHappyPathOracles = new address[](
-            _poolSettings.oracles.length
-        );
+        address[] memory optimisedHappyPathOracles = new address[](_poolSettings.oracles.length);
         for (uint i; i < _poolSettings.oracles.length; ++i) {
             optimisedHappyPathOracles[i] = _poolSettings.oracles[i][0];
         }
@@ -211,10 +222,7 @@ contract UpdateWeightRunner is Ownable2Step {
             epsilonMax: _poolSettings.epsilonMax,
             absoluteWeightGuardRail: _poolSettings.absoluteWeightGuardRail,
             ruleParameters: _poolSettings.ruleParameters,
-            timingSettings: PoolTimingSettings({
-                updateInterval: _poolSettings.updateInterval,
-                lastPoolUpdateRun: 0
-            }),
+            timingSettings: PoolTimingSettings({ updateInterval: _poolSettings.updateInterval, lastPoolUpdateRun: 0 }),
             poolManager: _poolSettings.poolManager
         });
 
@@ -236,34 +244,30 @@ contract UpdateWeightRunner is Ownable2Step {
         //Main external access point to trigger an update
         address rule = address(rules[_pool]);
         require(rule != address(0), "Pool not registered");
-        PoolRuleSettings memory settings = poolRuleSettings[_pool];
         
+        PoolRuleSettings memory settings = poolRuleSettings[_pool];
+
         require(
-            block.timestamp - settings.timingSettings.lastPoolUpdateRun >=
-                settings.timingSettings.updateInterval,
+            block.timestamp - settings.timingSettings.lastPoolUpdateRun >= settings.timingSettings.updateInterval,
             "Update not allowed"
         );
-        _performUpdateAndGetData(_pool, settings);
 
-        // emit event for easier tracking of updates and to allow for easier querying of updates
-        emit UpdatePerformed(msg.sender, _pool);
-    }
+        uint256 poolRegistryEntry = approvedPoolActions[_pool];
+        if(poolRegistryEntry & MASK_POOL_PERFORM_UPDATE > 0){            
+            _performUpdateAndGetData(_pool, settings);
 
-    /// @notice Allow / disallow an address to call performUpdateQuantAMM
-    /// @param _weightRunner the target runner address
-    /// @param _allowed whether or not it is considered a quantamm owned address
-    function setQuantAMMWeightRunner(
-        address _weightRunner,
-        bool _allowed
-    ) public onlyOwner {
-        require(quantAMMWeightRunners[_weightRunner] != _allowed, "Already set");
-        quantAMMWeightRunners[_weightRunner] = _allowed;
-        emit QuantAMMWeightRunnerSet(_weightRunner, _allowed);
+            // emit event for easier tracking of updates and to allow for easier querying of updates
+            emit UpdatePerformed(msg.sender, _pool);
+        }
+        else{
+            revert("Pool not approved to perform update");
+        }
     }
 
     /// @notice Change the ETH/USD oracle
-    /// @param _ethUsdOracle The new oracle address to use for ETH/USD 
-    function setETHUSDOracle(address _ethUsdOracle) public onlyOwner {
+    /// @param _ethUsdOracle The new oracle address to use for ETH/USD
+    function setETHUSDOracle(address _ethUsdOracle) public {
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
         ethOracle = OracleWrapper(_ethUsdOracle);
         emit ETHUSDOracleSet(_ethUsdOracle);
     }
@@ -271,22 +275,15 @@ contract UpdateWeightRunner is Ownable2Step {
     /// @notice Sets the timestamp of when an update was last run for a pool. Can by used as a breakgrass measure to retrigger an update.
     /// @param _poolAddress the target pool address
     /// @param _time the time to initialise the last update run to
-    function InitialisePoolLastRunTime(
-        address _poolAddress,
-        uint40 _time
-    ) external {
-        uint256 MASK_POOL_DAO_WEIGHT_UPDATES = 32;
-        uint256 poolRegistryEntry = IQuantAMMWeightedPool(_poolAddress).poolRegistry(_poolAddress);
+    function InitialisePoolLastRunTime(address _poolAddress, uint40 _time) external {
+        uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
 
         //current breakglass settings allow for dao or pool creator trigger. This is subject to review
         if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
             address daoRunner = QuantAMMBaseAdministration(quantammAdmin).daoRunner();
             require(msg.sender == daoRunner, "ONLYDAO");
-        } else {
-            require(
-                msg.sender == poolRuleSettings[_poolAddress].poolManager,
-                "ONLYMANAGER"
-            );
+        } else if (poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0) {
+            require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
         }
         poolRuleSettings[_poolAddress].timingSettings.lastPoolUpdateRun = _time;
         emit PoolLastRunSet(_poolAddress, _time);
@@ -294,9 +291,7 @@ contract UpdateWeightRunner is Ownable2Step {
 
     /// @notice Call oracle to retrieve new data
     /// @param _oracle the target oracle
-    function _getOracleData(
-        OracleWrapper _oracle
-    ) private view returns (OracleData memory oracleResult) {
+    function _getOracleData(OracleWrapper _oracle) private view returns (OracleData memory oracleResult) {
         if (!approvedOracles[address(_oracle)]) return oracleResult; // Return empty timestamp if oracle is no longer approved, result will be discarded
         (int216 data, uint40 timestamp) = _oracle.getData();
         oracleResult.data = data;
@@ -305,44 +300,33 @@ contract UpdateWeightRunner is Ownable2Step {
 
     /// @notice Get the data for a pool from the oracles and return it in the same order as the assets in the pool
     /// @param _pool Pool to get data for
-    function getData(
-        address _pool
-    ) public view returns (int256[] memory outputData) {
+    function getData(address _pool) public returns (int256[] memory outputData) {
+        bool internalCall = msg.sender != address(this);
+        require(internalCall || approvedPoolActions[_pool] & MASK_POOL_GET_DATA > 0, "Not allowed to get data");
         //optimised == happy path, optimised into a different array to save gas
         address[] memory optimisedOracles = poolOracles[_pool];
         uint oracleLength = optimisedOracles.length;
         uint numAssetOracles;
         outputData = new int256[](oracleLength);
-        uint oracleStalenessThreshold = IQuantAMMWeightedPool(_pool)
-            .getOracleStalenessThreshold();
+        uint oracleStalenessThreshold = IQuantAMMWeightedPool(_pool).getOracleStalenessThreshold();
 
         for (uint i; i < oracleLength; ) {
             // Asset is base asset
             OracleData memory oracleResult;
             oracleResult = _getOracleData(OracleWrapper(optimisedOracles[i]));
-            if (
-                oracleResult.timestamp >
-                block.timestamp - oracleStalenessThreshold
-            ) {
+            if (oracleResult.timestamp > block.timestamp - oracleStalenessThreshold) {
                 outputData[i] = oracleResult.data;
             } else {
                 unchecked {
                     numAssetOracles = poolBackupOracles[_pool][i].length;
                 }
 
-                for (
-                    uint j = 1 /*0 already done via optimised poolOracles*/;
-                    j < numAssetOracles;
-
-                ) {
+                for (uint j = 1 /*0 already done via optimised poolOracles*/; j < numAssetOracles; ) {
                     oracleResult = _getOracleData(
                         // poolBackupOracles[_pool][asset][oracle]
                         OracleWrapper(poolBackupOracles[_pool][i][j])
                     );
-                    if (
-                        oracleResult.timestamp >
-                        block.timestamp - oracleStalenessThreshold
-                    ) {
+                    if (oracleResult.timestamp > block.timestamp - oracleStalenessThreshold) {
                         // Oracle has fresh values
                         break;
                     } else if (j == numAssetOracles - 1) {
@@ -361,6 +345,10 @@ contract UpdateWeightRunner is Ownable2Step {
                 ++i;
             }
         }
+
+        if(!internalCall){
+            emit GetData(msg.sender, _pool);
+        }
     }
 
     function _getUpdatedWeightsAndOracleData(
@@ -369,7 +357,7 @@ contract UpdateWeightRunner is Ownable2Step {
         PoolRuleSettings memory _ruleSettings
     ) private returns (int256[] memory updatedWeights, int256[] memory data) {
         data = getData(_pool);
-        
+
         updatedWeights = rules[_pool].CalculateNewWeights(
             _currentWeights,
             data,
@@ -379,9 +367,8 @@ contract UpdateWeightRunner is Ownable2Step {
             _ruleSettings.epsilonMax,
             _ruleSettings.absoluteWeightGuardRail
         );
-        poolRuleSettings[_pool].timingSettings.lastPoolUpdateRun = uint40(
-            block.timestamp
-        );
+
+        poolRuleSettings[_pool].timingSettings.lastPoolUpdateRun = uint40(block.timestamp);
     }
 
     /// @notice Perform the update for a pool and get the new data
@@ -391,78 +378,62 @@ contract UpdateWeightRunner is Ownable2Step {
         address _poolAddress,
         PoolRuleSettings memory _ruleSettings
     ) private returns (int256[] memory) {
-        uint256[] memory targetWeightsUnsigned = IWeightedPool(_poolAddress).getNormalizedWeights();
-        
-        int256[] memory targetWeights = new int256[](targetWeightsUnsigned.length);
+        uint256[] memory currentWeightsUnsigned = IWeightedPool(_poolAddress).getNormalizedWeights();
+        int256[] memory currentWeights = new int256[](currentWeightsUnsigned.length);
 
-        for(uint i; i < targetWeightsUnsigned.length;){
-            targetWeights[i] = int256(targetWeightsUnsigned[i]);
+        for (uint i; i < currentWeights.length; ) {
+            currentWeights[i] = int256(currentWeightsUnsigned[i]);
 
-            unchecked{
+            unchecked {
                 i++;
             }
         }
-
-        uint weightAndMultiplierLength = targetWeights.length * 2;
-        (
-            int256[] memory updatedWeights,
-            int256[] memory data
-        ) = _getUpdatedWeightsAndOracleData(_poolAddress, targetWeights, _ruleSettings);
-
-        // the base pool needs both the target weights and the per block multipler per asset
-        int256[] memory targetWeightsAndBlockMultiplier = new int256[](
-            weightAndMultiplierLength
+        uint weightAndMultiplierLength = currentWeights.length * 2;
+        (int256[] memory updatedWeights, int256[] memory data) = _getUpdatedWeightsAndOracleData(
+            _poolAddress,
+            currentWeights,
+            _ruleSettings
         );
+        // the base pool needs both the target weights and the per block multipler per asset
+        int256[] memory targetWeightsAndBlockMultiplier = new int256[](weightAndMultiplierLength);
 
         int256 currentLastInterpolationPossible = type(int256).max;
-        int256 updateInterval = int256(
-            int40(_ruleSettings.timingSettings.updateInterval)
-        );
-
-        for (uint i; i < targetWeights.length; ) {
-            targetWeightsAndBlockMultiplier[i] = targetWeights[i];
+        int256 updateInterval = int256(int40(_ruleSettings.timingSettings.updateInterval));
+        for (uint i; i < currentWeights.length; ) {
+            targetWeightsAndBlockMultiplier[i] = currentWeights[i];
 
             // this would be the simple scenario if we did not have to worry about guard rails
-            int256 blockMultiplier = (updatedWeights[i] - targetWeights[i]) /
-                updateInterval;
+            int256 blockMultiplier = (updatedWeights[i] - currentWeights[i]) / updateInterval;
 
-            targetWeightsAndBlockMultiplier[
-                i + targetWeights.length
-            ] = blockMultiplier;
-
+            targetWeightsAndBlockMultiplier[i + currentWeights.length] = blockMultiplier;
+            int256 absGuardRail18 = int256(int64(_ruleSettings.absoluteWeightGuardRail));
+            int256 upperGuardRail = (PRBMathSD59x18.fromInt(1) - (PRBMathSD59x18.mul(PRBMathSD59x18.fromInt(int256(currentWeights.length - 1)), absGuardRail18)));
+            
             unchecked {
                 //This is your worst case scenario, usually you expect (and have DR) that at your next interval you
                 //get another update. However what if you don't. You can carry on interpolating until you hit a rail
                 //This calculates the first blocktime which one of your constituents hits the rail and that is your max
                 //interpolation weight
-                //There are economic reasons for this detailed in the whitepaper design notes. 
+                //There are economic reasons for this detailed in the whitepaper design notes.
                 int256 weightBetweenTargetAndMax;
                 int256 blockTimeUntilGuardRailHit;
                 if (blockMultiplier > int256(0)) {
-                    weightBetweenTargetAndMax =
-                        int256(int64(_ruleSettings.absoluteWeightGuardRail)) -
-                        targetWeights[i];
+                    weightBetweenTargetAndMax = upperGuardRail - currentWeights[i];
+                    //the updated weight should never be above guard rail. final check as block multiplier 
+                    //will be even worse if 
                     //not using .div so that the 18dp is removed
-                    blockTimeUntilGuardRailHit =
-                        weightBetweenTargetAndMax /
-                        blockMultiplier;
+                    blockTimeUntilGuardRailHit = weightBetweenTargetAndMax / blockMultiplier;
                 } else if (blockMultiplier == int256(0)) {
                     blockTimeUntilGuardRailHit = type(int256).max;
                 } else {
-                    weightBetweenTargetAndMax =
-                        targetWeights[i] -
-                        int256(int64(_ruleSettings.absoluteWeightGuardRail));
+                    weightBetweenTargetAndMax = currentWeights[i] - absGuardRail18;
+
                     //not using .div so that the 18dp is removed
-                    
-                    blockTimeUntilGuardRailHit =
-                        weightBetweenTargetAndMax /
-                        blockMultiplier;
+                    //abs block multiplier
+                    blockTimeUntilGuardRailHit = weightBetweenTargetAndMax / int256(uint256(-1 * blockMultiplier));                    
                 }
 
-                if (
-                    blockTimeUntilGuardRailHit <
-                    currentLastInterpolationPossible
-                ) {
+                if (blockTimeUntilGuardRailHit < currentLastInterpolationPossible) {
                     //-1 to avoid any round issues at boundry. Cheaper than seeing if there will be and then doing -1
                     currentLastInterpolationPossible = blockTimeUntilGuardRailHit;
                 }
@@ -474,15 +445,11 @@ contract UpdateWeightRunner is Ownable2Step {
         uint40 lastTimestampThatInterpolationWorks = uint40(type(uint40).max);
 
         //next expected update + time beyond that
-        currentLastInterpolationPossible +=
-            int40(uint40(block.timestamp)) +
-            int40(_ruleSettings.timingSettings.updateInterval);
+        currentLastInterpolationPossible += int40(uint40(block.timestamp));
 
         //needed to prevent silent overflows
-        if (currentLastInterpolationPossible < int40(type(uint40).max)) {
-            lastTimestampThatInterpolationWorks = uint40(
-                int40(currentLastInterpolationPossible)
-            );
+        if (currentLastInterpolationPossible < int256(type(int40).max)){
+            lastTimestampThatInterpolationWorks = uint40(int40(currentLastInterpolationPossible));
         }
 
         //the main point of interaction between the update weight runner and the quantammAdmin is here
@@ -504,19 +471,22 @@ contract UpdateWeightRunner is Ownable2Step {
         address _poolAddress,
         uint40 _lastInterpolationTimePossible
     ) external {
-        uint256 MASK_POOL_DAO_WEIGHT_UPDATES = 32;
-        uint256 poolRegistryEntry = IQuantAMMWeightedPool(_poolAddress).poolRegistry(_poolAddress);
+        uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
         if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
             address daoRunner = QuantAMMBaseAdministration(quantammAdmin).daoRunner();
             require(msg.sender == daoRunner, "ONLYDAO");
-        } else {
-            require(
-                msg.sender == poolRuleSettings[_poolAddress].poolManager,
-                "ONLYMANAGER"
-            );
+        } else if(poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0){
+            require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
+        }else if(poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0){
+            require(msg.sender == quantammAdmin, "ONLYADMIN");
+        }
+        else {
+            revert("No permission to set weight values");
         }
 
         IQuantAMMWeightedPool(_poolAddress).setWeights(_weights, _poolAddress, _lastInterpolationTimePossible);
+
+        emit SetWeightManual(msg.sender, _poolAddress, _weights, _lastInterpolationTimePossible);
     }
 
     /// @notice Breakglass function to allow the DAO or the pool manager to set the intermediate values of the rule manually
@@ -530,27 +500,26 @@ contract UpdateWeightRunner is Ownable2Step {
         int256[] memory _newParameters,
         uint _numberOfAssets
     ) external {
-        uint256 MASK_POOL_DAO_WEIGHT_UPDATES = 32;
-        uint256 poolRegistryEntry = IQuantAMMWeightedPool(_poolAddress).poolRegistry(_poolAddress);
+        uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
 
         //Who can trigger these very powerful breakglass features is under review
         if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
             address daoRunner = QuantAMMBaseAdministration(quantammAdmin).daoRunner();
             require(msg.sender == daoRunner, "ONLYDAO");
-        } else {
-            require(
-                msg.sender == poolRuleSettings[_poolAddress].poolManager,
-                "ONLYMANAGER"
-            );
+        } else if(poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0){
+            require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
+        } else if(poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0){
+            require(msg.sender == quantammAdmin, "ONLYADMIN");
         }
+        else {
+            revert("No permission to set intermediate values");
+        }
+
         IUpdateRule rule = rules[_poolAddress];
 
         // utilises the base function so that manual updates go through the standard process
-        rule.initialisePoolRuleIntermediateValues(
-            _poolAddress,
-            _newMovingAverages,
-            _newParameters,
-            _numberOfAssets
-        );
+        rule.initialisePoolRuleIntermediateValues(_poolAddress, _newMovingAverages, _newParameters, _numberOfAssets);
+
+        emit SetIntermediateValuesManually(msg.sender, _poolAddress, _newMovingAverages, _newParameters, _numberOfAssets);
     }
 }

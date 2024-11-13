@@ -7,10 +7,20 @@ import "./base/QuantammMathGuard.sol";
 import "./base/QuantammMathMovingAverage.sol";
 import "./UpdateRule.sol";
 
-/// @title AntiMomentumUpdateRule contract for QuantAMM anti-momentum update rule implementation 
+/// @title AntiMomentumUpdateRule contract for QuantAMM anti-momentum update rule implementation
 /// @notice Contains the logic for calculating the anti-momentum update rule and updating the weights of the QuantAMM pool
 contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
-    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {}
+    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
+        name = "AntiMomentum";
+        description = "TODO";
+        devNotes = "TODO";
+        limitations = "TODO";
+        
+        parameterDescriptions = new string[](3);
+        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change TODO";
+        parameterDescriptions[1] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
+        parameterDescriptions[2] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
+    }
 
     using PRBMathSD59x18 for int256;
 
@@ -42,7 +52,7 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         QuantAMMAntiMomentumLocals memory locals;
         locals.kappa = _parameters[0];
         locals.useRawPrice = false;
-        
+
         // the second parameter determines if antimomentum should use the price or the average price as the denominator
         // using the average price has shown greater performance and resilience due to greater smoothing
         if (_parameters.length > 1) {
@@ -50,14 +60,10 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         }
 
         _poolParameters.numberOfAssets = _prevWeights.length;
-        
-        locals.newWeights = _calculateQuantAMMGradient(
-            _data,
-            _poolParameters
-        );
 
+        locals.newWeights = _calculateQuantAMMGradient(_data, _poolParameters);
 
-        for (locals.i = 0 ; locals.i < _prevWeights.length; ) {
+        for (locals.i = 0; locals.i < _prevWeights.length; ) {
             locals.denominator = _poolParameters.movingAverage[locals.i];
             if (locals.useRawPrice) {
                 locals.denominator = _data[locals.i];
@@ -71,14 +77,13 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 ++locals.i;
             }
         }
-        
 
         // To avoid intermediate overflows (because of normalization), we only downcast in the end to an uint64
         newWeightsConverted = new int256[](_prevWeights.length);
         if (locals.kappa.length == 1) {
             locals.normalizationFactor /= int256(_prevWeights.length);
             // w(t − 1) + κ ·(ℓp(t) − 1/p(t) · ∂p(t)/∂t)
-            
+
             for (locals.i = 0; locals.i < _prevWeights.length; ) {
                 int256 res = int256(_prevWeights[locals.i]) +
                     int256(locals.kappa[0]).mul(locals.normalizationFactor - locals.newWeights[locals.i]);
@@ -111,18 +116,13 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         return newWeightsConverted;
     }
 
-    function _requiresPrevMovingAverage()
-        internal
-        pure
-        override
-        returns (uint16)
-    {
+    function _requiresPrevMovingAverage() internal pure override returns (uint16) {
         return REQUIRES_PREV_MAVG;
     }
 
-    /// @param _poolAddress address of pool being initialised 
+    /// @param _poolAddress address of pool being initialised
     /// @param _initialValues array of initial gradient values
-    /// @param _numberOfAssets number of assets in the pool 
+    /// @param _numberOfAssets number of assets in the pool
     function _setInitialIntermediateValues(
         address _poolAddress,
         int256[] memory _initialValues,
@@ -133,13 +133,8 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
 
     /// @notice Check if the given parameters are valid for the rule
     /// @dev If parameters are not valid, either reverts or returns false
-    function validParameters(
-        int256[][] calldata _parameters
-    ) external pure override returns (bool) {
-        if (
-            _parameters.length == 1 ||
-            (_parameters.length == 2 && _parameters[1].length == 1)
-        ) {
+    function validParameters(int256[][] calldata _parameters) external pure override returns (bool) {
+        if (_parameters.length == 1 || (_parameters.length == 2 && _parameters[1].length == 1)) {
             int256[] memory kappa = _parameters[0];
             uint16 valid = uint16(kappa.length) > 0 ? 1 : 0;
             for (uint i; i < kappa.length; ) {

@@ -1,12 +1,11 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 import "../UpdateWeightRunner.sol";
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "../rules/UpdateRule.sol";
 
-
-contract MockPool  {
-    uint16 public updateInterval;
+contract MockPool {
+    uint16 public  immutable updateInterval;
 
     int256 public lambda;
 
@@ -20,12 +19,11 @@ contract MockPool  {
 
     uint immutable oracleStalenessThreshold;
 
-    address updateWeightRunner;
+    address  immutable updateWeightRunner;
 
     uint256 poolLpTokenValue;
 
     uint256 public afterTokenTransferID;
-
 
     constructor(uint16 _updateInterval, int256 _lambda, address _updateWeightRunner) {
         updateInterval = _updateInterval;
@@ -36,23 +34,23 @@ contract MockPool  {
         updateWeightRunner = _updateWeightRunner;
     }
 
-    function numAssets() external view  returns (uint) {
+    function numAssets() external view returns (uint) {
         return numberOfAssets;
     }
 
-    function getBaseAssets() external view  returns (IERC20[] memory) {}
+    function getBaseAssets() external view returns (IERC20[] memory) {}
 
-    function getAssets() external view  returns (address[] memory) {}
-    
-    function getEpsilonMax() external view returns (int256){
+    function getAssets() external view returns (address[] memory) {}
+
+    function getEpsilonMax() external view returns (int256) {
         return epsilonMax;
     }
 
-    function getAbsoluteGuardRails() external view returns (int256){
+    function getAbsoluteGuardRails() external view returns (int256) {
         return absoluteWeightGuardRail;
     }
 
-    function setRuleForPool ( 
+    function setRuleForPool(
         IUpdateRule _rule,
         address[][] calldata _poolOracles,
         uint64[] calldata _lambda,
@@ -60,25 +58,26 @@ contract MockPool  {
         uint64 _epsilonMax,
         uint64 _absoluteWeightGuardRail,
         uint40 _updateInterval,
-        address _poolManager) external {
-            IQuantAMMWeightedPool.PoolSettings memory _poolSettings;
-            _poolSettings.rule = _rule;
-            _poolSettings.oracles = _poolOracles;
-            _poolSettings.updateInterval = uint16(_updateInterval);
-            _poolSettings.lambda = _lambda;
-            _poolSettings.epsilonMax = _epsilonMax;
-            _poolSettings.absoluteWeightGuardRail = _absoluteWeightGuardRail;
-            _poolSettings.ruleParameters = _ruleParameters;
-            _poolSettings.poolManager = _poolManager;
+        address _poolManager
+    ) external {
+        IQuantAMMWeightedPool.PoolSettings memory _poolSettings;
+        _poolSettings.rule = _rule;
+        _poolSettings.oracles = _poolOracles;
+        _poolSettings.updateInterval = uint16(_updateInterval);
+        _poolSettings.lambda = _lambda;
+        _poolSettings.epsilonMax = _epsilonMax;
+        _poolSettings.absoluteWeightGuardRail = _absoluteWeightGuardRail;
+        _poolSettings.ruleParameters = _ruleParameters;
+        _poolSettings.poolManager = _poolManager;
 
-            UpdateWeightRunner(updateWeightRunner).setRuleForPool(_poolSettings);
+        UpdateWeightRunner(updateWeightRunner).setRuleForPool(_poolSettings);
     }
 
-    function setNumberOfAssets(uint _numberOfAssets) external{
+    function setNumberOfAssets(uint _numberOfAssets) external {
         numberOfAssets = _numberOfAssets;
     }
 
-    function performRuleUpdate()  external {}
+    function performRuleUpdate() external {}
 
     function callSetRuleForPool(
         UpdateWeightRunner _updateWeightRunner,
@@ -122,8 +121,8 @@ contract MockPool  {
     function getTokenAddress() public pure returns (address tokenAddress) {
         return address(0);
     }
-    
-    function getOracleStalenessThreshold() external view  returns (uint){
+
+    function getOracleStalenessThreshold() external view returns (uint) {
         return oracleStalenessThreshold;
     }
 
@@ -138,6 +137,4 @@ contract MockPool  {
     function afterTokenTransfer(address /*from*/, address /*to*/, uint256 firstTokenId) public {
         afterTokenTransferID = firstTokenId;
     }
-    int256[] weights;
-
 }

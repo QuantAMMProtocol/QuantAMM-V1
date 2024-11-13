@@ -24,13 +24,13 @@ contract OracleWrapperTest is Test {
         vm.warp(block.timestamp + delay);
 
         // Get data from the oracle
-        (int216 data, uint40 timestamp)  = chainlinkOracle.getData();
+        (int216 data, uint40 timestamp) = chainlinkOracle.getData();
 
         // Check the values
-        assertEq(data, fixedValue);  // Check if data equals 1000 ether
+        assertEq(data, fixedValue); // Check if data equals 1000 ether
 
         uint256 nowTimestamp = block.timestamp;
-        assertEq(timestamp, nowTimestamp - delay);  // Check if timestamp is correct
+        assertEq(timestamp, nowTimestamp - delay); // Check if timestamp is correct
     }
 
     // Test 2: Should return stale information of primary oracle
@@ -45,12 +45,12 @@ contract OracleWrapperTest is Test {
         vm.warp(block.timestamp + delay);
 
         // Get data from the oracle
-        (int216 data, uint40 timestamp)  = chainlinkOracle.getData();
+        (int216 data, uint40 timestamp) = chainlinkOracle.getData();
 
         // Check the values
-        assertEq(data, fixedValue);  // Check if data equals 1000 ether
+        assertEq(data, fixedValue); // Check if data equals 1000 ether
 
         uint256 nowTimestamp = block.timestamp;
-        assertEq(timestamp, nowTimestamp - delay);  // Check if timestamp is correct
+        assertEq(timestamp, nowTimestamp - delay); // Check if timestamp is correct
     }
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
 import { IPoolVersion } from "@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IPoolVersion.sol";
@@ -53,10 +53,12 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         int256[] _initialMovingAverages;
         int256[] _initialIntermediateValues;
         uint256 _oracleStalenessThreshold;
+        uint256 poolRegistry;
+        string[][] poolDetails;
     }
-    
+
     string private _poolVersion;
-    address private _updateWeightRunner;
+    address private immutable _updateWeightRunner;
 
     /// @param vault the balancer v3 valt
     /// @param pauseWindowDuration the pause duration
@@ -70,6 +72,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         string memory poolVersion,
         address updateWeightRunner
     ) BasePoolFactory(vault, pauseWindowDuration, type(QuantAMMWeightedPool).creationCode) Version(factoryVersion) {
+        require(updateWeightRunner != address(0), "update weight runner cannot be default address");
         _poolVersion = poolVersion;
         _updateWeightRunner = updateWeightRunner;
     }
@@ -83,9 +86,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
      * @notice Deploys a new `WeightedPool`.
      * @dev Tokens must be sorted for pool registration.
      */
-    function create(
-        NewPoolParams memory params
-    ) external returns (address pool) {
+    function create(NewPoolParams memory params) external returns (address pool) {
         if (params.roleAccounts.poolCreator != address(0)) {
             revert StandardPoolWithCreator();
         }
@@ -102,7 +103,9 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
                     symbol: params.symbol,
                     numTokens: params.normalizedWeights.length,
                     version: "version",
-                    updateWeightRunner: _updateWeightRunner
+                    updateWeightRunner: _updateWeightRunner,
+                    poolRegistry: params.poolRegistry,
+                    poolDetails: params.poolDetails
                 }),
                 getVault()
             ),

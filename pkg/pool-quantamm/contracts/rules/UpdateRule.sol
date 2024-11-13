@@ -26,8 +26,14 @@ An inherited base contract approach created a good domain driven design where bo
 /// @title QuantAMMUpdateRule base contract for QuantAMM update rules
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool and protections, must be implemented by all rules used in quantAMM
 abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IUpdateRule {
-    uint16 private constant REQUIRES_PREV_MAVG = 1;
+    uint16 private constant REQ_PREV_MAVG_VAL = 1;
     address private immutable updateWeightRunner;
+    
+    string public name;
+    string public description;
+    string public devNotes;
+    string public limitations;
+    string[] public parameterDescriptions;
 
     struct QuantAMMUpdateRuleLocals {
         uint i;
@@ -65,8 +71,7 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
         uint64[] calldata _lambdaStore,
         uint64 _epsilonMax,
         uint64 _absoluteWeightGuardRail
-    ) external returns (int256[] memory updatedWeights) {        
-        
+    ) external returns (int256[] memory updatedWeights) {
         QuantAMMUpdateRuleLocals memory locals;
 
         locals.numberOfAssets = _prevWeights.length;
@@ -80,8 +85,7 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
             }
         }
 
-        locals.requiresPrevAverage = _requiresPrevMovingAverage() ==
-            REQUIRES_PREV_MAVG;
+        locals.requiresPrevAverage = _requiresPrevMovingAverage() == REQ_PREV_MAVG_VAL;
         locals.intermediateMovingAverageStateLength = locals.numberOfAssets;
 
         if (locals.requiresPrevAverage) {
@@ -92,14 +96,9 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
 
         locals.currMovingAverage = new int256[](locals.numberOfAssets);
         locals.updatedMovingAverage = new int256[](locals.numberOfAssets);
-        locals.calculationMovingAverage = new int256[](
-            locals.intermediateMovingAverageStateLength
-        );
-        
-        locals.currMovingAverage = _quantAMMUnpack128Array(
-            movingAverages[_pool],
-            locals.numberOfAssets
-        );
+        locals.calculationMovingAverage = new int256[](locals.intermediateMovingAverageStateLength);
+
+        locals.currMovingAverage = _quantAMMUnpack128Array(movingAverages[_pool], locals.numberOfAssets);
 
         //All rules require the use of moving averages so the logic is executed in the base
         locals.updatedMovingAverage = _calculateQuantAMMMovingAverage(
@@ -122,11 +121,9 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
         // The potential sticky end if there is an odd number if constituents is dealt at the end
         // The saving of one SSTORE is more than the extra logic gas
         locals.i = 0;
-        for ( ;locals.i < locals.nMinusOne; ) {
+        for (; locals.i < locals.nMinusOne; ) {
             if (locals.requiresPrevAverage) {
-                locals.calculationMovingAverage[
-                    locals.i + locals.numberOfAssets
-                ] = locals.currMovingAverage[locals.i];
+                locals.calculationMovingAverage[locals.i + locals.numberOfAssets] = locals.currMovingAverage[locals.i];
             }
             locals.calculationMovingAverage[locals.i] = locals.updatedMovingAverage[locals.i];
 
@@ -134,15 +131,13 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
                 locals.secondIndex = locals.i + 1;
             }
             if (locals.requiresPrevAverage) {
-                locals.calculationMovingAverage[
-                    locals.secondIndex + locals.numberOfAssets
-                ] = locals.currMovingAverage[locals.secondIndex];
+                locals.calculationMovingAverage[locals.secondIndex + locals.numberOfAssets] = locals.currMovingAverage[
+                    locals.secondIndex
+                ];
             }
-            locals.calculationMovingAverage[locals.secondIndex] = locals.updatedMovingAverage[
-                locals.secondIndex
-            ];
+            locals.calculationMovingAverage[locals.secondIndex] = locals.updatedMovingAverage[locals.secondIndex];
 
-            if(!locals.requiresPrevAverage) {             
+            if (!locals.requiresPrevAverage) {
                 movingAverages[_pool][locals.storageIndex] = _quantAMMPackTwo128(
                     locals.updatedMovingAverage[locals.i],
                     locals.updatedMovingAverage[locals.secondIndex]
@@ -161,29 +156,20 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
                 locals.nMinusOne = ((locals.lastAssetIndex) / 2);
             }
             if (locals.requiresPrevAverage) {
-                locals.calculationMovingAverage[
-                    locals.lastAssetIndex + locals.numberOfAssets
-                ] = locals.currMovingAverage[locals.lastAssetIndex];
+                locals.calculationMovingAverage[locals.lastAssetIndex + locals.numberOfAssets] = locals
+                    .currMovingAverage[locals.lastAssetIndex];
             }
-            locals.calculationMovingAverage[locals.lastAssetIndex] = locals.updatedMovingAverage[
-                locals.lastAssetIndex
-            ];
-            if(!locals.requiresPrevAverage){
-                movingAverages[_pool][locals.nMinusOne] = locals.updatedMovingAverage[
-                    locals.lastAssetIndex
-                ];
+            locals.calculationMovingAverage[locals.lastAssetIndex] = locals.updatedMovingAverage[locals.lastAssetIndex];
+            if (!locals.requiresPrevAverage) {
+                movingAverages[_pool][locals.nMinusOne] = locals.updatedMovingAverage[locals.lastAssetIndex];
             }
-            
         }
-        
+
         //because of mixing of prev and current if the numassets is odd it is makes normal code unreadable to do inline
         //this means for rules requiring prev moving average there is an addition SSTORE and local packed array
-        if(locals.requiresPrevAverage){
-            movingAverages[_pool] = _quantAMMPack128Array(
-                locals.calculationMovingAverage
-            );
-        }    
-        
+        if (locals.requiresPrevAverage) {
+            movingAverages[_pool] = _quantAMMPack128Array(locals.calculationMovingAverage);
+        }
 
         QuantAMMPoolParameters memory poolParameters;
         poolParameters.lambda = locals.lambda;
@@ -191,12 +177,7 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
         poolParameters.pool = _pool;
 
         //calling the function in the derived contract specific to the specific rule
-        locals.unGuardedUpdatedWeights = _getWeights(
-            _prevWeights,
-            _data,
-            _parameters,
-            poolParameters
-        );
+        locals.unGuardedUpdatedWeights = _getWeights(_prevWeights, _data, _parameters, poolParameters);
 
         //Guard weights is done in the base contract so regardless of the rule the logic will always be executed
         updatedWeights = _guardQuantAMMWeights(
@@ -244,24 +225,11 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
     ) external {
         //initialisation is controlled during the registration process
         //this is to make sure no external actor can call this function
-        require(
-            msg.sender == _poolAddress || msg.sender == updateWeightRunner,
-            "UNAUTH"
-        );
-        _setInitialMovingAverages(
-            _poolAddress,
-            _newMovingAverages,
-            _numberOfAssets
-        );
-        _setInitialIntermediateValues(
-            _poolAddress,
-            _newInitialValues,
-            _numberOfAssets
-        );
+        require(msg.sender == _poolAddress || msg.sender == updateWeightRunner, "UNAUTH");
+        _setInitialMovingAverages(_poolAddress, _newMovingAverages, _numberOfAssets);
+        _setInitialIntermediateValues(_poolAddress, _newInitialValues, _numberOfAssets);
     }
 
     /// @notice Check if the given parameters are valid for the rule
-    function validParameters(
-        int256[][] calldata parameters
-    ) external view virtual returns (bool);
+    function validParameters(int256[][] calldata parameters) external view virtual returns (bool);
 }

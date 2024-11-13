@@ -5,7 +5,7 @@ pragma solidity >=0.8.24;
 /// @param _lambda λ
 /// @param _numberOfAssets number of assets in the pool
 /// @param _pool the target pool address
-struct QuantAMMPoolParameters{
+struct QuantAMMPoolParameters {
     address pool;
     uint numberOfAssets;
     int128[] lambda;

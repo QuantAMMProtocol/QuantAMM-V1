@@ -6,15 +6,15 @@ import "../../UpdateWeightRunner.sol";
 import "../../QuantAMMStorage.sol";
 import "./QuantammBasedRuleHelpers.sol";
 
-/// @title QuantAMMCovarianceBasedRule contract base for QuantAMM rules that use covariance matrices to calculate the new weights of a pool      
+/// @title QuantAMMCovarianceBasedRule contract base for QuantAMM rules that use covariance matrices to calculate the new weights of a pool
 /// @notice This contract is abstract and needs to be inherited and implemented to be used. It also stores the intermediate values of all pools
 abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
     using PRBMathSD59x18 for int256;
 
     int256 private constant ONE = 1 * 1e18; // Result of PRBMathSD59x18.fromInt(1), store as constant to avoid recalculation every time
     int256 private constant TENPOWEIGHTEEN = (10 ** 18);
-    
-    //key is pool address, value is the intermediate state of the covariance matrix in a packed array of 128 bit integers   
+
+    //key is pool address, value is the intermediate state of the covariance matrix in a packed array of 128 bit integers
     mapping(address => int256[]) internal intermediateCovarianceStates;
 
     struct QuantAMMCovariance {
@@ -30,7 +30,7 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
     }
 
     /// @notice Calculates the new intermediate state for the covariance update, i.e. A(t) = λA(t - 1) + (p(t) - p̅(t - 1))(p(t) - p̅(t))'
-    /// @param _newData p(t) 
+    /// @param _newData p(t)
     /// @param _poolParameters pool parameters
     function _calculateQuantAMMCovariance(
         int256[] calldata _newData,
@@ -43,7 +43,7 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
             intermediateCovarianceStates[_poolParameters.pool],
             locals.n
         );
-        
+
         int256[][] memory newState = new int256[][](locals.nSquared);
 
         locals.u = new int256[](locals.n); // (p(t) - p̅(t - 1))
@@ -72,7 +72,7 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
                     locals.intermediateState =
                         locals.convertedLambda.mul(intermediateCovarianceState[i][j]) +
                         locals.u[i].mul(locals.v[j]).div(TENPOWEIGHTEEN); // i is the row, j the column -> u_i * v_j the result of the outer product.
-                    
+
                     newState[i][j] = locals.intermediateState.mul(locals.oneMinusLambda);
                     intermediateCovarianceState[i][j] = locals.intermediateState;
                     unchecked {
@@ -109,41 +109,30 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
             }
         }
 
-        _quantAMMPack128Matrix(
-            intermediateCovarianceState,
-            intermediateCovarianceStates[_poolParameters.pool]
-        );
+        _quantAMMPack128Matrix(intermediateCovarianceState, intermediateCovarianceStates[_poolParameters.pool]);
 
         return newState;
     }
 
     /// @param _poolAddress the pool address being initialised
     /// @param _initialValues the values passed in during the creation of the pool
-    /// @param _numberOfAssets  the number of assets in the pool being initialised 
+    /// @param _numberOfAssets  the number of assets in the pool being initialised
     function _setIntermediateCovariance(
         address _poolAddress,
         int256[][] memory _initialValues,
         uint _numberOfAssets
     ) internal {
         uint storeLength = intermediateCovarianceStates[_poolAddress].length;
-        if (
-            (storeLength == 0 && _initialValues.length == _numberOfAssets) ||
-            _initialValues.length == storeLength
-        ) {
+        if ((storeLength == 0 && _initialValues.length == _numberOfAssets) || _initialValues.length == storeLength) {
             for (uint i; i < _numberOfAssets; ) {
-                require(
-                    _initialValues[i].length == _numberOfAssets,
-                    "Bad init covar row"
-                );
+                require(_initialValues[i].length == _numberOfAssets, "Bad init covar row");
                 unchecked {
                     ++i;
                 }
             }
             if (storeLength == 0) {
                 if ((_numberOfAssets * _numberOfAssets) % 2 == 0) {
-                    intermediateCovarianceStates[_poolAddress] = new int256[](
-                        (_numberOfAssets * _numberOfAssets) / 2
-                    );
+                    intermediateCovarianceStates[_poolAddress] = new int256[]((_numberOfAssets * _numberOfAssets) / 2);
                 } else {
                     intermediateCovarianceStates[_poolAddress] = new int256[](
                         (((_numberOfAssets * _numberOfAssets) - 1) / 2) + 1
@@ -152,10 +141,7 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
             }
 
             //should be initiiduring create pool
-            _quantAMMPack128Matrix(
-                _initialValues,
-                intermediateCovarianceStates[_poolAddress]
-            );
+            _quantAMMPack128Matrix(_initialValues, intermediateCovarianceStates[_poolAddress]);
         } else {
             revert("Invalid set covariance");
         }

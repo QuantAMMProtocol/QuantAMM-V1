@@ -1,27 +1,17 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 import "../../rules/MinimumVarianceUpdateRule.sol";
 
-
 contract MockMinimumVarianceRule is MinimumVarianceUpdateRule {
-    constructor(
-        address _updateWeightRunner
-    ) MinimumVarianceUpdateRule(_updateWeightRunner) {}
+    constructor(address _updateWeightRunner) MinimumVarianceUpdateRule(_updateWeightRunner) {}
 
     int256[] weights;
 
-    function GetResultWeights()
-        external
-        view
-        returns (int256[] memory results)
-    {
+    function GetResultWeights() external view returns (int256[] memory results) {
         return weights;
     }
 
-    function GetMovingAverages(
-        address poolAddress,
-        uint numAssets
-    ) external view returns (int256[] memory results) {
+    function GetMovingAverages(address poolAddress, uint numAssets) external view returns (int256[] memory results) {
         return _quantAMMUnpack128Array(movingAverages[poolAddress], numAssets);
     }
 
@@ -29,11 +19,7 @@ contract MockMinimumVarianceRule is MinimumVarianceUpdateRule {
         address poolAddress,
         uint numAssets
     ) external view returns (int256[] memory results) {
-        return
-            _quantAMMUnpack128Array(
-                intermediateVarianceStates[poolAddress],
-                numAssets
-            );
+        return _quantAMMUnpack128Array(intermediateVarianceStates[poolAddress], numAssets);
     }
 
     function CalculateUnguardedWeights(
@@ -48,12 +34,7 @@ contract MockMinimumVarianceRule is MinimumVarianceUpdateRule {
         poolParameters.lambda = lambda;
         poolParameters.movingAverage = _movingAverageData;
         poolParameters.pool = pool;
-        
-        weights = _getWeights(
-            prevWeights,
-            data,
-            _parameters,
-            poolParameters
-        );
+
+        weights = _getWeights(prevWeights, data, _parameters, poolParameters);
     }
 }

@@ -39,8 +39,7 @@
   "dependencies": {
     "@balancer-labs/v3-interfaces": "workspace:*",
     "@chainlink/contracts": "^1.2.0",
-    "@prb/math": "^2.5.0",
-    "@violetprotocol/ethereum-access-token": "^0.2.0"
+    "@prb/math": "^2.5.0"
   },
   "devDependencies": {
     "@balancer-labs/solidity-toolbox": "workspace:*",

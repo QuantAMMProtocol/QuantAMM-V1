@@ -17,31 +17,26 @@ contract MultiHopOracle is OracleWrapper {
     HopConfig[] public oracles;
 
     constructor(HopConfig[] memory _oracles) {
-        for(uint i = 0; i < _oracles.length; i++) {
+        for (uint i = 0; i < _oracles.length; i++) {
             oracles.push(_oracles[i]);
         }
     }
 
     /// @notice Returns the latest data from one oracle hopping across n oracles
     /// @return data the latest data from the oracle in the QuantAMM format
-    /// @return timestamp the timestamp of the data retrieval 
-    function _getData()
-        internal
-        view
-        override
-        returns (int216 data, uint40 timestamp)
-    {
+    /// @return timestamp the timestamp of the data retrieval
+    function _getData() internal view override returns (int216 data, uint40 timestamp) {
         HopConfig memory firstOracle = oracles[0];
         (data, timestamp) = firstOracle.oracle.getData();
         if (firstOracle.invert) {
             data = 10 ** 36 / data; // 10^36 (i.e., 1 with 18 decimals * 10^18) to get the inverse with 18 decimals.
             // 10**36 is automatically precomputed by the compiler, no explicit caching needed
         }
-        for (uint i = 1; i < oracles.length; ) {
+        uint256 oracleLength = oracles.length;
+
+        for (uint i = 1; i < oracleLength; ) {
             HopConfig memory oracleConfig = oracles[i];
-            (int216 oracleRes, uint40 oracleTimestamp) = oracleConfig
-                .oracle
-                .getData();
+            (int216 oracleRes, uint40 oracleTimestamp) = oracleConfig.oracle.getData();
             if (oracleTimestamp < timestamp) {
                 timestamp = oracleTimestamp; // Return minimum timestamp
             }

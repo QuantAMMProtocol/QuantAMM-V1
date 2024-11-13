@@ -31,10 +31,7 @@ abstract contract QuantAMMStorage {
     /// @notice Packs two 128 bit integers into one 256 bit integer
     /// @param _leftInt the left integer to pack
     /// @param _rightInt the right integer to pack
-    function _quantAMMPackTwo128(
-        int256 _leftInt,
-        int256 _rightInt
-    ) internal pure returns (int256 packed) {
+    function _quantAMMPackTwo128(int256 _leftInt, int256 _rightInt) internal pure returns (int256 packed) {
         require((_leftInt <= MAX128) && (_rightInt <= MAX128), "Overflow");
         require((_leftInt >= MIN128) && (_rightInt >= MIN128), "Underflow");
         packed = (_leftInt << 128) | int256(uint256(_rightInt << 128) >> 128);
@@ -68,7 +65,7 @@ abstract contract ScalarQuantAMMBaseStorage {
         int256 _eighthInt
     ) internal pure returns (int256 packed) {
         require(
-                _firstInt <= MAX32 &&
+            _firstInt <= MAX32 &&
                 _firstInt >= MIN32 &&
                 _secondInt <= MAX32 &&
                 _secondInt >= MIN32 &&
@@ -96,29 +93,35 @@ abstract contract ScalarQuantAMMBaseStorage {
         int256 seventhPacked = int256(uint256(_seventhInt << 224) >> 224) << 32;
         int256 eighthPacked = int256(uint256(_eighthInt << 224) >> 224);
 
-        packed = firstPacked | secondPacked | thirdPacked | fourthPacked | fifthPacked | sixthPacked | seventhPacked | eighthPacked;
-    
+        packed =
+            firstPacked |
+            secondPacked |
+            thirdPacked |
+            fourthPacked |
+            fifthPacked |
+            sixthPacked |
+            seventhPacked |
+            eighthPacked;
     }
 
     /// @notice Unpacks a 256 bit integer into 8 32 bit integers
     /// @param sourceElem the integer to unpack
-    function quantAMMUnpack32(int256 sourceElem) internal pure returns (int256[] memory targetArray){
-            
-            targetArray = new int256[](8);
-            targetArray[0] = (sourceElem >> 224) * 1e9;
-            targetArray[1] = int256(int32(sourceElem >> 192)) * 1e9;
-            targetArray[2] = int256(int32(sourceElem >> 160)) * 1e9;
-            targetArray[3] = int256(int32(sourceElem >> 128)) * 1e9;
-            targetArray[4] = int256(int32(sourceElem >> 96)) * 1e9;
-            targetArray[5] = int256(int32(sourceElem >> 64)) * 1e9;
-            targetArray[6] = int256(int32(sourceElem >> 32)) * 1e9;
-            targetArray[7] = int256(int32(sourceElem)) * 1e9;
+    function quantAMMUnpack32(int256 sourceElem) internal pure returns (int256[] memory targetArray) {
+        targetArray = new int256[](8);
+        targetArray[0] = (sourceElem >> 224) * 1e9;
+        targetArray[1] = int256(int32(sourceElem >> 192)) * 1e9;
+        targetArray[2] = int256(int32(sourceElem >> 160)) * 1e9;
+        targetArray[3] = int256(int32(sourceElem >> 128)) * 1e9;
+        targetArray[4] = int256(int32(sourceElem >> 96)) * 1e9;
+        targetArray[5] = int256(int32(sourceElem >> 64)) * 1e9;
+        targetArray[6] = int256(int32(sourceElem >> 32)) * 1e9;
+        targetArray[7] = int256(int32(sourceElem)) * 1e9;
 
-            return targetArray;
+        return targetArray;
     }
 
     /// @notice Unpacks a 256 bit integer into n 32 bit integers
-    /// @param _sourceArray the array to unpack 
+    /// @param _sourceArray the array to unpack
     /// @param _targetArrayLength the number of 32 bit integers to unpack
     function quantAMMUnpack32Array(
         int256[] memory _sourceArray,
@@ -140,39 +143,25 @@ abstract contract ScalarQuantAMMBaseStorage {
                         targetArray[targetIndex] = (sourceElem >> 224) * 1e9;
                         ++targetIndex;
 
-                        targetArray[targetIndex] =
-                            int256(int32(sourceElem >> 192)) *
-                            1e9;
+                        targetArray[targetIndex] = int256(int32(sourceElem >> 192)) * 1e9;
                         ++targetIndex;
 
-                        targetArray[targetIndex] =
-                            int256(int32(sourceElem >> 160)) *
-                            1e9;
+                        targetArray[targetIndex] = int256(int32(sourceElem >> 160)) * 1e9;
                         ++targetIndex;
 
-                        targetArray[targetIndex] =
-                            int256(int32(sourceElem >> 128)) *
-                            1e9;
+                        targetArray[targetIndex] = int256(int32(sourceElem >> 128)) * 1e9;
                         ++targetIndex;
 
-                        targetArray[targetIndex] =
-                            int256(int32(sourceElem >> 96)) *
-                            1e9;
+                        targetArray[targetIndex] = int256(int32(sourceElem >> 96)) * 1e9;
                         ++targetIndex;
 
-                        targetArray[targetIndex] =
-                            int256(int32(sourceElem >> 64)) *
-                            1e9;
+                        targetArray[targetIndex] = int256(int32(sourceElem >> 64)) * 1e9;
                         ++targetIndex;
 
-                        targetArray[targetIndex] =
-                            int256(int32(sourceElem >> 32)) *
-                            1e9;
+                        targetArray[targetIndex] = int256(int32(sourceElem >> 32)) * 1e9;
                         ++targetIndex;
 
-                        targetArray[targetIndex] =
-                            int256(int32(sourceElem)) *
-                            1e9;
+                        targetArray[targetIndex] = int256(int32(sourceElem)) * 1e9;
                         ++targetIndex;
                     }
                 }
@@ -205,11 +194,7 @@ abstract contract ScalarQuantAMMBaseStorage {
             unchecked {
                 uint offset = 224;
                 for (uint i = targetIndex; i < targetArray.length; ) {
-                    targetArray[i] =
-                        int256(
-                            int32(_sourceArray[stickyEndSourceElem] >> offset)
-                        ) *
-                        1e9;
+                    targetArray[i] = int256(int32(_sourceArray[stickyEndSourceElem] >> offset)) * 1e9;
                     offset -= 32;
                     ++i;
                 }
@@ -219,9 +204,7 @@ abstract contract ScalarQuantAMMBaseStorage {
 
     /// @notice Packs an array of 32 bit integers into an array of 256 bit integers
     /// @param _sourceArray the array to pack
-    function quantAMMPack32Array(
-        int256[] memory _sourceArray
-    ) internal pure returns (int256[] memory targetArray) {
+    function quantAMMPack32Array(int256[] memory _sourceArray) internal pure returns (int256[] memory targetArray) {
         uint targetArrayLength;
         uint storageIndex;
         uint nonStickySourceLength;
@@ -303,12 +286,9 @@ abstract contract ScalarQuantAMMBaseStorage {
 /// @title QuantAMMStorage contract for QuantAMM storage slot packing and unpacking scalar rule weights
 /// @notice Contains the logic for packing and unpacking storage slots with 128 bit integers for rule weights
 abstract contract ScalarRuleQuantAMMStorage is QuantAMMStorage {
-
     /// @notice Packs n 128 bit integers into n/2 256 bit integers
     /// @param _sourceArray the array to pack
-    function _quantAMMPack128Array(
-        int256[] memory _sourceArray
-    ) internal pure returns (int256[] memory targetArray) {
+    function _quantAMMPack128Array(int256[] memory _sourceArray) internal pure returns (int256[] memory targetArray) {
         uint sourceArrayLength = _sourceArray.length;
         uint targetArrayLength = sourceArrayLength;
         uint storageIndex;
@@ -321,10 +301,7 @@ abstract contract ScalarRuleQuantAMMStorage is QuantAMMStorage {
             }
             targetArray = new int256[](targetArrayLength);
             for (uint i; i < sourceArrayLength - 1; ) {
-                targetArray[storageIndex] = _quantAMMPackTwo128(
-                    _sourceArray[i],
-                    _sourceArray[i + 1]
-                );
+                targetArray[storageIndex] = _quantAMMPackTwo128(_sourceArray[i], _sourceArray[i + 1]);
                 unchecked {
                     i += 2;
                     ++storageIndex;
@@ -333,8 +310,7 @@ abstract contract ScalarRuleQuantAMMStorage is QuantAMMStorage {
         } else {
             int256 lastArrayItem = _sourceArray[_sourceArray.length - 1];
             require(
-                (lastArrayItem >= int256(type(int128).min)) &&
-                    (lastArrayItem <= int256(type(int128).max)),
+                (lastArrayItem >= int256(type(int128).min)) && (lastArrayItem <= int256(type(int128).max)),
                 "Last array element overflow"
             );
             unchecked {
@@ -343,18 +319,13 @@ abstract contract ScalarRuleQuantAMMStorage is QuantAMMStorage {
             targetArray = new int256[](targetArrayLength);
             uint sourceArrayLengthMinusTwo = sourceArrayLength - 2;
             for (uint i; i < sourceArrayLengthMinusTwo; ) {
-                targetArray[storageIndex] = _quantAMMPackTwo128(
-                    _sourceArray[i],
-                    _sourceArray[i + 1]
-                );
+                targetArray[storageIndex] = _quantAMMPackTwo128(_sourceArray[i], _sourceArray[i + 1]);
                 unchecked {
                     i += 2;
                     ++storageIndex;
                 }
             }
-            targetArray[storageIndex] = int256(
-                int128(_sourceArray[sourceArrayLength - 1])
-            );
+            targetArray[storageIndex] = int256(int128(_sourceArray[sourceArrayLength - 1]));
         }
     }
 
@@ -375,10 +346,7 @@ abstract contract ScalarRuleQuantAMMStorage is QuantAMMStorage {
             unchecked {
                 ++targetIndex;
             }
-            if (
-                (!divisibleByTwo && i < sourceArrayLengthMinusOne) ||
-                divisibleByTwo
-            ) {
+            if ((!divisibleByTwo && i < sourceArrayLengthMinusOne) || divisibleByTwo) {
                 targetArray[targetIndex] = int256(int128(_sourceArray[i]));
             }
             unchecked {
@@ -388,9 +356,7 @@ abstract contract ScalarRuleQuantAMMStorage is QuantAMMStorage {
         }
 
         if (!divisibleByTwo) {
-            targetArray[_targetArrayLength - 1] = int256(
-                int128(_sourceArray[sourceArrayLengthMinusOne])
-            );
+            targetArray[_targetArrayLength - 1] = int256(int128(_sourceArray[sourceArrayLengthMinusOne]));
         }
     }
 }
@@ -401,31 +367,24 @@ abstract contract ScalarRuleQuantAMMStorage is QuantAMMStorage {
 /// @title QuantAMMStorage contract for QuantAMM storage slot packing and unpacking vector rule weights
 /// @notice This logic to pack and unpack vectors is hardcoded for square matrices only as that is the usecase for QuantAMM
 abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
-
     /// @notice Packs n 128 bit integers into n/2 256 bit integers
     /// @param _sourceMatrix the matrix to pack
     /// @param _targetArray the array to pack into
-    function _quantAMMPack128Matrix(
-        int256[][] memory _sourceMatrix,
-        int256[] storage _targetArray
-    ) internal {
+    function _quantAMMPack128Matrix(int256[][] memory _sourceMatrix, int256[] storage _targetArray) internal {
         // 2d array of 3 elements each with 3 elements
 
         // | |1|, |2|, |3|, |
         // | |4|, |5|, |6|, |
         // | |7|, |8|, |9|  |
-        
+
         // becomes array of 5 elements, the last being half filled
-        
-        // | 1 2 | 3 4 | 5 6 | 7 8 | 9 _ | 
+
+        // | 1 2 | 3 4 | 5 6 | 7 8 | 9 _ |
 
         // this saves 3 length SSTORES and SLOADS, as well as reducing the slots by 3
 
         uint targetArrayLength = _targetArray.length;
-        require(
-            targetArrayLength * 2 >= _sourceMatrix.length * _sourceMatrix.length,
-            "Matrix doesnt fit storage"
-        );
+        require(targetArrayLength * 2 >= _sourceMatrix.length * _sourceMatrix.length, "Matrix doesnt fit storage");
         uint targetArrayIndex;
         int256 leftInt;
         uint right;
@@ -454,11 +413,7 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
             }
             if (((_sourceMatrix.length * _sourceMatrix.length) % 2) != 0) {
                 _targetArray[targetArrayLength - 1] = int256(
-                    int128(
-                        _sourceMatrix[_sourceMatrix.length - 1][
-                            _sourceMatrix.length - 1
-                        ]
-                    )
+                    int128(_sourceMatrix[_sourceMatrix.length - 1][_sourceMatrix.length - 1])
                 );
             }
         }
@@ -471,17 +426,14 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
         int256[] memory _sourceArray,
         uint _numberOfAssets
     ) internal pure returns (int256[][] memory targetArray) {
-        // | 1 2 | 3 4 | 5 6 | 7 8 | 9 _ | 
+        // | 1 2 | 3 4 | 5 6 | 7 8 | 9 _ |
 
         // becomes 2d array of 3 elements each with 3 elements
 
         // | |1|, |2|, |3|, |
         // | |4|, |5|, |6|, |
         // | |7|, |8|, |9|  |
-        require(
-            _sourceArray.length * 2 >= _numberOfAssets * _numberOfAssets,
-            "Source cannot provide target"
-        );
+        require(_sourceArray.length * 2 >= _numberOfAssets * _numberOfAssets, "Source cannot provide target");
         targetArray = new int256[][](_numberOfAssets);
         for (uint i; i < _numberOfAssets; ) {
             targetArray[i] = new int256[](_numberOfAssets);
@@ -494,17 +446,13 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
         uint targetRow;
         for (uint i; i < _sourceArray.length; ) {
             if (targetIndex < _numberOfAssets) {
-                targetArray[targetRow][targetIndex] = int256(
-                    int128(_sourceArray[i] >> 128)
-                );
+                targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i] >> 128));
                 unchecked {
                     ++targetIndex;
                 }
 
                 if (targetIndex < _numberOfAssets) {
-                    targetArray[targetRow][targetIndex] = int256(
-                        int128(_sourceArray[i])
-                    );
+                    targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i]));
                     unchecked {
                         ++targetIndex;
                     }
@@ -516,9 +464,7 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                     if (targetRow < _numberOfAssets) {
                         targetArray[targetRow] = new int256[](_numberOfAssets);
                         if (targetIndex < _numberOfAssets) {
-                            targetArray[targetRow][targetIndex] = int256(
-                                int128(_sourceArray[i])
-                            );
+                            targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i]));
                             unchecked {
                                 ++targetIndex;
                             }
@@ -532,17 +478,13 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                 }
                 if (targetRow < _numberOfAssets) {
                     targetArray[targetRow] = new int256[](_numberOfAssets);
-                    targetArray[targetRow][targetIndex] = int256(
-                        int128(_sourceArray[i] >> 128)
-                    );
+                    targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i] >> 128));
                     unchecked {
                         ++targetIndex;
                     }
 
                     if (targetIndex < _numberOfAssets) {
-                        targetArray[targetRow][targetIndex] = int256(
-                            int128(_sourceArray[i])
-                        );
+                        targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i]));
                         unchecked {
                             ++targetIndex;
                         }
@@ -552,9 +494,7 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                             targetIndex = 0;
                         }
                         if (targetRow < _numberOfAssets) {
-                            targetArray[targetRow] = new int256[](
-                                _numberOfAssets
-                            );
+                            targetArray[targetRow] = new int256[](_numberOfAssets);
                         }
                     }
                 }

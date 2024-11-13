@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "../rules/UpdateRule.sol";
@@ -18,15 +18,25 @@ contract MockIdentityRule is IUpdateRule {
 
     bool public CalculateNewWeightsCalled;
 
-    bytes public gradient;
+    int256[] public movingAverages;
 
-    bytes public variances;
+    int256[] public intermediateValues;
 
-    bytes public covariances;
+    uint public numberOfAssets;
 
-    bytes public precision;
+    int256[] weights;
 
-    uint16 private constant REQUIRES_PREV_MAVG = 0;
+    function getWeights() external view returns (int256[] memory){
+        return weights;
+    }
+
+    function getMovingAverages() external view returns (int256[] memory) {
+        return movingAverages;
+    }
+
+    function getIntermediateValues() external view returns (int256[] memory) {
+        return intermediateValues;
+    }
 
     function CalculateNewWeights(
         int256[] calldata prevWeights,
@@ -38,20 +48,25 @@ contract MockIdentityRule is IUpdateRule {
         uint64 /* absoluteWeightGuardRail*/
     ) external override returns (int256[] memory /*updatedWeights*/) {
         CalculateNewWeightsCalled = true;
-        return new int256[](prevWeights.length);
+        if(weights.length == 0) {
+            return new int256[](prevWeights.length);
+        }
+        return weights;
     }
 
     function initialisePoolRuleIntermediateValues(
-        address poolAddress,
+        address /*pool*/,
         int256[] memory _newMovingAverages,
         int256[] memory _newParameters,
         uint _numberOfAssets
-    ) external override {}
+    ) external override {
+        movingAverages = _newMovingAverages;
+        intermediateValues = _newParameters;
+        numberOfAssets = _numberOfAssets;
+    }
 
     /// @notice Check if the given parameters are valid for the rule
-    function validParameters(
-        int256[][] calldata /*parameters*/
-    ) external pure override returns (bool) {
+    function validParameters(int256[][] calldata /*parameters*/) external pure override returns (bool) {
         return true;
     }
 
@@ -73,5 +88,9 @@ contract MockIdentityRule is IUpdateRule {
 
     function setQueryVariances(bool _queryVariances) public {
         queryVariances = _queryVariances;
+    }
+
+    function setWeights(int256[] memory newCalculatedWeights) public {
+        weights = newCalculatedWeights;
     }
 }

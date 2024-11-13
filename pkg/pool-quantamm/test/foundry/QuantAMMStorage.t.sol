@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "../../contracts/mock/MockQuantAMMStorage.sol"; // Assuming your MockQuantAMMStorage contract is in the src folder
 import { QuantAMMTestUtils } from "./utils.t.sol";
 
-contract QuantAMMStorageTest is Test , QuantAMMTestUtils{
+contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     MockQuantAMMStorage internal mockQuantAMMStorage;
 
     // Deploy MockQuantAMMStorage contract before each test
@@ -14,7 +14,7 @@ contract QuantAMMStorageTest is Test , QuantAMMTestUtils{
     }
 
     // Helper function to check array contents
-    function ArrayCheckSum(int128[] memory sourceArray, int128[] memory targetArray) internal pure{
+    function ArrayCheckSum(int128[] memory sourceArray, int128[] memory targetArray) internal pure {
         // Ensure both arrays are of the same length
         assertEq(targetArray.length, sourceArray.length);
 
@@ -33,10 +33,10 @@ contract QuantAMMStorageTest is Test , QuantAMMTestUtils{
 
         // Call the ExternalEncodeDecode128Array function from the contract
         int256[] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecode128Array(targetValues, 2);
-        
+
         checkResult(redecoded, targetValues);
     }
-      // Test 2: Encoding and Decoding of 128-bit Arrays (Smallest Odd Array)
+    // Test 2: Encoding and Decoding of 128-bit Arrays (Smallest Odd Array)
     function testQuantAMMStorageSmallestOddArray() public view {
         // Define the target values
         int256[] memory targetValues = new int256[](3);
@@ -123,9 +123,12 @@ contract QuantAMMStorageTest is Test , QuantAMMTestUtils{
         targetValuesPrecision[22] = 411111111111111111e18 + 27;
         targetValuesPrecision[23] = 511111111111111111e18 + 28;
 
-        int256[] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecode128Array(targetValuesPrecision, targetValuesPrecision.length);
-        
-        checkResult(redecoded, targetValuesPrecision);        
+        int256[] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecode128Array(
+            targetValuesPrecision,
+            targetValuesPrecision.length
+        );
+
+        checkResult(redecoded, targetValuesPrecision);
     }
 
     // Test 1: Encoding and Decoding of 32-bit Arrays (Basic Values)
@@ -166,7 +169,10 @@ contract QuantAMMStorageTest is Test , QuantAMMTestUtils{
             }
 
             // Call the ExternalEncodeDecode32Array function from the contract
-            int256[] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecode32Array(testTargetValues, testTargetValues.length);
+            int256[] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecode32Array(
+                testTargetValues,
+                testTargetValues.length
+            );
 
             // Check if the original and decoded arrays are the same
             checkResult(redecoded, testTargetValues);
@@ -177,16 +183,16 @@ contract QuantAMMStorageTest is Test , QuantAMMTestUtils{
     function testQuantAMMStoragePrecisionArray() public view {
         // Define the precision target values
         int256[] memory targetValuesPrecision = new int256[](24);
-        targetValuesPrecision[0] = 0.000000001e18;    // 0.000000001
-        targetValuesPrecision[1] = 0.000000002e18;    // 0.000000002
-        targetValuesPrecision[2] = 0.000000003e18;    // 0.000000003
-        targetValuesPrecision[3] = 0.000000004e18;    // 0.000000004
-        targetValuesPrecision[4] = 0.000000005e18;    // 0.000000005
-        targetValuesPrecision[5] = 0.000000006e18;    // 0.000000006
-        targetValuesPrecision[6] = 0.000000007e18;    // 0.000000007
-        targetValuesPrecision[7] = 0.000000008e18;    // 0.000000008
-        targetValuesPrecision[8] = 0.000000009e18;    // 0.000000009
-        targetValuesPrecision[9] = 0.000000012e18;  // 0.000000012
+        targetValuesPrecision[0] = 0.000000001e18; // 0.000000001
+        targetValuesPrecision[1] = 0.000000002e18; // 0.000000002
+        targetValuesPrecision[2] = 0.000000003e18; // 0.000000003
+        targetValuesPrecision[3] = 0.000000004e18; // 0.000000004
+        targetValuesPrecision[4] = 0.000000005e18; // 0.000000005
+        targetValuesPrecision[5] = 0.000000006e18; // 0.000000006
+        targetValuesPrecision[6] = 0.000000007e18; // 0.000000007
+        targetValuesPrecision[7] = 0.000000008e18; // 0.000000008
+        targetValuesPrecision[8] = 0.000000009e18; // 0.000000009
+        targetValuesPrecision[9] = 0.000000012e18; // 0.000000012
         targetValuesPrecision[10] = 0.000000013e18; // 0.000000013
         targetValuesPrecision[11] = 0.000000014e18; // 0.000000014
         targetValuesPrecision[12] = 0.000000015e18; // 0.000000015
@@ -211,13 +217,15 @@ contract QuantAMMStorageTest is Test , QuantAMMTestUtils{
             }
 
             // Call the ExternalEncodeDecode32Array function from the contract
-            int256[] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecode32Array(testTargetValues, testTargetValues.length);
+            int256[] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecode32Array(
+                testTargetValues,
+                testTargetValues.length
+            );
 
             // Check if the original and decoded arrays are the same
             checkResult(redecoded, testTargetValues);
         }
     }
-
 
     // Helper function to create a test matrix of size n x n
     function createMatrix(uint256 assets) internal pure returns (int256[][] memory) {

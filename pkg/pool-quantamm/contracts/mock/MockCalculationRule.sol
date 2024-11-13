@@ -1,12 +1,11 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "../rules/base/QuantammBasedRuleHelpers.sol";
 import "../rules/base/QuantammCovarianceBasedRule.sol";
 import "../rules/base/QuantammGradientBasedRule.sol";
 import "../rules/base/QuantammVarianceBasedRule.sol";
-
 
 contract MockCalculationRule is
     IUpdateRule,
@@ -17,12 +16,6 @@ contract MockCalculationRule is
     int256[] prevMovingAverage;
     int256[] results;
     int256[][] matrixResults;
-
-    uint16 private constant REQUIRES_PREV_MAVG = 0;
-
-    function requiresPrevMovingAverage() internal pure returns (uint16) {
-        return REQUIRES_PREV_MAVG;
-    }
 
     function setPrevMovingAverage(int256[] memory _prevMovingAverage) external {
         prevMovingAverage = _prevMovingAverage;
@@ -36,9 +29,7 @@ contract MockCalculationRule is
         return matrixResults;
     }
 
-    function convert256Array(
-        int256[] memory originalArray
-    ) internal pure returns (int128[] memory) {
+    function convert256Array(int256[] memory originalArray) internal pure returns (int128[] memory) {
         int128[] memory finalArray = new int128[](originalArray.length);
         for (uint i; i < originalArray.length; ++i) {
             finalArray[i] = int128(originalArray[i]);
@@ -59,12 +50,7 @@ contract MockCalculationRule is
         poolParameters.lambda = _lambda;
         poolParameters.movingAverage = _movingAverage;
 
-        results = convert256Array(
-            _calculateQuantAMMVariance(
-                _newData,
-                poolParameters
-            )
-        );
+        results = convert256Array(_calculateQuantAMMVariance(_newData, poolParameters));
     }
 
     function externalCalculateQuantAMMGradient(
@@ -80,14 +66,10 @@ contract MockCalculationRule is
         poolParameters.lambda = lambda;
         poolParameters.movingAverage = _movingAverage;
 
-        int256[] memory calcResults = _calculateQuantAMMGradient(
-            _newData,
-            poolParameters
-        );
-        
+        int256[] memory calcResults = _calculateQuantAMMGradient(_newData, poolParameters);
+
         results = calcResults;
     }
-
 
     function externalCalculateQuantAMMCovariance(
         int256[] calldata _newData,
@@ -102,25 +84,14 @@ contract MockCalculationRule is
         poolParameters.lambda = _lambda;
         poolParameters.movingAverage = _movingAverage;
 
-        matrixResults = _calculateQuantAMMCovariance(
-            _newData,
-            poolParameters
-        );
+        matrixResults = _calculateQuantAMMCovariance(_newData, poolParameters);
     }
 
-    function setInitialGradient(
-        address poolAddress,
-        int256[] memory _initialValues,
-        uint _numberOfAssets
-    ) external {
+    function setInitialGradient(address poolAddress, int256[] memory _initialValues, uint _numberOfAssets) external {
         _setGradient(poolAddress, _initialValues, _numberOfAssets);
     }
 
-    function setInitialVariance(
-        address poolAddress,
-        int256[] memory _initialValues,
-        uint _numberOfAssets
-    ) external {
+    function setInitialVariance(address poolAddress, int256[] memory _initialValues, uint _numberOfAssets) external {
         _setIntermediateVariance(poolAddress, _initialValues, _numberOfAssets);
     }
 
@@ -150,7 +121,5 @@ contract MockCalculationRule is
     ) external override {}
 
     /// @notice Check if the given parameters are valid for the rule
-    function validParameters(
-        int256[][] calldata parameters
-    ) external pure override returns (bool) {}
+    function validParameters(int256[][] calldata parameters) external pure override returns (bool) {}
 }

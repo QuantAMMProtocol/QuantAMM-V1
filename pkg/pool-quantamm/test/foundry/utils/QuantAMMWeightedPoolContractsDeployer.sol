@@ -42,13 +42,21 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
                     )
                 );
         } else {
-            return new QuantAMMWeightedPoolFactory(vault, pauseWindowDuration, factoryVersion, poolVersion, updateWeightRunner);
+            return
+                new QuantAMMWeightedPoolFactory(
+                    vault,
+                    pauseWindowDuration,
+                    factoryVersion,
+                    poolVersion,
+                    updateWeightRunner
+                );
         }
     }
 
     function deployQuantAMMWeightedMathMock() internal returns (QuantAMMWeightedMathMock) {
         if (reusingArtifacts) {
-            return QuantAMMWeightedMathMock(deployCode(_computeWeightedPathTest(type(QuantAMMWeightedMathMock).name), ""));
+            return
+                QuantAMMWeightedMathMock(deployCode(_computeWeightedPathTest(type(QuantAMMWeightedMathMock).name), ""));
         } else {
             return new QuantAMMWeightedMathMock();
         }

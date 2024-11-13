@@ -5,10 +5,20 @@ import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "./UpdateRule.sol";
 import "./base/QuantammGradientBasedRule.sol";
 
-/// @title MomentumUpdateRule contract for QuantAMM momentum update rule 
+/// @title MomentumUpdateRule contract for QuantAMM momentum update rule
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the momentum update rule
 contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
-    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {}
+    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
+        name = "Momentum";
+        description = "TODO";
+        devNotes = "TODO";
+        limitations = "TODO";
+        
+        parameterDescriptions = new string[](3);
+        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change TODO";
+        parameterDescriptions[1] = "Use raw price: 0 = use moving average, 1 = use raw price";
+        parameterDescriptions[2] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
+    }
 
     using PRBMathSD59x18 for int256;
 
@@ -52,22 +62,17 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         locals.prevWeightLength = _prevWeights.length;
 
         // newWeights is reused multiple times to save gas of multiple array initialisation
-        locals.newWeights = _calculateQuantAMMGradient(
-            _data,
-            _poolParameters
-        );
+        locals.newWeights = _calculateQuantAMMGradient(_data, _poolParameters);
 
-        
         for (locals.i = 0; locals.i < locals.prevWeightLength; ) {
-            
             locals.denominator = _poolParameters.movingAverage[locals.i];
             if (locals.useRawPrice) {
                 locals.denominator = _data[locals.i];
             }
-            
+
             // 1/p(t) * ∂p(t)/∂t calculated and stored as used in multiple places
             locals.newWeights[locals.i] = ONE.div(locals.denominator).mul(locals.newWeights[locals.i]);
-            
+
             if (locals.kappaStore.length == 1) {
                 locals.normalizationFactor += locals.newWeights[locals.i];
             } else {
@@ -80,7 +85,7 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         }
 
         newWeightsConverted = new int256[](locals.prevWeightLength);
-        
+
         if (locals.kappaStore.length == 1) {
             //scalar logic separate to vector for efficiency
             locals.normalizationFactor /= int256(locals.prevWeightLength);
@@ -109,7 +114,8 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
 
             // To avoid intermediate overflows (because of normalization), we only downcast in the end to an uint6
             for (locals.i = 0; locals.i < _prevWeights.length; ) {
-                locals.res = int256(_prevWeights[locals.i]) +
+                locals.res =
+                    int256(_prevWeights[locals.i]) +
                     locals.kappaStore[locals.i].mul(locals.newWeights[locals.i] - locals.normalizationFactor);
                 require(locals.res >= 0, "Invalid weight");
                 newWeightsConverted[locals.i] = locals.res;
@@ -132,24 +138,14 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         _setGradient(_poolAddress, _initialValues, _numberOfAssets);
     }
 
-    function _requiresPrevMovingAverage()
-        internal
-        pure
-        override
-        returns (uint16)
-    {
+    function _requiresPrevMovingAverage() internal pure override returns (uint16) {
         return REQUIRES_PREV_MAVG;
     }
 
     /// @notice Check if the given parameters are valid for the rule
     /// @dev If parameters are not valid, either reverts or returns false
-    function validParameters(
-        int256[][] calldata _parameters
-    ) external pure override returns (bool) {
-        if (
-            _parameters.length == 1 ||
-            (_parameters.length == 2 && _parameters[1].length == 1)
-        ) {
+    function validParameters(int256[][] calldata _parameters) external pure override returns (bool) {
+        if (_parameters.length == 1 || (_parameters.length == 2 && _parameters[1].length == 1)) {
             int256[] memory kappa = _parameters[0];
             uint16 valid = uint16(kappa.length) > 0 ? 1 : 0;
             for (uint i; i < kappa.length; ) {

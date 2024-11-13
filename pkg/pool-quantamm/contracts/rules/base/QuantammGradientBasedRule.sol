@@ -17,6 +17,15 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
     // key is pool address, value is the intermediate state of the gradient in a packed array of 128 bit integers
     mapping(address => int256[]) internal intermediateGradientStates;
 
+    /// @dev struct to avoind stack to deep issues
+    /// @notice Struct to store local variables for the gradient calculation
+    /// @param mulFactor λ^3 / (1 - λ)
+    /// @param intermediateValue intermediate value during a gradient calculation
+    /// @param secondIntermediateValue second intermediate value during a gradient calculation
+    /// @param secondIndex index of the second intermediate value
+    /// @param storageArrayIndex index of the storage array
+    /// @param finalValues final values of the gradient
+    /// @param intermediateGradientState intermediate state during a gradient calculation
     struct QuantAMMGradientLocals {
         int256 mulFactor;
         int256 intermediateValue;

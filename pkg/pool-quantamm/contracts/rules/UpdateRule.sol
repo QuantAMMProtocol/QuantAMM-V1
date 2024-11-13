@@ -35,6 +35,22 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
     string public limitations;
     string[] public parameterDescriptions;
 
+    /// @dev struct to avoid stack too deep issues
+    /// @notice Struct to store local variables for the update rule
+    /// @param i index for looping
+    /// @param nMinusOne number of assets minus one
+    /// @param numberOfAssets number of assets in the pool
+    /// @param requiresPrevAverage boolean to determine if the rule requires the previous moving average
+    /// @param intermediateMovingAverageStateLength length of the intermediate moving average state
+    /// @param currMovingAverage current moving average
+    /// @param updatedMovingAverage updated moving average
+    /// @param calculationMovingAverage moving average used in the calculation
+    /// @param intermediateGradientState intermediate gradient state
+    /// @param unGuardedUpdatedWeights unguarded updated weights
+    /// @param lambda lambda values
+    /// @param secondIndex second index for looping
+    /// @param storageIndex storage index for moving averages
+    /// @param lastAssetIndex last asset index
     struct QuantAMMUpdateRuleLocals {
         uint i;
         uint nMinusOne;

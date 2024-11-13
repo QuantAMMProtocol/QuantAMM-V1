@@ -17,6 +17,17 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
     //key is pool address, value is the intermediate state of the covariance matrix in a packed array of 128 bit integers
     mapping(address => int256[]) internal intermediateCovarianceStates;
 
+    /// @dev struct to avoind stack to deep issues
+    /// @notice Struct to store local variables for the covariance calculation
+    /// @param n Dimension of square matrix
+    /// @param nSquared n * n
+    /// @param intermediateCovarianceState intermediate state of the covariance matrix
+    /// @param newState new state of the covariance matrix
+    /// @param u (p(t) - p̅(t - 1))
+    /// @param v (p(t) - p̅(t))
+    /// @param convertedLambda λ
+    /// @param oneMinusLambda 1 - λ
+    /// @param intermediateState intermediate state during a covariance matrix calculation
     struct QuantAMMCovariance {
         uint256 n;
         uint256 nSquared;
@@ -32,6 +43,7 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
     /// @notice Calculates the new intermediate state for the covariance update, i.e. A(t) = λA(t - 1) + (p(t) - p̅(t - 1))(p(t) - p̅(t))'
     /// @param _newData p(t)
     /// @param _poolParameters pool parameters
+    /// @return newState new state of the covariance matrix
     function _calculateQuantAMMCovariance(
         int256[] calldata _newData,
         QuantAMMPoolParameters memory _poolParameters

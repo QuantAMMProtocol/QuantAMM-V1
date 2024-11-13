@@ -27,6 +27,16 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     int256 private constant ONE = 1 * 1e18; // Result of PRBMathSD59x18.fromInt(1), store as constant to avoid recalculation every time
     uint16 private constant REQUIRES_PREV_MAVG = 0;
 
+    /// @dev struct to avoid stack too deep issues
+    /// @notice Struct to store local variables for the anti-momentum calculation
+    /// @param kappa array of kappa value parameters
+    /// @param newWeights array of new weights
+    /// @param normalizationFactor normalization factor for the weights
+    /// @param useRawPrice boolean to determine if raw price should be used or average
+    /// @param i index for looping
+    /// @param denominator denominator for the weights
+    /// @param sumKappa sum of all kappa values
+    /// @param res result of the calculation
     struct QuantAMMAntiMomentumLocals {
         int256[] kappa;
         int256[] newWeights;

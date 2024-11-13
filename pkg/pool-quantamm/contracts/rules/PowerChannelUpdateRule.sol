@@ -26,6 +26,20 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     int256 private constant ONE = 1 * 1e18; // Result of PRBMathSD59x18.fromInt(1), store as constant to avoid recalculation every time
     uint16 private constant REQUIRES_PREV_MAVG = 0;
 
+    /// @dev struct to avoid stack too deep issues
+    /// @notice Struct to store local variables for the power channel calculation
+    /// @param kappa array of kappa value parameters
+    /// @param newWeights array of new weights
+    /// @param normalizationFactor normalization factor for the weights
+    /// @param prevWeightsLength length of the previous weights
+    /// @param useRawPrice boolean to determine if raw price should be used or average
+    /// @param i index for looping
+    /// @param q Q value
+    /// @param denominator denominator for the weights
+    /// @param sumKappa sum of all kappa values
+    /// @param res result of the calculation
+    /// @param sign sign of the calculation
+    /// @param intermediateRes intermediate result of the calculation
     struct QuantAMMPowerChannelLocals {
         int256[] kappa;
         int256[] newWeights;
@@ -34,6 +48,7 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         bool useRawPrice;
         uint i;
         int256 q;
+        int256[] vectorQ;
         int256 denominator;
         int256 sumKappa;
         int256 res;
@@ -41,11 +56,11 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         int256 intermediateRes;
     }
 
+    /// @notice w(t) = w(t − 1) + κ · ( sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q − ℓp(t) ) where ℓp(t) = 1/N * ∑(sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q)
     /// @param _prevWeights the previous weights retrieved from the vault
     /// @param _data the latest data from the signal, usually price
     /// @param _parameters the parameters of the rule that are not lambda
     /// @param _poolParameters pool parameters
-    /// @notice w(t) = w(t − 1) + κ · ( sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q − ℓp(t) ) where ℓp(t) = 1/N * ∑(sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q)
     function _getWeights(
         int256[] calldata _prevWeights,
         int256[] calldata _data,
@@ -60,7 +75,6 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         locals.newWeights = _calculateQuantAMMGradient(_data, _poolParameters);
 
         locals.kappa = _parameters[0];
-        locals.q = _parameters[1][0];
 
         locals.useRawPrice = false;
 
@@ -69,8 +83,15 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             locals.useRawPrice = _parameters[2][0] == ONE;
         }
 
+        bool scalarQ = _parameters[1].length == 1;
+        locals.q = _parameters[1][0];
+        
         for (locals.i = 0; locals.i < locals.prevWeightsLength; ) {
             locals.denominator = _poolParameters.movingAverage[locals.i];
+            if(!scalarQ){
+                locals.q = _parameters[1][locals.i];
+            }
+
             if (locals.useRawPrice) {
                 locals.denominator = _data[locals.i];
             }
@@ -131,10 +152,12 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         return newWeightsConverted;
     }
 
+    /// @notice Get the number of assets required for the rule
     function _requiresPrevMovingAverage() internal pure override returns (uint16) {
         return REQUIRES_PREV_MAVG;
     }
 
+    /// @notice Set the initial intermediate values for the rule, in this case the gradient
     /// @param _poolAddress address of pool being initialised
     /// @param _initialValues the initial intermediate values provided
     /// @param _numberOfAssets number of assets in the pool
@@ -149,12 +172,13 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     /// @notice Check if the given parameters are valid for the rule
     /// @dev If parameters are not valid, either reverts or returns false
     function validParameters(int256[][] calldata parameters) external pure override returns (bool valid) {
-        valid = true;
         if (
             (parameters.length == 2 || (parameters.length == 3 && parameters[2].length == 1)) &&
             (parameters[0].length > 0) &&
-            parameters[1].length == 1
+            (parameters[0].length == 1 && parameters[1].length == 1 
+            || parameters[1].length == parameters[0].length)
         ) {
+            valid = true;
             for (uint i; i < parameters[0].length; ) {
                 if (!(parameters[0][i] > 0)) {
                     valid = false;
@@ -164,8 +188,17 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                     ++i;
                 }
             }
-            bool validQ = parameters[1][0] > ONE;
-            return validQ && valid;
+
+            for (uint i; i < parameters[1].length; ) {
+                if(parameters[1][i] <= ONE){
+                    valid = false;
+                    break;
+                }
+                unchecked {
+                    ++i;
+                }
+            }
+            return valid;   
         }
         return false;
     }

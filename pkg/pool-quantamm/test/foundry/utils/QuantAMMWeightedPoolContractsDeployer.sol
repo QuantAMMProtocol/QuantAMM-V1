@@ -17,14 +17,15 @@ import { BaseContractsDeployer } from "@balancer-labs/v3-solidity-utils/test/fou
 
 import { MockUpdateWeightRunner } from "../../../contracts/mock/MockUpdateWeightRunner.sol";
 import { MockChainlinkOracle } from "../../../contracts/mock/MockChainlinkOracles.sol";
-import { IQuantAMMWeightedPool } from "../../../contracts/IQuantAMMWeightedPool.sol";
 import { MockMomentumRule } from "../../../contracts/mock/mockRules/MockMomentumRule.sol";
 import { MockQuantAMMWeightedPool } from "../../../contracts/mock/QuantAMMWeightedPoolMock.sol";
 import { QuantAMMWeightedMathMock } from "../../../contracts/mock/QuantAMMWeightedMathMock.sol";
 import { QuantAMMWeightedPool } from "../../../contracts/QuantAMMWeightedPool.sol";
 import { QuantAMMWeightedPoolFactory } from "../../../contracts/QuantAMMWeightedPoolFactory.sol";
-import { IUpdateRule } from "../../../contracts/rules/IUpdateRule.sol";
-import { OracleWrapper } from "../../../contracts/OracleWrapper.sol";
+
+import { IQuantAMMWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
+import { IUpdateRule } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
+import { OracleWrapper } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
 
 /**
  * @dev This contract contains functions for deploying mocks and contracts related to the "WeightedPool". These functions should have support for reusing artifacts from the hardhat compilation.

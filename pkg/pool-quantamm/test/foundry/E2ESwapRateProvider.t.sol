@@ -49,8 +49,6 @@ contract E2eSwapRateProviderWeightedTest is
         rateProviders[tokenAIdx] = IRateProvider(address(rateProviderTokenA));
         rateProviders[tokenBIdx] = IRateProvider(address(rateProviderTokenB));
 
-        PoolRoleAccounts memory roleAccounts;
-
         address newPool = address(createQuantAMMPool(tokens, label, rateProviders, vault, lp));
         vm.label(newPool, label);
 

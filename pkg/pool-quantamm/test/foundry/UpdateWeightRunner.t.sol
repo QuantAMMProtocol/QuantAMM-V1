@@ -766,6 +766,376 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
     }
 
 
+    function testUpdateWeightRunnerCalculateMultiplierAndSetWeightsFromRuleSuccess() public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = 0.5e18;
+        weights[1] = 0.5e18;
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(8);
+        
+        uint40 blockTime = uint40(block.timestamp);
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = deployOracle(fixedValue, delay);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(address(mockPool));
+        address[][] memory oracles = new address[][](1);
+        oracles[0] = new address[](1);
+        oracles[0][0] = address(chainlinkOracle);
+
+        uint64[] memory lambda = new uint64[](1);
+        lambda[0] = 0.0000000005e18;
+        updateWeightRunner.setRuleForPool(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: mockRule,
+                oracles: oracles,
+                updateInterval: 100,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
+        vm.stopPrank();
+        
+        vm.startPrank(addr2);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        vm.stopPrank();
+
+        mockPool.setPoolRegistry(32);
+
+        int256[] memory poolWeights = new int256[](2);
+        poolWeights[0] = 0.6e18;
+        poolWeights[1] = 0.4e18;
+
+        uint256[] memory currentWeightsUnsigned = IWeightedPool(address(mockPool)).getNormalizedWeights();
+        int256[] memory currentWeights = new int256[](currentWeightsUnsigned.length);
+
+        for (uint i; i < currentWeights.length; ) {
+            currentWeights[i] = int256(currentWeightsUnsigned[i]);
+
+            unchecked {
+                i++;
+            }
+        }
+        vm.startPrank(address(mockRule));
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+        vm.stopPrank();
+        currentWeightsUnsigned = IWeightedPool(address(mockPool)).getNormalizedWeights();
+        currentWeights = new int256[](currentWeightsUnsigned.length);
+
+        for (uint i; i < currentWeights.length; ) {
+            currentWeights[i] = int256(currentWeightsUnsigned[i]);
+
+            unchecked {
+                i++;
+            }
+        }
+
+        currentWeights = mockPool.getWeights();
+
+        assertEq(currentWeights[0], 0.5e18);
+        assertEq(currentWeights[1], 0.5e18);
+        assertEq(currentWeights[2], 0.001e18);
+        assertEq(currentWeights[3], -0.001e18);
+    }
+
+
+    function testUpdateWeightRunnerCalculateMultiplierAndSetWeightsFromRuleFailBadSender() public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = 0.5e18;
+        weights[1] = 0.5e18;
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(8);
+        
+        uint40 blockTime = uint40(block.timestamp);
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = deployOracle(fixedValue, delay);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        //test non setup pools cannot be used
+        vm.startPrank(address(chainlinkOracle));
+        vm.expectRevert("ONLYRULECANSETWEIGHTS");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: weights,
+                updatedWeights: weights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(address(mockPool));
+        address[][] memory oracles = new address[][](1);
+        oracles[0] = new address[](1);
+        oracles[0][0] = address(chainlinkOracle);
+
+        uint64[] memory lambda = new uint64[](1);
+        lambda[0] = 0.0000000005e18;
+        
+
+        updateWeightRunner.setRuleForPool(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: mockRule,
+                oracles: oracles,
+                updateInterval: 100,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
+        vm.stopPrank();
+        
+        vm.startPrank(addr2);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        vm.stopPrank();
+
+        mockPool.setPoolRegistry(32);
+
+        int256[] memory poolWeights = new int256[](2);
+        poolWeights[0] = 0.6e18;
+        poolWeights[1] = 0.4e18;
+
+        uint256[] memory currentWeightsUnsigned = IWeightedPool(address(mockPool)).getNormalizedWeights();
+        int256[] memory currentWeights = new int256[](currentWeightsUnsigned.length);
+
+        for (uint i; i < currentWeights.length; ) {
+            currentWeights[i] = int256(currentWeightsUnsigned[i]);
+
+            unchecked {
+                i++;
+            }
+        }
+        vm.startPrank(address(mockPool));
+        vm.expectRevert("ONLYRULECANSETWEIGHTS");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(address(0));
+        vm.expectRevert("ONLYRULECANSETWEIGHTS");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        vm.expectRevert("ONLYRULECANSETWEIGHTS");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+        vm.stopPrank();
+
+
+        vm.startPrank(addr1);
+        vm.expectRevert("ONLYRULECANSETWEIGHTS");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        vm.expectRevert("ONLYRULECANSETWEIGHTS");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(address(chainlinkOracle));
+        vm.expectRevert("ONLYRULECANSETWEIGHTS");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+        vm.stopPrank();
+    }
+
+    function testUpdateWeightRunnerCalculateMultiplierAndSetWeightsFromRuleFailBadRegistry() public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = 0.5e18;
+        weights[1] = 0.5e18;
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(8);
+        
+        uint40 blockTime = uint40(block.timestamp);
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = deployOracle(fixedValue, delay);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(address(mockPool));
+        address[][] memory oracles = new address[][](1);
+        oracles[0] = new address[](1);
+        oracles[0][0] = address(chainlinkOracle);
+
+        uint64[] memory lambda = new uint64[](1);
+        lambda[0] = 0.0000000005e18;
+        updateWeightRunner.setRuleForPool(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: mockRule,
+                oracles: oracles,
+                updateInterval: 100,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
+        vm.stopPrank();
+        
+        vm.startPrank(addr2);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        vm.stopPrank();
+
+        int256[] memory poolWeights = new int256[](2);
+        poolWeights[0] = 0.6e18;
+        poolWeights[1] = 0.4e18;
+
+        uint256[] memory currentWeightsUnsigned = IWeightedPool(address(mockPool)).getNormalizedWeights();
+        int256[] memory currentWeights = new int256[](currentWeightsUnsigned.length);
+
+        for (uint i; i < currentWeights.length; ) {
+            currentWeights[i] = int256(currentWeightsUnsigned[i]);
+
+            unchecked {
+                i++;
+            }
+        }
+        vm.startPrank(address(mockRule));
+        mockPool.setPoolRegistry(2);
+        vm.expectRevert("FUNCTIONNOTAPPROVEDFORPOOL");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+
+        mockPool.setPoolRegistry(4);
+        vm.expectRevert("FUNCTIONNOTAPPROVEDFORPOOL");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+
+
+        mockPool.setPoolRegistry(8);
+        vm.expectRevert("FUNCTIONNOTAPPROVEDFORPOOL");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+
+        mockPool.setPoolRegistry(16);
+        vm.expectRevert("FUNCTIONNOTAPPROVEDFORPOOL");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+
+        mockPool.setPoolRegistry(64);
+        vm.expectRevert("FUNCTIONNOTAPPROVEDFORPOOL");
+        updateWeightRunner.calculateMultiplierAndSetWeightsFromRule(UpdateWeightRunner.CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: poolWeights,
+                updateInterval: int256(100),
+                absoluteWeightGuardRail18: 0.2e18,
+                poolAddress: address(mockPool)
+            })
+        );
+        vm.stopPrank();
+    }
+
+
+
     function testUpdateWeightRunnerSetWeightsManuallyFailsOwnerPermAdminFails() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.0000000005e18;

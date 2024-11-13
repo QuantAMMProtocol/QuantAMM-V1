@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.20;
 
-import "./AggregatorV3Interface.sol";
+import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import "./OracleWrapper.sol";
 
 /// @title ChainlinkOracle contract based on the underlying QuantAMM oracle wrapper

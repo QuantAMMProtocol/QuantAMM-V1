@@ -128,4 +128,10 @@ library ArrayHelpers {
         ret[2] = array[2];
         return ret;
     }
+
+    function toMemoryArray(uint64[1] memory array) internal pure returns (uint64[] memory) {
+        uint64[] memory ret = new uint64[](1);
+        ret[0] = array[0];
+        return ret;
+    }
 }

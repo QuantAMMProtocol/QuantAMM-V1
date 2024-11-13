@@ -4,8 +4,6 @@ yarn-error.log*
 
 # Dependency directories
 node_modules/
-artifacts/
-typechain-types/
 
 # Yarn
 .yarn/*

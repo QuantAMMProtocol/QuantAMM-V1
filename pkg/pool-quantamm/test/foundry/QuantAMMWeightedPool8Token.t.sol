@@ -37,11 +37,6 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
     uint64 public constant MAX_SWAP_FEE_PERCENTAGE = 10e16;
 
     QuantAMMWeightedPoolFactory internal quantAMMWeightedPoolFactory;
-    MockUpdateWeightRunner internal updateWeightRunner;
-    MockChainlinkOracle internal chainlinkOracle;
-    address internal owner;
-    address internal addr1;
-    address internal addr2;
 
     function setUp() public override {
         int216 fixedValue = 1000;
@@ -66,8 +61,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
             IVault(address(vault)),
             365 days,
             "Factory v1",
-            "Pool v1",
-            address(updateWeightRunner)
+            "Pool v1"
         );
         vm.label(address(quantAMMWeightedPoolFactory), "quantamm weighted pool factory");
     }
@@ -469,11 +463,6 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         testParam memory firstWeight = testParam(5, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(7, 0.15e18, 0.001e18);
         _onSwapInGivenOutInternal(firstWeight, secondWeight, 7, 2.214834140775105000e18);
-    }
-
-    function _deployOracle(int216 fixedValue, uint delay) internal returns (MockChainlinkOracle) {
-        MockChainlinkOracle oracle = new MockChainlinkOracle(fixedValue, delay);
-        return oracle;
     }
 
     function _getDefaultBalances() internal pure returns (uint256[] memory balances) {

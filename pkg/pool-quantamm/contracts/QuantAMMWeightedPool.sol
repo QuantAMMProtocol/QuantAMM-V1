@@ -740,7 +740,7 @@ contract QuantAMMWeightedPool is
         require(_poolSettings.rule.validParameters(_poolSettings.ruleParameters), "INVRLEPRM"); //Invalid rule parameters
 
         //0 is hodl, 1 is trade whole pool which invariant doesnt let you do anyway
-        require(_poolSettings.maxTradeSizeRatio > 0 && _poolSettings.maxTradeSizeRatio < 0.3e18, "INVMAXTRADE"); //Invalid max trade size
+        require(_poolSettings.maxTradeSizeRatio > 0 && _poolSettings.maxTradeSizeRatio <= 0.3e18, "INVMAXTRADE"); //Invalid max trade size
 
         int256 sumWeights;
         for (uint i; i < _initialWeights.length; ) {

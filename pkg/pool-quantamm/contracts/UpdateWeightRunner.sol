@@ -96,13 +96,26 @@ contract UpdateWeightRunner is Ownable2Step {
         uint40 timestamp;
     }
 
+    /// @notice main eth oracle that could be used to determine value of pools and assets.
+    /// @dev this could be used for things like uplift only withdrawal fee hooks 
     OracleWrapper private ethOracle;
 
+    /// @notice Mask to check if a pool is allowed to perform an update, some might only want to get data
     uint256 private constant MASK_POOL_PERFORM_UPDATE = 1;
+
+    /// @notice Mask to check if a pool is allowed to get data
     uint256 private constant MASK_POOL_GET_DATA = 2;
+
+    /// @notice Mask to check if a potential quantamm dao can update weights
     uint256 private constant MASK_POOL_DAO_WEIGHT_UPDATES = 4;
+
+    /// @notice Mask to check if a pool owner can update weights
     uint256 private constant MASK_POOL_OWNER_UPDATES = 8;
+
+    /// @notice Mask to check if a pool is allowed to perform admin updates
     uint256 private constant MASK_POOL_QUANTAMM_ADMIN_UPDATES = 16;
+
+    /// @notice Mask to check if a pool is allowed to perform direct weight update from a rule
     uint256 private constant MASK_POOL_RULE_DIRECT_SET_WEIGHT = 32;
 
     constructor(address _quantammAdmin, address _ethOracle) Ownable(msg.sender) {

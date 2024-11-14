@@ -10,9 +10,6 @@ import "./UpdateRule.sol";
 contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
         name = "PowerChannel";
-        description = "TODO";
-        devNotes = "TODO";
-        limitations = "TODO";
 
         parameterDescriptions = new string[](4);
         parameterDescriptions[0] = "Q: Q dictates the harshness of the channel boundry";

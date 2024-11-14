@@ -113,6 +113,5 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
         IQuantAMMWeightedPool(_poolAddress).setUpdateWeightRunnerAddress(_newUpdateWeightRunner);
         updateWeightRunner = _newUpdateWeightRunner;
         emit UpdateWeightRunnerUpdated(_poolAddress, _newUpdateWeightRunner, msg.sender);
-        //event emitted in the update weight runner
     }
 }

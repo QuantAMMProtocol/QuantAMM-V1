@@ -30,9 +30,6 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
     address private immutable updateWeightRunner;
     
     string public name;
-    string public description;
-    string public devNotes;
-    string public limitations;
     string[] public parameterDescriptions;
 
     /// @dev struct to avoid stack too deep issues

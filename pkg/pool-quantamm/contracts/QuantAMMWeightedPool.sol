@@ -97,6 +97,14 @@ contract QuantAMMWeightedPool is
     /// @notice the pool settings for getting weights and assets keyed by pool
     QuantAMMBaseGetWeightData poolSettings;
 
+    /// @notice the pool settings for setting weights keyed by pool
+    /// @param name The name of the pool
+    /// @param symbol The symbol of the pool
+    /// @param numTokens The number of tokens in the pool
+    /// @param version The version of the pool
+    /// @param updateWeightRunner The address of the update weight runner
+    /// @param poolRegistry The settings of admin functionality of pools
+    /// @param poolDetails The details of the pool. dynamic user driven descriptive data
     struct NewPoolParams {
         string name;
         string symbol;
@@ -156,6 +164,7 @@ contract QuantAMMWeightedPool is
         updateWeightRunner = UpdateWeightRunner(params.updateWeightRunner);
         quantammAdmin = updateWeightRunner.quantammAdmin();
         poolRegistry = params.poolRegistry;
+        poolDetails = params.poolDetails;
     }
 
     /// @inheritdoc IBasePool

@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
-import "../rules/IUpdateRule.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "../rules/UpdateRule.sol";
 import "../UpdateWeightRunner.sol";
 
@@ -18,21 +18,17 @@ contract MockIdentityRule is IUpdateRule {
 
     bool public CalculateNewWeightsCalled;
 
-    bytes public gradient;
-
-    bytes public variances;
-
-    bytes public covariances;
-
-    bytes public precision;
-
-    uint16 private constant REQUIRES_PREV_MAVG = 0;
-
     int256[] public movingAverages;
 
     int256[] public intermediateValues;
 
     uint public numberOfAssets;
+
+    int256[] weights;
+
+    function getWeights() external view returns (int256[] memory){
+        return weights;
+    }
 
     function getMovingAverages() external view returns (int256[] memory) {
         return movingAverages;
@@ -52,7 +48,10 @@ contract MockIdentityRule is IUpdateRule {
         uint64 /* absoluteWeightGuardRail*/
     ) external override returns (int256[] memory /*updatedWeights*/) {
         CalculateNewWeightsCalled = true;
-        return new int256[](prevWeights.length);
+        if(weights.length == 0) {
+            return new int256[](prevWeights.length);
+        }
+        return weights;
     }
 
     function initialisePoolRuleIntermediateValues(
@@ -89,5 +88,9 @@ contract MockIdentityRule is IUpdateRule {
 
     function setQueryVariances(bool _queryVariances) public {
         queryVariances = _queryVariances;
+    }
+
+    function setWeights(int256[] memory newCalculatedWeights) public {
+        weights = newCalculatedWeights;
     }
 }

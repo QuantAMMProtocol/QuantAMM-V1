@@ -15,17 +15,16 @@ import { ArrayHelpers } from "@balancer-labs/v3-solidity-utils/contracts/test/Ar
 import { BalancerPoolToken } from "@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol";
 import { BaseVaultTest } from "@balancer-labs/v3-vault/test/foundry/utils/BaseVaultTest.sol";
 
-import { IQuantAMMWeightedPool } from "../../contracts/IQuantAMMWeightedPool.sol";
 import { QuantAMMWeightedPool } from "../../contracts/QuantAMMWeightedPool.sol";
 import { QuantAMMWeightedPoolFactory } from "../../contracts/QuantAMMWeightedPoolFactory.sol";
 import { QuantAMMWeightedPoolContractsDeployer } from "./utils/QuantAMMWeightedPoolContractsDeployer.sol";
 import { PoolSwapParams, SwapKind } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
-import { OracleWrapper } from "../../contracts/OracleWrapper.sol";
+import { OracleWrapper } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
 import { MockUpdateWeightRunner } from "../../contracts/mock/MockUpdateWeightRunner.sol";
 import { MockMomentumRule } from "../../contracts/mock/mockRules/MockMomentumRule.sol";
 import { MockChainlinkOracle } from "../../contracts/mock/MockChainlinkOracles.sol";
 
-import "../../contracts/IQuantAMMWeightedPool.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 
 contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, BaseVaultTest {
     using CastingHelpers for address[];
@@ -38,11 +37,6 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
     uint64 public constant MAX_SWAP_FEE_PERCENTAGE = 10e16;
 
     QuantAMMWeightedPoolFactory internal quantAMMWeightedPoolFactory;
-    MockUpdateWeightRunner internal updateWeightRunner;
-    MockChainlinkOracle internal chainlinkOracle;
-    address internal owner;
-    address internal addr1;
-    address internal addr2;
 
     function setUp() public override {
         int216 fixedValue = 1000;
@@ -55,7 +49,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         addr2 = addr2Local;
         // Deploy UpdateWeightRunner contract
         vm.startPrank(owner);
-        updateWeightRunner = new MockUpdateWeightRunner(owner);
+        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2);
 
         chainlinkOracle = _deployOracle(fixedValue, delay);
 
@@ -67,8 +61,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
             IVault(address(vault)),
             365 days,
             "Factory v1",
-            "Pool v1",
-            address(updateWeightRunner)
+            "Pool v1"
         );
         vm.label(address(quantAMMWeightedPoolFactory), "quantamm weighted pool factory");
 
@@ -479,11 +472,6 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(newBalance == 34.933148109829107000e18);
     }
 
-    function _deployOracle(int216 fixedValue, uint delay) internal returns (MockChainlinkOracle) {
-        MockChainlinkOracle oracle = new MockChainlinkOracle(fixedValue, delay);
-        return oracle;
-    }
-
     function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
         PoolRoleAccounts memory roleAccounts;
         IERC20[] memory tokens = [address(dai), address(usdc)].toMemoryArray().asIERC20();
@@ -532,14 +520,13 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
                 0.2e18,
                 0.2e18,
                 parameters,
-                new address[](0),
-                new address[](0),
                 address(0)
             ),
             initialWeights,
             initialWeights,
             3600,
-            0
+            0,
+            new string[][](0)
         );
     }
 }

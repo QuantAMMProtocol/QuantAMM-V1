@@ -6,7 +6,7 @@ import "./base/QuantammMathGuard.sol";
 import "./base/QuantammMathMovingAverage.sol";
 import "../UpdateWeightRunner.sol";
 import "./base/QuantammBasedRuleHelpers.sol";
-import "./IUpdateRule.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 
 /*
 ARCHITECTURE DESIGN NOTES
@@ -26,9 +26,28 @@ An inherited base contract approach created a good domain driven design where bo
 /// @title QuantAMMUpdateRule base contract for QuantAMM update rules
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool and protections, must be implemented by all rules used in quantAMM
 abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IUpdateRule {
-    uint16 private constant REQUIRES_PREV_MAVG = 1;
+    uint16 private constant REQ_PREV_MAVG_VAL = 1;
     address private immutable updateWeightRunner;
+    
+    string public name;
+    string[] public parameterDescriptions;
 
+    /// @dev struct to avoid stack too deep issues
+    /// @notice Struct to store local variables for the update rule
+    /// @param i index for looping
+    /// @param nMinusOne number of assets minus one
+    /// @param numberOfAssets number of assets in the pool
+    /// @param requiresPrevAverage boolean to determine if the rule requires the previous moving average
+    /// @param intermediateMovingAverageStateLength length of the intermediate moving average state
+    /// @param currMovingAverage current moving average
+    /// @param updatedMovingAverage updated moving average
+    /// @param calculationMovingAverage moving average used in the calculation
+    /// @param intermediateGradientState intermediate gradient state
+    /// @param unGuardedUpdatedWeights unguarded updated weights
+    /// @param lambda lambda values
+    /// @param secondIndex second index for looping
+    /// @param storageIndex storage index for moving averages
+    /// @param lastAssetIndex last asset index
     struct QuantAMMUpdateRuleLocals {
         uint i;
         uint nMinusOne;
@@ -81,7 +100,7 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
             }
         }
 
-        locals.requiresPrevAverage = _requiresPrevMovingAverage() == REQUIRES_PREV_MAVG;
+        locals.requiresPrevAverage = _requiresPrevMovingAverage() == REQ_PREV_MAVG_VAL;
         locals.intermediateMovingAverageStateLength = locals.numberOfAssets;
 
         if (locals.requiresPrevAverage) {

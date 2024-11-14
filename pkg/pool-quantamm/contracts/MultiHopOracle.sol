@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24;
 
-import "./OracleWrapper.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
 
 /// @notice For tokens where no direct oracle / price feeds exists, multiple oracle wrappers can be combined to one.
 contract MultiHopOracle is OracleWrapper {
@@ -32,7 +32,9 @@ contract MultiHopOracle is OracleWrapper {
             data = 10 ** 36 / data; // 10^36 (i.e., 1 with 18 decimals * 10^18) to get the inverse with 18 decimals.
             // 10**36 is automatically precomputed by the compiler, no explicit caching needed
         }
-        for (uint i = 1; i < oracles.length; ) {
+        uint256 oracleLength = oracles.length;
+
+        for (uint i = 1; i < oracleLength; ) {
             HopConfig memory oracleConfig = oracles[i];
             (int216 oracleRes, uint40 oracleTimestamp) = oracleConfig.oracle.getData();
             if (oracleTimestamp < timestamp) {

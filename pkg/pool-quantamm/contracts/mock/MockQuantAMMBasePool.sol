@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
 import {
     IWeightedPool,
@@ -27,12 +27,12 @@ import { WeightedMath } from "@balancer-labs/v3-solidity-utils/contracts/math/We
 import { InputHelpers } from "@balancer-labs/v3-solidity-utils/contracts/helpers/InputHelpers.sol";
 import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Version.sol";
 import { ScalarQuantAMMBaseStorage } from "../QuantAMMStorage.sol";
-import { IQuantAMMWeightedPool } from "../IQuantAMMWeightedPool.sol";
+import { IQuantAMMWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 import { ScalarQuantAMMBaseStorage } from "../QuantAMMStorage.sol";
-import "../rules/IUpdateRule.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "../UpdateWeightRunner.sol";
 
-contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
+contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
     constructor(uint16 _updateInterval, address _updateWeightRunner) {
         updateInterval = _updateInterval;
         lambda = new uint64[](0);
@@ -42,22 +42,22 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
     }
 
-    int256[] weights;
-    uint40 lastInterpolationTimePossible;
-
-    uint numBaseAssets; // How many base assets are included in the pool, between 0 and assets.length
+    int256[] public weights;
+    
+    
+    uint40 public lastInterpolationTimePossible;
 
     int256[][] public ruleParameters; // Arbitrary parameters that are passed to the rule
 
     uint64[] public lambda; // Decay parameter for exponentially-weighted moving average (0 < λ < 1), stored as SD59x18 number
 
-    uint64 public epsilonMax; // Maximum allowed delta for a weight update, stored as SD59x18 number
+    uint64 public immutable epsilonMax; // Maximum allowed delta for a weight update, stored as SD59x18 number
 
-    uint64 public absoluteWeightGuardRail; // Maximum allowed weight for a token, stored as SD59x18 number
+    uint64 public immutable absoluteWeightGuardRail; // Maximum allowed weight for a token, stored as SD59x18 number
 
-    uint64 public updateInterval; // Minimum amount of seconds between two updates
+    uint64 public immutable updateInterval; // Minimum amount of seconds between two updates
 
-    uint oracleStalenessThreshold;
+    uint immutable oracleStalenessThreshold;
 
     address poolAddress;
 
@@ -67,6 +67,10 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
 
     UpdateWeightRunner internal immutable updateWeightRunner;
 
+    function getWeights() external view returns (int256[] memory){
+        return weights;
+    }
+    
     function setWeights(
         int256[] calldata _weights,
         address _poolAddress,
@@ -99,16 +103,13 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     function onSwap(PoolSwapParams calldata params) external override returns (uint256 amountCalculatedScaled18) {}
 
     function getNormalizedWeights() external view override returns (uint256[] memory) {
-        uint256[] memory normalizedWeights = new uint256[](weights.length);
-        for (uint256 i = 0; i < weights.length; i++) {
+
+        uint256[] memory normalizedWeights = new uint256[](weights.length / 2);
+        for (uint256 i = 0; i < weights.length / 2; i++) {
             normalizedWeights[i] = uint256(weights[i]);
         }
         return normalizedWeights;
     }
-
-    function getWeightedPoolDynamicData() external view override returns (WeightedPoolDynamicData memory data) {}
-
-    function getWeightedPoolImmutableData() external view override returns (WeightedPoolImmutableData memory data) {}
 
     function setInitialWeights(int256[] calldata _weights) external {
         weights = _weights;
@@ -121,8 +122,24 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IWeightedPool {
     function setPoolRegistry(uint256 _poolRegistry) external {
         poolRegistry = _poolRegistry;
     }
-    
+
     function getOracleStalenessThreshold() external view override returns (uint) {
         return oracleStalenessThreshold;
     }
+
+    function getQuantAMMWeightedPoolDynamicData()
+        external
+        view
+        override
+        returns (QuantAMMWeightedPoolDynamicData memory data)
+    {}
+
+    function getQuantAMMWeightedPoolImmutableData()
+        external
+        view
+        override
+        returns (QuantAMMWeightedPoolImmutableData memory data)
+    {}
+
+    function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {}
 }

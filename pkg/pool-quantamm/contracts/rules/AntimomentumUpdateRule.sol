@@ -10,13 +10,30 @@ import "./UpdateRule.sol";
 /// @title AntiMomentumUpdateRule contract for QuantAMM anti-momentum update rule implementation
 /// @notice Contains the logic for calculating the anti-momentum update rule and updating the weights of the QuantAMM pool
 contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
-    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {}
+    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
+        name = "AntiMomentum";
+        
+        parameterDescriptions = new string[](3);
+        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change TODO";
+        parameterDescriptions[1] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
+        parameterDescriptions[2] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
+    }
 
     using PRBMathSD59x18 for int256;
 
     int256 private constant ONE = 1 * 1e18; // Result of PRBMathSD59x18.fromInt(1), store as constant to avoid recalculation every time
     uint16 private constant REQUIRES_PREV_MAVG = 0;
 
+    /// @dev struct to avoid stack too deep issues
+    /// @notice Struct to store local variables for the anti-momentum calculation
+    /// @param kappa array of kappa value parameters
+    /// @param newWeights array of new weights
+    /// @param normalizationFactor normalization factor for the weights
+    /// @param useRawPrice boolean to determine if raw price should be used or average
+    /// @param i index for looping
+    /// @param denominator denominator for the weights
+    /// @param sumKappa sum of all kappa values
+    /// @param res result of the calculation
     struct QuantAMMAntiMomentumLocals {
         int256[] kappa;
         int256[] newWeights;

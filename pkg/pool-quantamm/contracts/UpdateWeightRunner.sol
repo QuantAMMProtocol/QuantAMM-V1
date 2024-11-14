@@ -3,11 +3,12 @@ pragma solidity >=0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@prb/math/contracts/PRBMathSD59x18.sol";
-import "./OracleWrapper.sol";
-import "./IQuantAMMWeightedPool.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 import "./QuantAMMBaseAdministration.sol";
-import "./rules/IUpdateRule.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "./rules/UpdateRule.sol";
+
 import "./QuantAMMWeightedPool.sol";
 
 import { IWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-weighted/IWeightedPool.sol";
@@ -95,20 +96,37 @@ contract UpdateWeightRunner is Ownable2Step {
         uint40 timestamp;
     }
 
+    /// @notice main eth oracle that could be used to determine value of pools and assets.
+    /// @dev this could be used for things like uplift only withdrawal fee hooks 
     OracleWrapper private ethOracle;
 
+    /// @notice Mask to check if a pool is allowed to perform an update, some might only want to get data
     uint256 private constant MASK_POOL_PERFORM_UPDATE = 1;
+
+    /// @notice Mask to check if a pool is allowed to get data
     uint256 private constant MASK_POOL_GET_DATA = 2;
+
+    /// @notice Mask to check if a potential quantamm dao can update weights
     uint256 private constant MASK_POOL_DAO_WEIGHT_UPDATES = 4;
+
+    /// @notice Mask to check if a pool owner can update weights
     uint256 private constant MASK_POOL_OWNER_UPDATES = 8;
+
+    /// @notice Mask to check if a pool is allowed to perform admin updates
     uint256 private constant MASK_POOL_QUANTAMM_ADMIN_UPDATES = 16;
 
+    /// @notice Mask to check if a pool is allowed to perform direct weight update from a rule
+    uint256 private constant MASK_POOL_RULE_DIRECT_SET_WEIGHT = 32;
+
     constructor(address _quantammAdmin, address _ethOracle) Ownable(msg.sender) {
+        require(_quantammAdmin != address(0), "Admin cannot be default address");
+        require(_ethOracle != address(0), "eth oracle cannot be default address");
+        
         quantammAdmin = _quantammAdmin;
         ethOracle = OracleWrapper(_ethOracle);
     }
 
-    address internal immutable quantammAdmin;
+    address public immutable quantammAdmin;
 
     /// @notice key is pool address, value is rule settings for running the pool
     mapping(address => PoolRuleSettings) public poolRuleSettings;
@@ -363,6 +381,7 @@ contract UpdateWeightRunner is Ownable2Step {
             _ruleSettings.epsilonMax,
             _ruleSettings.absoluteWeightGuardRail
         );
+
         poolRuleSettings[_pool].timingSettings.lastPoolUpdateRun = uint40(block.timestamp);
     }
 
@@ -373,58 +392,88 @@ contract UpdateWeightRunner is Ownable2Step {
         address _poolAddress,
         PoolRuleSettings memory _ruleSettings
     ) private returns (int256[] memory) {
-        uint256[] memory targetWeightsUnsigned = IWeightedPool(_poolAddress).getNormalizedWeights();
+        uint256[] memory currentWeightsUnsigned = IWeightedPool(_poolAddress).getNormalizedWeights();
+        int256[] memory currentWeights = new int256[](currentWeightsUnsigned.length);
 
-        int256[] memory targetWeights = new int256[](targetWeightsUnsigned.length);
-
-        for (uint i; i < targetWeightsUnsigned.length; ) {
-            targetWeights[i] = int256(targetWeightsUnsigned[i]);
+        for (uint i; i < currentWeights.length; ) {
+            currentWeights[i] = int256(currentWeightsUnsigned[i]);
 
             unchecked {
                 i++;
             }
         }
 
-        uint weightAndMultiplierLength = targetWeights.length * 2;
         (int256[] memory updatedWeights, int256[] memory data) = _getUpdatedWeightsAndOracleData(
             _poolAddress,
-            targetWeights,
+            currentWeights,
             _ruleSettings
         );
 
+        _calculateMultiplerAndSetWeights(
+            CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: updatedWeights,
+                updateInterval: int256(int40(_ruleSettings.timingSettings.updateInterval)),
+                absoluteWeightGuardRail18: int256(int64(_ruleSettings.absoluteWeightGuardRail)),
+                poolAddress: _poolAddress
+            })
+        );
+
+        return data;
+    }
+
+    struct CalculateMuliplierAndSetWeightsLocal{
+        int256[] currentWeights;
+        int256[] updatedWeights;
+        int256 updateInterval;
+        int256 absoluteWeightGuardRail18;
+        address poolAddress;
+    }
+
+    /// @dev The multipler is the amount per block to add/remove from the last successful weight update. 
+    /// @notice Calculate the multiplier and set the weights for a pool.
+    /// @param local Local data for the function
+    function _calculateMultiplerAndSetWeights(CalculateMuliplierAndSetWeightsLocal memory local) internal {
+        uint weightAndMultiplierLength = local.currentWeights.length * 2;
         // the base pool needs both the target weights and the per block multipler per asset
         int256[] memory targetWeightsAndBlockMultiplier = new int256[](weightAndMultiplierLength);
 
         int256 currentLastInterpolationPossible = type(int256).max;
-        int256 updateInterval = int256(int40(_ruleSettings.timingSettings.updateInterval));
 
-        for (uint i; i < targetWeights.length; ) {
-            targetWeightsAndBlockMultiplier[i] = targetWeights[i];
+        for (uint i; i < local.currentWeights.length; ) {
+            targetWeightsAndBlockMultiplier[i] = local.currentWeights[i];
 
             // this would be the simple scenario if we did not have to worry about guard rails
-            int256 blockMultiplier = (updatedWeights[i] - targetWeights[i]) / updateInterval;
+            int256 blockMultiplier = (local.updatedWeights[i] - local.currentWeights[i]) / local.updateInterval;
 
-            targetWeightsAndBlockMultiplier[i + targetWeights.length] = blockMultiplier;
-
+            targetWeightsAndBlockMultiplier[i + local.currentWeights.length] = blockMultiplier;
+            
+            int256 upperGuardRail = (PRBMathSD59x18.fromInt(1) - (PRBMathSD59x18.mul(PRBMathSD59x18.fromInt(int256(local.currentWeights.length - 1)), local.absoluteWeightGuardRail18)));
+            
             unchecked {
                 //This is your worst case scenario, usually you expect (and have DR) that at your next interval you
-                //get another update. However what if you don't. You can carry on interpolating until you hit a rail
+                //get another update. However what if you don't, you can carry on interpolating until you hit a rail
                 //This calculates the first blocktime which one of your constituents hits the rail and that is your max
                 //interpolation weight
-                //There are economic reasons for this detailed in the whitepaper design notes.
+                //There are also economic reasons for this detailed in the whitepaper design notes.
+                //In an event of a chain halt, the pool will still be able to interpolate weights, 
+                //there are reasons for or against this being better than stopping at the update interval blocktime.
                 int256 weightBetweenTargetAndMax;
                 int256 blockTimeUntilGuardRailHit;
                 if (blockMultiplier > int256(0)) {
-                    weightBetweenTargetAndMax = int256(int64(_ruleSettings.absoluteWeightGuardRail)) - targetWeights[i];
+                    weightBetweenTargetAndMax = upperGuardRail - local.currentWeights[i];
+                    //the updated weight should never be above guard rail. final check as block multiplier 
+                    //will be even worse if 
                     //not using .div so that the 18dp is removed
                     blockTimeUntilGuardRailHit = weightBetweenTargetAndMax / blockMultiplier;
                 } else if (blockMultiplier == int256(0)) {
                     blockTimeUntilGuardRailHit = type(int256).max;
                 } else {
-                    weightBetweenTargetAndMax = targetWeights[i] - int256(int64(_ruleSettings.absoluteWeightGuardRail));
-                    //not using .div so that the 18dp is removed
+                    weightBetweenTargetAndMax = local.currentWeights[i] - local.absoluteWeightGuardRail18;
 
-                    blockTimeUntilGuardRailHit = weightBetweenTargetAndMax / blockMultiplier;
+                    //not using .div so that the 18dp is removed
+                    //abs block multiplier
+                    blockTimeUntilGuardRailHit = weightBetweenTargetAndMax / int256(uint256(-1 * blockMultiplier));                    
                 }
 
                 if (blockTimeUntilGuardRailHit < currentLastInterpolationPossible) {
@@ -439,23 +488,36 @@ contract UpdateWeightRunner is Ownable2Step {
         uint40 lastTimestampThatInterpolationWorks = uint40(type(uint40).max);
 
         //next expected update + time beyond that
-        currentLastInterpolationPossible +=
-            int40(uint40(block.timestamp)) +
-            int40(_ruleSettings.timingSettings.updateInterval);
+        currentLastInterpolationPossible += int40(uint40(block.timestamp));
 
         //needed to prevent silent overflows
-        if (currentLastInterpolationPossible < int40(type(uint40).max)) {
+        if (currentLastInterpolationPossible < int256(type(int40).max)){
             lastTimestampThatInterpolationWorks = uint40(int40(currentLastInterpolationPossible));
         }
 
         //the main point of interaction between the update weight runner and the quantammAdmin is here
-        IQuantAMMWeightedPool(_poolAddress).setWeights(
+        IQuantAMMWeightedPool(local.poolAddress).setWeights(
             targetWeightsAndBlockMultiplier,
-            _poolAddress,
+            local.poolAddress,
             lastTimestampThatInterpolationWorks
         );
+    }
 
-        return data;
+    /// @notice Ability to set weights from a rule without calculating new weights being triggered for approved configured pools
+    /// @param params Local data for the function
+    /// @dev requested for use in zk rules where weights are calculated with circuit and this is only called post verifier call
+    function calculateMultiplierAndSetWeightsFromRule(CalculateMuliplierAndSetWeightsLocal memory params) external {
+        //some level of protocol oversight required here that no rule is approved where this function is not called inapproriately
+        require(msg.sender == address(rules[params.poolAddress]), "ONLYRULECANSETWEIGHTS");
+
+        uint256 poolRegistryEntry = QuantAMMWeightedPool(params.poolAddress).poolRegistry();
+        require(poolRegistryEntry & MASK_POOL_RULE_DIRECT_SET_WEIGHT > 0, "FUNCTIONNOTAPPROVEDFORPOOL");
+        
+        //why do we still need to calculate the multiplier and why not just set the weights like in the manual override?
+        //the reason is we enforce clamp weights for all base rules however that still requires the catch all
+        //pre update interval guardrail reach check. This is the only place where this is enforced
+        //it also centralises logic for weight vectors, just like normal rules, zk rules do not to duplicate logic somewhere else.
+        _calculateMultiplerAndSetWeights(params);
     }
 
     /// @notice Breakglass function to allow the DAO or the pool manager to set the quantammAdmins weights manually

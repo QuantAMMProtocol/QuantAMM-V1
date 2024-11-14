@@ -1,11 +1,11 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 import "../UpdateWeightRunner.sol";
-import "../rules/IUpdateRule.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "../rules/UpdateRule.sol";
 
 contract MockPool {
-    uint16 public updateInterval;
+    uint16 public  immutable updateInterval;
 
     int256 public lambda;
 
@@ -19,7 +19,7 @@ contract MockPool {
 
     uint immutable oracleStalenessThreshold;
 
-    address updateWeightRunner;
+    address  immutable updateWeightRunner;
 
     uint256 poolLpTokenValue;
 
@@ -137,5 +137,4 @@ contract MockPool {
     function afterTokenTransfer(address /*from*/, address /*to*/, uint256 firstTokenId) public {
         afterTokenTransferID = firstTokenId;
     }
-    int256[] weights;
 }

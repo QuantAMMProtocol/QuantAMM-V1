@@ -8,7 +8,12 @@ import "./UpdateRule.sol";
 /// @title MinimumVarianceUpdateRule contract for QuantAMM minimum variance update rule
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the minimum variance update rule and updating the weights of the QuantAMM pool
 contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
-    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {}
+    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
+        name = "MinimumVariance";
+
+        parameterDescriptions = new string[](1);
+        parameterDescriptions[0] = "Mixing Variance: TODO";
+    }
 
     using PRBMathSD59x18 for int256;
 
@@ -85,6 +90,7 @@ contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
         return newWeightsConverted;
     }
 
+    /// @notice Set the initial intermediate values for the rule
     /// @param _poolAddress target pool address
     /// @param _initialValues initial values of intermediate state
     /// @param _numberOfAssets number of assets in the pool
@@ -96,11 +102,14 @@ contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
         _setIntermediateVariance(_poolAddress, _initialValues, _numberOfAssets);
     }
 
+    /// @notice Wether the rule requires the previous moving average
+    /// @return 1 if the rule requires the previous moving average, 0 otherwise
     function _requiresPrevMovingAverage() internal pure override returns (uint16) {
         return REQUIRES_PREV_MAVG;
     }
 
     /// @notice Check if the given parameters are valid for the rule
+    /// @param _parameters the parameters of the rule, in this case the mixing variance
     /// @dev If parameters are not valid, either reverts or returns false
     function validParameters(int256[][] calldata _parameters) external pure override returns (bool) {
         if (_parameters.length == 1 && _parameters[0].length >= 1) {

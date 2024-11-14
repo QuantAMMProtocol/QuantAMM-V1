@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
-import "../rules/IUpdateRule.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "../rules/base/QuantammBasedRuleHelpers.sol";
 import "../rules/base/QuantammCovarianceBasedRule.sol";
 import "../rules/base/QuantammGradientBasedRule.sol";
@@ -16,12 +16,6 @@ contract MockCalculationRule is
     int256[] prevMovingAverage;
     int256[] results;
     int256[][] matrixResults;
-
-    uint16 private constant REQUIRES_PREV_MAVG = 0;
-
-    function requiresPrevMovingAverage() internal pure returns (uint16) {
-        return REQUIRES_PREV_MAVG;
-    }
 
     function setPrevMovingAverage(int256[] memory _prevMovingAverage) external {
         prevMovingAverage = _prevMovingAverage;

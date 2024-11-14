@@ -8,13 +8,31 @@ import "./base/QuantammGradientBasedRule.sol";
 /// @title MomentumUpdateRule contract for QuantAMM momentum update rule
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the momentum update rule
 contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
-    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {}
+    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
+        name = "Momentum";
+        
+        parameterDescriptions = new string[](3);
+        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change TODO";
+        parameterDescriptions[1] = "Use raw price: 0 = use moving average, 1 = use raw price";
+        parameterDescriptions[2] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
+    }
 
     using PRBMathSD59x18 for int256;
 
     int256 private constant ONE = 1 * 1e18; // Result of PRBMathSD59x18.fromInt(1), store as constant to avoid recalculation every time
     uint16 private constant REQUIRES_PREV_MAVG = 0;
 
+    /// @dev struct to avoid stack too deep issues
+    /// @notice Struct to store local variables for the momentum calculation
+    /// @param kappaStore array of kappa value parameters
+    /// @param newWeights array of new weights
+    /// @param normalizationFactor normalization factor for the weights
+    /// @param prevWeightLength length of the previous weights
+    /// @param useRawPrice boolean to determine if raw price should be used or average
+    /// @param i index for looping
+    /// @param denominator denominator for the weights
+    /// @param sumKappa sum of all kappa values
+    /// @param res result of the calculation
     struct QuantAMMMomentumLocals {
         int256[] kappaStore;
         int256[] newWeights;
@@ -27,10 +45,10 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         int256 res;
     }
 
+    /// @notice w(t) = w(t − 1) + κ · ( 1/p(t) * ∂p(t)/∂t − ℓp(t)) where ℓp(t) = 1/N * ∑( 1/p(t)i * ∂p(t)i/∂t) - see whitepaper
     /// @param _prevWeights the previous weights retrieved from the vault
     /// @param _data the latest data from the signal, usually price
     /// @param _parameters the parameters of the rule that are not lambda
-    /// @notice w(t) = w(t − 1) + κ · ( 1/p(t) * ∂p(t)/∂t − ℓp(t)) where ℓp(t) = 1/N * ∑( 1/p(t)i * ∂p(t)i/∂t) - see whitepaper
     function _getWeights(
         int256[] calldata _prevWeights,
         int256[] calldata _data,
@@ -117,6 +135,7 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         return newWeightsConverted;
     }
 
+    /// @notice Set the initial intermediate values for the pool, in this case the gradient
     /// @param _poolAddress the target pool address
     /// @param _initialValues the initial values of the pool
     /// @param _numberOfAssets the number of assets in the pool
@@ -128,6 +147,8 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         _setGradient(_poolAddress, _initialValues, _numberOfAssets);
     }
 
+    /// @notice Check if the rule requires the previous moving average
+    /// @return 0 if it does not require the previous moving average, 1 if it does
     function _requiresPrevMovingAverage() internal pure override returns (uint16) {
         return REQUIRES_PREV_MAVG;
     }

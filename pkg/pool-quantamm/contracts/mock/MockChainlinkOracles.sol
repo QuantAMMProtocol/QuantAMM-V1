@@ -1,14 +1,14 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.24;
 
-import "../OracleWrapper.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
 
 contract MockChainlinkOracle is OracleWrapper {
     int216 private fixedReply;
-    uint private delay;
+    uint private  immutable delay;
     uint40 public oracleTimestamp;
 
-    constructor(int216 _fixedReply, uint _delay) OracleWrapper() {
+    constructor(int216 _fixedReply, uint _delay) {
         fixedReply = _fixedReply;
         delay = _delay;
         oracleTimestamp = uint40(block.timestamp);

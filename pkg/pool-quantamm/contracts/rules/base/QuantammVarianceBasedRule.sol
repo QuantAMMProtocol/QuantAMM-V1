@@ -17,6 +17,18 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
     // Key is the pool address and stores the intermediate variance state in a packed array of 128 bit integers
     mapping(address => int256[]) internal intermediateVarianceStates;
 
+    /// @dev struct to avoind stack to deep issues
+    /// @notice Struct to store local variables for the variance calculation
+    /// @param storageIndex index of the storage array
+    /// @param secondIndex index of the second intermediate value
+    /// @param intermediateState intermediate state during a variance calculation
+    /// @param n number of assets in the pool
+    /// @param nMinusOne n - 1
+    /// @param notDivisibleByTwo boolean to check if n is not divisible by 2
+    /// @param convertedLambda λ
+    /// @param oneMinusLambda 1 - λ
+    /// @param intermediateVarianceState intermediate state of the variance
+    /// @param finalState final state of the variance
     struct QuantAMMVarianceLocals {
         uint256 storageIndex;
         uint256 secondIndex;

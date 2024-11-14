@@ -10,9 +10,6 @@ import "./UpdateRule.sol";
 contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
         name = "MinimumVariance";
-        description = "TODO";
-        devNotes = "TODO";
-        limitations = "TODO";
 
         parameterDescriptions = new string[](1);
         parameterDescriptions[0] = "Mixing Variance: TODO";

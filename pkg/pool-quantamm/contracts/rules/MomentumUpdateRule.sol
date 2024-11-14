@@ -10,9 +10,6 @@ import "./base/QuantammGradientBasedRule.sol";
 contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
         name = "Momentum";
-        description = "TODO";
-        devNotes = "TODO";
-        limitations = "TODO";
         
         parameterDescriptions = new string[](3);
         parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change TODO";

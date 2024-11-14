@@ -30,8 +30,8 @@ import { InputHelpers } from "@balancer-labs/v3-solidity-utils/contracts/helpers
 import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Version.sol";
 import { ScalarQuantAMMBaseStorage } from "./QuantAMMStorage.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IUpdateRule } from "./rules/IUpdateRule.sol"; // Ensure this path is correct
-import { IQuantAMMWeightedPool } from "./IQuantAMMWeightedPool.sol";
+import { IUpdateRule } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol"; // Ensure this path is correct
+import { IQuantAMMWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 import { ScalarQuantAMMBaseStorage } from "./QuantAMMStorage.sol";
 import { UpdateWeightRunner } from "./UpdateWeightRunner.sol";
 import "@prb/math/contracts/PRBMathSD59x18.sol";

@@ -1,8 +1,9 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.20;
 
+
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import "./OracleWrapper.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
 
 /// @title ChainlinkOracle contract based on the underlying QuantAMM oracle wrapper
 /// @notice Contains the logic for retrieving data from a Chainlink oracle and converting it to the QuantAMM format using the oracle wrapper contract 

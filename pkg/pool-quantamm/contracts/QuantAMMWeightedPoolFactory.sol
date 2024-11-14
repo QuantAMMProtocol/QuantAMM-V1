@@ -13,7 +13,7 @@ import {
 import { BasePoolFactory } from "@balancer-labs/v3-pool-utils/contracts/BasePoolFactory.sol";
 import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Version.sol";
 
-import "./IQuantAMMWeightedPool.sol";
+import { IQuantAMMWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 import { QuantAMMWeightedPool } from "./QuantAMMWeightedPool.sol";
 
 /**

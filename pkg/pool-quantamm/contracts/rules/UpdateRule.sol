@@ -6,7 +6,7 @@ import "./base/QuantammMathGuard.sol";
 import "./base/QuantammMathMovingAverage.sol";
 import "../UpdateWeightRunner.sol";
 import "./base/QuantammBasedRuleHelpers.sol";
-import "./IUpdateRule.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 
 /*
 ARCHITECTURE DESIGN NOTES

@@ -27,9 +27,9 @@ import { WeightedMath } from "@balancer-labs/v3-solidity-utils/contracts/math/We
 import { InputHelpers } from "@balancer-labs/v3-solidity-utils/contracts/helpers/InputHelpers.sol";
 import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Version.sol";
 import { ScalarQuantAMMBaseStorage } from "../QuantAMMStorage.sol";
-import { IQuantAMMWeightedPool } from "../IQuantAMMWeightedPool.sol";
+import { IQuantAMMWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 import { ScalarQuantAMMBaseStorage } from "../QuantAMMStorage.sol";
-import "../rules/IUpdateRule.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "../UpdateWeightRunner.sol";
 
 contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {

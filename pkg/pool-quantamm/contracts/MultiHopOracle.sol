@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24;
 
-import "./OracleWrapper.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
 
 /// @notice For tokens where no direct oracle / price feeds exists, multiple oracle wrappers can be combined to one.
 contract MultiHopOracle is OracleWrapper {

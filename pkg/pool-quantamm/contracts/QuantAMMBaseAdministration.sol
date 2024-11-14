@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "./QuantAMMStorage.sol";
-import "./IQuantAMMWeightedPool.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "./DaoOperations.sol";
 import "./UpdateWeightRunner.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";

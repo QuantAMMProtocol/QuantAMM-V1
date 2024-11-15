@@ -84,7 +84,7 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             if (locals.kappaStore.length == 1) {
                 locals.normalizationFactor += locals.newWeights[locals.i];
             } else {
-                locals.normalizationFactor += (locals.newWeights[locals.i] * locals.kappaStore[locals.i]);
+                locals.normalizationFactor += (locals.newWeights[locals.i].mul(locals.kappaStore[locals.i]));
             }
 
             unchecked {
@@ -118,7 +118,7 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 }
             }
 
-            locals.normalizationFactor /= sumKappa;
+            locals.normalizationFactor = locals.normalizationFactor.div(sumKappa);
 
             // To avoid intermediate overflows (because of normalization), we only downcast in the end to an uint6
             for (locals.i = 0; locals.i < _prevWeights.length; ) {

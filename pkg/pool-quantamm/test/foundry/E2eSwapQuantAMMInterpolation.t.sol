@@ -27,6 +27,17 @@ contract E2eSwapQuantAMMInterpolationTest is E2eSwapTest, QuantAMMWeightedPoolCo
         return poolAddress;
     }
 
+
+    function testFailExactInRepeatExactOut() public {
+        uint256 arg1 = 26854;
+        uint256 arg2 = 0;
+        uint256 arg3 = 83816;
+        uint256 arg4 = 11427036527394634073677232301271145399482789665112437;
+
+        // Call the function under test with these arguments
+        testExactInRepeatExactOutVariableFees__Fuzz(arg1, arg2, arg3, arg4);
+    }
+    
     function calculateMinAndMaxSwapAmounts() internal override {
         minSwapAmountTokenA = poolInitAmountTokenA / 1e3;
         minSwapAmountTokenB = poolInitAmountTokenB / 1e3;

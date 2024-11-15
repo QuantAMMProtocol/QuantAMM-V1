@@ -12,6 +12,10 @@ contract MockUpdateRule is UpdateRule {
     bool validParametersResults;
 
 
+    function setWeights(int256[] memory _weights) external {
+        weights = _weights;
+    }
+
     function GetResultWeights() external view returns (int256[] memory results) {
         return weights;
     }

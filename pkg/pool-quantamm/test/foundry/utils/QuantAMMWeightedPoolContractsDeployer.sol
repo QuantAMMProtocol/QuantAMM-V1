@@ -221,7 +221,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
 
         vm.startPrank(owner);
 
-        updateWeightRunner.setWeightsManually([int256(0.5e18),int256(0.5e18), -int256(0.0001e18), int256(0.0001e18)].toMemoryArray(), address(newPool), uint40(block.timestamp + 100));
+        updateWeightRunner.setWeightsManually([int256(0.65e18),int256(0.35e18), -int256(0.0001e18), int256(0.0001e18)].toMemoryArray(), address(newPool), uint40(block.timestamp + 100));
 
         vm.stopPrank();
 

@@ -7,7 +7,7 @@ import "../../../contracts/mock/mockRules/MockMinimumVarianceRule.sol";
 import "../../../contracts/mock/MockPool.sol";
 import "../utils.t.sol";
 
-contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
+contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
     MockMinimumVarianceRule rule;
     MockPool mockPool;
 

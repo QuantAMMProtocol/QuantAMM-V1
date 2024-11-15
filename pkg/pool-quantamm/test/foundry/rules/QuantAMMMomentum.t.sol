@@ -56,13 +56,13 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
-    function testTestEmpty1DParametersShouldNotBeAccepted() public view {
+    function testEmpty1DParametersShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
 
-    function testTestZeroShouldBeAccepted() public view {
+    function testZeroShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(0);
@@ -70,7 +70,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
-    function testTestPositiveNumberShouldBeAccepted() public view {
+    function testPositiveNumberShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(42);
@@ -86,7 +86,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertTrue(result);
     }
 
-    function testTestNegativeNumberShouldNotBeAccepted() public view {
+    function testNegativeNumberShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
         parameters[0][0] = -PRBMathSD59x18.fromInt(1);
@@ -129,7 +129,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
-    function testTestCorrectUpdateWithHigherPrices() public {
+    function testCorrectUpdateWithHigherPrices() public {
         /*
             ℓp(t)	0.10125	
             moving average	[0.9, 1.2]
@@ -186,7 +186,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testTestCorrectUpdateWithLowerPrices() public {
+    function testCorrectUpdateWithLowerPrices() public {
         /*
             moving average	2.7	4
             alpha	-1.633333333	1.4
@@ -242,7 +242,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testTestCorrectUpdateWithHigherPrices_VectorParams() public {
+    function testCorrectUpdateWithHigherPrices_VectorParams() public {
         // Define local variables for the parameters
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
@@ -293,7 +293,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testTestCorrectUpdateWithLowerPrices_VectorParams() public {
+    function testCorrectUpdateWithLowerPrices_VectorParams() public {
         // Define local variables for the parameters
 
         int256[][] memory parameters = new int256[][](2);
@@ -345,7 +345,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testTestCorrectUpdateWithHigherPricesAverageDenominator() public {
+    function testCorrectUpdateWithHigherPricesAverageDenominator() public {
         /*
             ℓp(t)	0.10125	
             moving average	[0.9, 1.2]
@@ -401,7 +401,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testTestCorrectUpdateWithLowerPricesAverageDenominator() public {
+    function testCorrectUpdateWithLowerPricesAverageDenominator() public {
         /*
             moving average	2.7	4
             alpha	-1.633333333	1.4
@@ -455,7 +455,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testTestCorrectUpdateWithHigherPricesAverageDenominator_VectorParams() public {
+    function testCorrectUpdateWithHigherPricesAverageDenominator_VectorParams() public {
         // Define local variables for the parameters
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
@@ -504,7 +504,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testTestCorrectUpdateWithLowerPricesAverageDenominator_VectorParams() public {
+    function testCorrectUpdateWithLowerPricesAverageDenominator_VectorParams() public {
         // Define local variables for the parameters
 
         int256[][] memory parameters = new int256[][](1);

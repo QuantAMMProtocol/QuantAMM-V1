@@ -851,6 +851,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
 
         // Expected result weights
         int256[] memory expectedResults = new int256[](2);
+        
         expectedResults[0] = 0.499925962876008448e18;
         expectedResults[1] = 0.500074037123973120e18;
 

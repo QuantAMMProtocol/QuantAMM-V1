@@ -198,42 +198,6 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         return address(newPool);
     }
 
-
-    function createQuantAMMPoolInterpolating(
-        address[] memory tokens,
-        string memory label,
-        IRateProvider[] memory rateProviders,
-        IVaultMock vault,
-        address poolCreator
-    ) internal returns (address) {
-        
-        QuantAMMWeightedPoolFactory factory = deployQuantAMMWeightedPoolFactory(
-            IVault(address(vault)),
-            365 days,
-            "Factory v1",
-            "Pool v1"
-        );
-        
-        QuantAMMWeightedPool newPool = QuantAMMWeightedPool(
-            factory.create(_createPoolParams(tokens, rateProviders))
-        );
-        vm.label(address(newPool), label);
-
-        vm.startPrank(owner);
-
-        updateWeightRunner.setWeightsManually([int256(0.65e18),int256(0.35e18), -int256(0.0001e18), int256(0.0001e18)].toMemoryArray(), address(newPool), uint40(block.timestamp + 100));
-
-        vm.stopPrank();
-
-        // Cannot set the pool creator directly on a standard Balancer stable pool factory.
-        vault.manualSetPoolCreator(address(newPool), poolCreator);
-
-        ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
-        feeController.manualSetPoolCreator(address(newPool), poolCreator);
-
-        return address(newPool);
-    }
-
     function deployQuantAMMWeightedMathMock() internal returns (QuantAMMWeightedMathMock) {
         if (reusingArtifacts) {
             return

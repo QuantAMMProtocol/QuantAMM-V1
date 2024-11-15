@@ -19,13 +19,13 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         mockPool = new MockPool(3600, PRBMathSD59x18.fromInt(1), address(rule));
     }
 
-    function testMinVarEmptyParametersShouldNotBeAccepted() public view {
+    function testEmptyParametersShouldNotBeAccepted() public view {
         int256[][] memory parameters; // Empty parameters
         bool valid = rule.validParameters(parameters); // Call the function
         assertFalse(valid); // Assert that the result is false
     }
 
-    function testMinVarZeroShouldBeAccepted() public view {
+    function testZeroShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1); // Additional parameters
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(0); // 0 should be accepted
@@ -34,7 +34,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, true); // Assert that the result is true
     }
 
-    function testMinVarNumberBetweenZeroAndOneShouldBeAccepted() public view {
+    function testNumberBetweenZeroAndOneShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1); // Additional parameters
         parameters[0] = new int256[](1);
         parameters[0][0] = 0.75e18; // 0.75 should be accepted
@@ -43,7 +43,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, true); // Assert that the result is true
     }
 
-    function testFuzz_MinVarNumberBetweenZeroAndOneShouldBeAccepted(int256 param) public view {
+    function testFuzz_NumberBetweenZeroAndOneShouldBeAccepted(int256 param) public view {
         int256[][] memory parameters = new int256[][](1); // Additional parameters
         parameters[0] = new int256[](1);
         parameters[0][0] = bound(param, 1, 0.9999999999999999e18); // 0.75 should be accepted
@@ -52,7 +52,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, true); // Assert that the result is true
     }
 
-    function testMinVarNumberGreaterThanOneShouldNotBeAccepted() public view {
+    function testNumberGreaterThanOneShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1); // Additional parameters
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(2); // 2 should not be accepted
@@ -61,7 +61,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, false); // Assert that the result is false
     }
 
-    function testFuzz_MinVarNumberGreaterThanOneShouldNotBeAccepted(int256 param) public view {
+    function testFuzz_NumberGreaterThanOneShouldNotBeAccepted(int256 param) public view {
         int256[][] memory parameters = new int256[][](1); // Additional parameters
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(bound(param, 1e18, maxScaledFixedPoint18())); // 2 should not be accepted
@@ -70,7 +70,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, false); // Assert that the result is false
     }
 
-    function testMinVarNumberLessThanZeroShouldNotBeAccepted() public view {
+    function testNumberLessThanZeroShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1); // Additional parameters
         parameters[0] = new int256[](1);
         parameters[0][0] = -PRBMathSD59x18.fromInt(1); // -1 should not be accepted
@@ -79,7 +79,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, false); // Assert that the result is false
     }
 
-    function testFuzz_MinVarNumberLessThanZeroShouldNotBeAccepted(int256 param) public view {
+    function testFuzz_NumberLessThanZeroShouldNotBeAccepted(int256 param) public view {
         int256[][] memory parameters = new int256[][](1); // Additional parameters
         parameters[0] = new int256[](1);
         parameters[0][0] = -PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18())); // -1 should not be accepted
@@ -88,7 +88,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, false); // Assert that the result is false
     }
 
-    function testMinVarAdditionalParametersShouldBeRejected() public view {
+    function testAdditionalParametersShouldBeRejected() public view {
         int256[][] memory parameters = new int256[][](2); // Additional parameters
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(0);
@@ -99,7 +99,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, false); // Assert that the result is false
     }
 
-    function testFuzz_MinVarAdditionalParametersShouldBeRejected(
+    function testFuzz_AdditionalParametersShouldBeRejected(
         uint256 paramLength,
         uint256 innerLength,
         int256 defaultParam
@@ -120,7 +120,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertEq(result, false); // Assert that the result is false
     }
 
-    function testMinVarCorrectUpdateWithLambdaPointFiveAndTwoWeights() public {
+    function testCorrectUpdateWithLambdaPointFiveAndTwoWeights() public {
         // Set the number of assets to 2
         mockPool.setNumberOfAssets(2);
 
@@ -172,7 +172,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         // Expected result: [0.5482832618025751, 0.4517167381974248]
     }
 
-    function testMinVarCorrectUpdateWithLambdaPointNineAndTwoWeights() public {
+    function testCorrectUpdateWithLambdaPointNineAndTwoWeights() public {
         // Set the number of assets to 2
         mockPool.setNumberOfAssets(2);
 
@@ -224,7 +224,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         checkResult(res, ex);
     }
 
-    function testMinVarCorrectUpdateWithVectorParameterLambdaPointFiveAndTwoWeights() public {
+    function testCorrectUpdateWithVectorParameterLambdaPointFiveAndTwoWeights() public {
         // Set the number of assets to 2
         mockPool.setNumberOfAssets(2);
 
@@ -279,7 +279,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         checkResult(res, ex);
     }
 
-    function testMinVarCorrectUpdateWithVectorParameterLambdaPointNineAndTwoWeights() public {
+    function testCorrectUpdateWithVectorParameterLambdaPointNineAndTwoWeights() public {
         // Set the number of assets to 2
         mockPool.setNumberOfAssets(2);
 
@@ -334,7 +334,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         checkResult(res, ex);
     }
 
-    function testMinVarCorrectUpdateWithScalarParameterVectorLambdaTwoWeights() public {
+    function testCorrectUpdateWithScalarParameterVectorLambdaTwoWeights() public {
         // Set the number of assets to 2
         mockPool.setNumberOfAssets(2);
 

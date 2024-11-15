@@ -43,26 +43,26 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         checkResult(res, results);
     }
 
-    function testMomentumRuleNoninitialisedParametersShouldNotBeAccepted() public view {
+    function testNoninitialisedParametersShouldNotBeAccepted() public view {
         int256[][] memory parameters;
         bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
 
-    function testMomentumRuleEmptyParametersShouldNotBeAccepted() public view {
+    function testEmptyParametersShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
         bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
 
-    function testMomentumRuleTestEmpty1DParametersShouldNotBeAccepted() public view {
+    function testTestEmpty1DParametersShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
 
-    function testMomentumRuleTestZeroShouldBeAccepted() public view {
+    function testTestZeroShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(0);
@@ -70,7 +70,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
-    function testMomentumRuleTestPositiveNumberShouldBeAccepted() public view {
+    function testTestPositiveNumberShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(42);
@@ -78,7 +78,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertTrue(result);
     }
 
-    function testFuzz_MomentumRuleTestPositiveNumberShouldBeAccepted(int256 param) public view {
+    function testFuzz_TestPositiveNumberShouldBeAccepted(int256 param) public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18()));
@@ -86,7 +86,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertTrue(result);
     }
 
-    function testMomentumRuleTestNegativeNumberShouldNotBeAccepted() public view {
+    function testTestNegativeNumberShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
         parameters[0][0] = -PRBMathSD59x18.fromInt(1);
@@ -94,7 +94,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
-    function testFuzz_MomentumRuleTestNegativeNumberShouldNotBeAccepted(int256 param) public view {
+    function testFuzz_TestNegativeNumberShouldNotBeAccepted(int256 param) public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
         parameters[0][0] = -PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18()));
@@ -102,7 +102,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
-    function testMomentumRuleVectorParamTestZeroShouldBeAccepted() public view {
+    function testVectorParamTestZeroShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
@@ -111,7 +111,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
-    function testMomentumRuleVectorParamTestPositiveNumberShouldBeAccepted() public view {
+    function testVectorParamTestPositiveNumberShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(42);
@@ -120,7 +120,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertTrue(result);
     }
 
-    function testMomentumRuleVectorParamTestNegativeNumberShouldNotBeAccepted() public view {
+    function testVectorParamTestNegativeNumberShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
@@ -129,7 +129,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
-    function testMomentumRuleTestCorrectUpdateWithHigherPrices() public {
+    function testTestCorrectUpdateWithHigherPrices() public {
         /*
             ℓp(t)	0.10125	
             moving average	[0.9, 1.2]
@@ -186,7 +186,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testMomentumRuleTestCorrectUpdateWithLowerPrices() public {
+    function testTestCorrectUpdateWithLowerPrices() public {
         /*
             moving average	2.7	4
             alpha	-1.633333333	1.4
@@ -242,7 +242,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testMomentumRuleTestCorrectUpdateWithHigherPrices_VectorParams() public {
+    function testTestCorrectUpdateWithHigherPrices_VectorParams() public {
         // Define local variables for the parameters
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
@@ -293,7 +293,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testMomentumRuleTestCorrectUpdateWithLowerPrices_VectorParams() public {
+    function testTestCorrectUpdateWithLowerPrices_VectorParams() public {
         // Define local variables for the parameters
 
         int256[][] memory parameters = new int256[][](2);
@@ -345,7 +345,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testMomentumRuleTestCorrectUpdateWithHigherPricesAverageDenominator() public {
+    function testTestCorrectUpdateWithHigherPricesAverageDenominator() public {
         /*
             ℓp(t)	0.10125	
             moving average	[0.9, 1.2]
@@ -401,7 +401,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testMomentumRuleTestCorrectUpdateWithLowerPricesAverageDenominator() public {
+    function testTestCorrectUpdateWithLowerPricesAverageDenominator() public {
         /*
             moving average	2.7	4
             alpha	-1.633333333	1.4
@@ -455,7 +455,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testMomentumRuleTestCorrectUpdateWithHigherPricesAverageDenominator_VectorParams() public {
+    function testTestCorrectUpdateWithHigherPricesAverageDenominator_VectorParams() public {
         // Define local variables for the parameters
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](2);
@@ -504,7 +504,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testMomentumRuleTestCorrectUpdateWithLowerPricesAverageDenominator_VectorParams() public {
+    function testTestCorrectUpdateWithLowerPricesAverageDenominator_VectorParams() public {
         // Define local variables for the parameters
 
         int256[][] memory parameters = new int256[][](1);

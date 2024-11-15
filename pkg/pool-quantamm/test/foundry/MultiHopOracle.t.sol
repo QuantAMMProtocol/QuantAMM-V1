@@ -37,7 +37,7 @@ contract MultiHopOracleTest is Test {
     }
 
     // Test 1: Without inversion
-    function testMultiHopOracleShouldReturnMultipliedDataWithoutInversion() public {
+    function testShouldReturnMultipliedDataWithoutInversion() public {
         int216 fixedValue1 = 1000;
         int216 fixedValue2 = 0.001e18;
         uint delay1 = 3600;
@@ -60,7 +60,7 @@ contract MultiHopOracleTest is Test {
     }
 
     // Test 2: With second oracle inverted
-    function testMultiHopOracleShouldReturnMultipliedDataWithSecondInverted() public {
+    function testShouldReturnMultipliedDataWithSecondInverted() public {
         int216 fixedValue1 = 10e18; //this tests the invert conversion
         int216 fixedValue2 = 100;
         uint delay1 = 3600;
@@ -83,7 +83,7 @@ contract MultiHopOracleTest is Test {
     }
 
     // Test 3: With first oracle inverted
-    function testMultiHopOracleShouldReturnMultipliedDataWithFirstInverted() public {
+    function testShouldReturnMultipliedDataWithFirstInverted() public {
         int216 fixedValue1 = 1000;
         int216 fixedValue2 = 10e18;
         uint delay1 = 3600;
@@ -106,7 +106,7 @@ contract MultiHopOracleTest is Test {
     }
 
     // Test 4: Should return lower timestamp (the second delay is greater)
-    function testMultiHopOracleShouldReturnLowerTimestamp() public {
+    function testShouldReturnLowerTimestamp() public {
         int216 fixedValue1 = 1000;
         int216 fixedValue2 = 0.001e18;
         uint delay1 = 3600;

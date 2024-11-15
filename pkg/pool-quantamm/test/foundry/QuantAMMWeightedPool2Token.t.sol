@@ -81,7 +81,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(weights[1] == 0.4e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightSetWeightInitial() public {
+    function testGetNormalizedWeightSetWeightInitial() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -105,7 +105,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(weights[1] == 0.4e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightSetWeightNBlocksAfter() public {
+    function testSetWeightNBlocksAfter() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -131,7 +131,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(weights[1] == 0.4e18 + 0.002e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightSetWeightAfterLimit() public {
+    function testSetWeightAfterLimit() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -157,7 +157,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(weights[1] == 0.4e18 + 0.005e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightComputeBalanceInitial() public {
+    function testComputeBalanceInitial() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -184,7 +184,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(newBalance == 1355.091881588694578000e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightComputeBalanceNBlocksAfter() public {
+    function testComputeBalanceNBlocksAfter() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -213,7 +213,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(newBalance == 1353.724562681596718000e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightComputeBalanceAfterLimit() public {
+    function testComputeBalanceAfterLimit() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -242,7 +242,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(newBalance == 1351.693086891767401000e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightOnSwapOutGivenInInitial() public {
+    function testOnSwapOutGivenInInitial() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -279,7 +279,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(newBalance == 266.431655917087542000e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightOnSwapOutGivenInNBlocksAfter() public {
+    function testOnSwapOutGivenInNBlocksAfter() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -318,7 +318,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(newBalance == 266.020595471997916000e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightOnSwapOutGivenInAfterLimit() public {
+    function testOnSwapOutGivenInAfterLimit() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -357,7 +357,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(newBalance == 265.411437865277198000e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightOnSwapInGivenOutInitial() public {
+    function testOnSwapInGivenOutInitial() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -394,7 +394,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(newBalance == 34.786918412177192000e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightOnSwapInGivenOutNBlocksAfter() public {
+    function testOnSwapInGivenOutNBlocksAfter() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -433,7 +433,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         assert(newBalance == 34.845699295402889000e18);
     }
 
-    function testQuantWeightedPoolGetNormalizedWeightOnSwapInGivenOutAfterLimit() public {
+    function testOnSwapInGivenOutAfterLimit() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);

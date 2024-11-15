@@ -25,7 +25,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     }
 
     // Test 1: Encoding and Decoding of 128-bit Arrays (Smallest Array)
-    function testQuantAMMStorageSmallestArray() public view {
+    function testSmallestArray() public view {
         // Define the target values
         int256[] memory targetValues = new int256[](2);
         targetValues[0] = 4e18;
@@ -37,7 +37,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         checkResult(redecoded, targetValues);
     }
     // Test 2: Encoding and Decoding of 128-bit Arrays (Smallest Odd Array)
-    function testQuantAMMStorageSmallestOddArray() public view {
+    function testSmallestOddArray() public view {
         // Define the target values
         int256[] memory targetValues = new int256[](3);
         targetValues[0] = 4e18;
@@ -51,7 +51,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     }
 
     // Test 3: Encoding and Decoding of 128-bit Arrays (Large Odd Array)
-    function testQuantAMMStorageLargeOddArray() public view {
+    function testLargeOddArray() public view {
         // Define the target values
         int256[] memory targetValues = new int256[](11);
         targetValues[0] = 1e18;
@@ -73,7 +73,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     }
 
     // Test 4: Encoding and Decoding of 128-bit Arrays (Large Even Array)
-    function testQuantAMMStorageLargeEvenArray() public view {
+    function testLargeEvenArray() public view {
         // Define the target values
         int256[] memory targetValues = new int256[](12);
         targetValues[0] = 1e18;
@@ -95,7 +95,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         checkResult(redecoded, targetValues);
     }
     // Test: Precision test for encoding and decoding arrays
-    function testQuantAMMStoragePrecision() public view {
+    function testPrecision() public view {
         // Define the target values with high precision
         int256[] memory targetValuesPrecision = new int256[](24);
         targetValuesPrecision[0] = 111111111111111111e18 + 1;
@@ -132,7 +132,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     }
 
     // Test 1: Encoding and Decoding of 32-bit Arrays (Basic Values)
-    function testQuantAMMStorageBasicArray() public view {
+    function testBasicArray() public view {
         // Define the basic target values
         int256[] memory targetValuesBasic = new int256[](24);
         targetValuesBasic[0] = 0.1e18; // 0.1
@@ -180,7 +180,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     }
 
     // Test 2: Encoding and Decoding of 32-bit Arrays (High Precision Values)
-    function testQuantAMMStoragePrecisionArray() public view {
+    function testPrecisionArray() public view {
         // Define the precision target values
         int256[] memory targetValuesPrecision = new int256[](24);
         targetValuesPrecision[0] = 0.000000001e18; // 0.000000001
@@ -240,7 +240,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     }
 
     // Test 1: Encoding and Decoding of the Smallest 2x2 Matrix
-    function testQuantAMMStorageSmallestMatrix() public {
+    function testSmallestMatrix() public {
         // Create a 2x2 test matrix
         int256[][] memory targetMatrix = createMatrix(2);
 
@@ -253,7 +253,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     }
 
     // Test 2: Encoding and Decoding of the Smallest Odd 3x3 Matrix
-    function testQuantAMMStorageSmallestOddMatrix() public {
+    function testSmallestOddMatrix() public {
         // Create a 3x3 test matrix
         int256[][] memory targetMatrix = createMatrix(3);
 
@@ -266,7 +266,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     }
 
     // Test 3: Encoding and Decoding of a Large Odd 11x11 Matrix
-    function testQuantAMMStorageLargeOddMatrix() public {
+    function testLargeOddMatrix() public {
         // Create an 11x11 test matrix
         int256[][] memory targetMatrix = createMatrix(11);
 
@@ -279,7 +279,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     }
 
     // Test 4: Encoding and Decoding of a Large Even 12x12 Matrix
-    function testQuantAMMStorageLargeEvenMatrix() public {
+    function testLargeEvenMatrix() public {
         // Create a 12x12 test matrix
         int256[][] memory targetMatrix = createMatrix(12);
 
@@ -292,7 +292,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     }
 
     // Test 5: Encoding and Decoding of a Precision Matrix
-    function testQuantAMMStoragePrecisionMatrix() public {
+    function testPrecisionMatrix() public {
         // Define the precision target matrix
         int256[][] memory targetMatrix = new int256[][](3);
         targetMatrix[0] = new int256[](3);

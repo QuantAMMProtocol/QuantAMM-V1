@@ -20,13 +20,13 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         mockPool = new MockPool(3600, PRBMathSD59x18.fromInt(1), address(rule));
     }
 
-    function testPowerChannelEmptyParametersShouldNotBeAccepted() public view {
+    function testEmptyParametersShouldNotBeAccepted() public view {
         int256[][] memory emptyParams;
         bool valid = rule.validParameters(emptyParams); // Passing empty parameters
         assertFalse(valid);
     }
 
-    function testPowerChannelKappaZeroQGreaterThanOneShouldNotBeAccepted() public view {
+    function testKappaZeroQGreaterThanOneShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(0); // kappa = 1
@@ -37,7 +37,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
-    function testPowerChannelVectorKappaZeroQGreaterThanOneShouldNotBeAccepted() public view {
+    function testVectorKappaZeroQGreaterThanOneShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(0); // kappa = 1
@@ -49,7 +49,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
     }
 
 
-    function testFuzz_PowerChannelKappaZeroQGreaterThanOneShouldNotBeAccepted(int256 q) public view {
+    function testFuzz_KappaZeroQGreaterThanOneShouldNotBeAccepted(int256 q) public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(0); // kappa = 1
@@ -61,7 +61,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
     }
 
 
-    function testFuzz_PowerChannelVectorKappaZeroQGreaterThanOneShouldNotBeAccepted(int256 vectorParams, int256 q) public view {
+    function testFuzz_VectorKappaZeroQGreaterThanOneShouldNotBeAccepted(int256 vectorParams, int256 q) public view {
         int256[][] memory parameters = new int256[][](2);
         uint256 paramCount = uint256(bound(vectorParams, 2, 10));
         parameters[0] = new int256[](paramCount);
@@ -79,7 +79,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
-    function testPowerChannelKappaGreaterThanZeroQGreaterThanOneShouldBeAccepted() public view {
+    function testKappaGreaterThanZeroQGreaterThanOneShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(1); // kappa > 0
@@ -91,7 +91,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
     }
 
 
-    function testPowerChannelVectorKappaGreaterThanZeroQGreaterThanOneShouldBeAccepted() public view {
+    function testVectorKappaGreaterThanZeroQGreaterThanOneShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1); // kappa > 0
@@ -104,7 +104,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertTrue(valid);
     }
 
-    function testPowerChannelVectorKappaQDifferentLengthsShouldNotBeAccepted() public view {
+    function testVectorKappaQDifferentLengthsShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1); // kappa > 0
@@ -116,7 +116,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
-    function testPowerChannelKappaGreaterThanZeroQEqualToOneShouldNotBeAccepted() public view {
+    function testKappaGreaterThanZeroQEqualToOneShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(1); // kappa > 0
@@ -127,7 +127,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
-    function testFuzz_PowerChannelKappaGreaterThanZeroQEqualToOneShouldNotBeAccepted(int256 kappa) public view {
+    function testFuzz_KappaGreaterThanZeroQEqualToOneShouldNotBeAccepted(int256 kappa) public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(bound(kappa, 1, maxScaledFixedPoint18())); // kappa > 0
@@ -138,7 +138,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
-    function testPowerChannelKappaLessThanZeroQGreaterThanOneShouldNotBeAccepted() public view {
+    function testKappaLessThanZeroQGreaterThanOneShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(-1); // kappa < 0
@@ -149,7 +149,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
-    function testFuzz_PowerChannelKappaLessThanZeroQGreaterThanOneShouldNotBeAccepted(
+    function testFuzz_KappaLessThanZeroQGreaterThanOneShouldNotBeAccepted(
         int256 kappa,
         int256 q
     ) public view {
@@ -163,7 +163,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
-    function testPowerChannelCorrectWeightsWithHigherPrices() public {
+    function testCorrectWeightsWithHigherPrices() public {
         int256[][] memory parameters = new int256[][](3);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(2048); // Parameter 1
@@ -216,7 +216,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         checkResult(resultWeights, expectedResults);
     }
     // Function that tests correct weights with lower prices
-    function testPowerChannelCorrectWeightsWithLowerPrices() public {
+    function testCorrectWeightsWithLowerPrices() public {
         int256[][] memory parameters = new int256[][](3);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(2048); // Parameter 1
@@ -275,7 +275,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         checkResult(resultWeights, expectedResults);
     }
 
-    function testPowerChannelCorrectWeightsWithVectorParamsHigherPrices() public {
+    function testCorrectWeightsWithVectorParamsHigherPrices() public {
         int256[][] memory parameters = new int256[][](3);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(2048); // Parameter 1
@@ -331,7 +331,7 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         checkResult(resultWeights, expectedResults);
     }
     // Function that tests correct weights with lower prices
-    function testPowerChannelCorrectWeightsWithVectorParamsLowerPrices() public {
+    function testCorrectWeightsWithVectorParamsLowerPrices() public {
         int256[][] memory parameters = new int256[][](3);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(2048); // Parameter 1

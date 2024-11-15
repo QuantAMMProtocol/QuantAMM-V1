@@ -67,12 +67,12 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         (daiIdx, usdcIdx) = getSortedIndexes(address(dai), address(usdc));
     }
 
-    function testQuantAMMWeightedFactoryPausedState() public view {
+    function testPausedState() public view {
         uint32 pauseWindowDuration = quantAMMWeightedPoolFactory.getPauseWindowDuration();
         assertEq(pauseWindowDuration, 365 days);
     }
 
-    function testQuantAMMWeightedFactoryEmptyOracleArrayFirst() public {
+    function testEmptyOracleArrayFirst() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         params._poolSettings.oracles = new address[][](0);
@@ -81,7 +81,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryEmptyOracleArrayMixed() public {
+    function testEmptyOracleArrayMixed() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         params._poolSettings.oracles = new address[][](1);
@@ -91,7 +91,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryUnapprovedOracleArray() public {
+    function testUnapprovedOracleArray() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         int216 fixedValue = 1000;
@@ -105,55 +105,55 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryInvalidRule() public {
+    function testInvalidRule() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.rule = IUpdateRule(address(0));
         vm.expectRevert("Invalid rule");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryInvalidRuleValidation() public {
+    function testInvalidRuleValidation() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.ruleParameters = new int256[][](0);
         vm.expectRevert("INVRLEPRM");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryEpsilonMaxInvalidAbove() public {
+    function testEpsilonMaxInvalidAbove() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.epsilonMax = 1e18 + 1;
         vm.expectRevert("INV_EPMX");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryEpsilonMaxInvalidBelow() public {
+    function testEpsilonMaxInvalidBelow() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.epsilonMax = 0e18;
         vm.expectRevert("INV_EPMX");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryEpsilonMaxValid() public {
+    function testEpsilonMaxValid() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.epsilonMax = 0.5e18;
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryLambdaInvalidEmpty() public {
+    function testLambdaInvalidEmpty() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](0);
         vm.expectRevert("Either scalar or vector");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryLambdaInvalidEmpty2D() public {
+    function testLambdaInvalidEmpty2D() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](1);
         vm.expectRevert("INVLAM");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryLambdaInvalidAbove() public {
+    function testLambdaInvalidAbove() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](1);
         params._poolSettings.lambda[0] = 1e18 + 1;
@@ -161,7 +161,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryLambdaInvalidBelow() public {
+    function testLambdaInvalidBelow() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](1);
         params._poolSettings.lambda[0] = 0e18;
@@ -169,14 +169,14 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryLambdaValid() public {
+    function testLambdaValid() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](1);
         params._poolSettings.lambda[0] = 0.5e18;
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryLambdaValid2D() public {
+    function testLambdaValid2D() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](2);
         params._poolSettings.lambda[0] = 0.5e18;
@@ -184,54 +184,54 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryAbsoluteToleranceInvalidAbove() public {
+    function testAbsoluteToleranceInvalidAbove() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.absoluteWeightGuardRail = 0.5e18 + 1;
         vm.expectRevert("INV_ABSWGT");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryAbsoluteToleranceInvalidBelow() public {
+    function testAbsoluteToleranceInvalidBelow() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.absoluteWeightGuardRail = 0e18;
         vm.expectRevert("INV_ABSWGT");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryAbsoluteToleranceValid() public {
+    function testAbsoluteToleranceValid() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.absoluteWeightGuardRail = 0.2e18;
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryMaxTradeSizeInvalidAbove() public {
+    function testMaxTradeSizeInvalidAbove() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.maxTradeSizeRatio = 0.3e18 + 1;
         vm.expectRevert("INVMAXTRADE");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryMaxTradeSizeInvalidBelow() public {
+    function testMaxTradeSizeInvalidBelow() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.maxTradeSizeRatio = 0e18;
         vm.expectRevert("INVMAXTRADE");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryMaxTradeSizeValid() public {
+    function testMaxTradeSizeValid() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.maxTradeSizeRatio = 0.2e18;
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryInvalidWeightSum() public {
+    function testInvalidWeightSum() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._initialWeights[0] = 0.6e18;
         vm.expectRevert("SWGT!=1");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testQuantAMMWeightedFactoryCreatePoolWithoutDonation() public {
+    function testCreatePoolWithoutDonation() public {
         address quantAMMWeightedPool = _deployAndInitializeQuantAMMWeightedPool(false);
 
         // Try to donate but fails because pool does not support donations
@@ -240,7 +240,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         router.donate(quantAMMWeightedPool, [poolInitAmount, poolInitAmount].toMemoryArray(), false, bytes(""));
     }
 
-    function testQuantAMMWeightedFactoryCreatePoolWithDonation() public {
+    function testCreatePoolWithDonation() public {
         uint256 amountToDonate = poolInitAmount;
 
         address quantAMMWeightedPool = _deployAndInitializeQuantAMMWeightedPool(true);

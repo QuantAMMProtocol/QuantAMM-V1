@@ -134,6 +134,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
                     : TokenType.WITH_RATE;
             }
         }
+
         tokenConfig = sortTokenConfig(tokenConfig);
         
         retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
@@ -163,7 +164,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
             [int256(0.5e18),int256(0.5e18)].toMemoryArray(),
             [int256(0.5e18),int256(0.5e18)].toMemoryArray(),
             3600,
-            0,
+            16,//able to set weights
             new string[][](0)
         );
     }
@@ -187,6 +188,42 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
             factory.create(_createPoolParams(tokens, rateProviders))
         );
         vm.label(address(newPool), label);
+
+        // Cannot set the pool creator directly on a standard Balancer stable pool factory.
+        vault.manualSetPoolCreator(address(newPool), poolCreator);
+
+        ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
+        feeController.manualSetPoolCreator(address(newPool), poolCreator);
+
+        return address(newPool);
+    }
+
+
+    function createQuantAMMPoolInterpolating(
+        address[] memory tokens,
+        string memory label,
+        IRateProvider[] memory rateProviders,
+        IVaultMock vault,
+        address poolCreator
+    ) internal returns (address) {
+        
+        QuantAMMWeightedPoolFactory factory = deployQuantAMMWeightedPoolFactory(
+            IVault(address(vault)),
+            365 days,
+            "Factory v1",
+            "Pool v1"
+        );
+        
+        QuantAMMWeightedPool newPool = QuantAMMWeightedPool(
+            factory.create(_createPoolParams(tokens, rateProviders))
+        );
+        vm.label(address(newPool), label);
+
+        vm.startPrank(owner);
+
+        updateWeightRunner.setWeightsManually([int256(0.5e18),int256(0.5e18), -int256(0.0001e18), int256(0.0001e18)].toMemoryArray(), address(newPool), uint40(block.timestamp + 100));
+
+        vm.stopPrank();
 
         // Cannot set the pool creator directly on a standard Balancer stable pool factory.
         vault.manualSetPoolCreator(address(newPool), poolCreator);

@@ -11,11 +11,10 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
         name = "PowerChannel";
 
-        parameterDescriptions = new string[](4);
-        parameterDescriptions[0] = "Q: Q dictates the harshness of the channel boundry";
-        parameterDescriptions[1] = "Kappa: Kappa dictates the aggressiveness of response to a signal change";
-        parameterDescriptions[2] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
-        parameterDescriptions[3] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
+        parameterDescriptions = new string[](3);
+        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change";
+        parameterDescriptions[1] = "Q: Q dictates the harshness of the channel boundry";
+        parameterDescriptions[2] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
     }
 
     using PRBMathSD59x18 for int256;
@@ -61,7 +60,7 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     function _getWeights(
         int256[] calldata _prevWeights,
         int256[] calldata _data,
-        int256[][] calldata _parameters, //[0]=q, [1]=k, [2]=useRawPrice
+        int256[][] calldata _parameters, //[0]=k, [1]=q, [2]=useRawPrice
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {
         QuantAMMPowerChannelLocals memory locals;
@@ -92,6 +91,7 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             if (locals.useRawPrice) {
                 locals.denominator = _data[locals.i];
             }
+
             locals.intermediateRes = ONE.div(locals.denominator).mul(locals.newWeights[locals.i]);
 
             unchecked {
@@ -100,7 +100,13 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             //sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q
             //stored as it is used in multiple places, saves on recalculation gas. _pow is quite expensive
             locals.newWeights[locals.i] = locals.sign.mul(_pow(locals.intermediateRes.abs(), locals.q));
-            locals.normalizationFactor += locals.newWeights[locals.i];
+
+            if (locals.kappa.length == 1) {
+                locals.normalizationFactor += locals.newWeights[locals.i];
+            } else {
+                locals.normalizationFactor += (locals.newWeights[locals.i] * locals.kappa[locals.i]);
+            }
+
             unchecked {
                 ++locals.i;
             }

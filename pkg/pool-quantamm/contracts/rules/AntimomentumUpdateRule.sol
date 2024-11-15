@@ -15,8 +15,7 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         
         parameterDescriptions = new string[](3);
         parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change TODO";
-        parameterDescriptions[1] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
-        parameterDescriptions[2] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
+        parameterDescriptions[1] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
     }
 
     using PRBMathSD59x18 for int256;
@@ -79,7 +78,11 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             //1/p(t) · ∂p(t)/∂t used in both the main part of the equation and normalisation so saved to save gas
             // used of new weights array allows reuse and saved gas
             locals.newWeights[locals.i] = ONE.div(locals.denominator).mul(int256(locals.newWeights[locals.i]));
-            locals.normalizationFactor += locals.newWeights[locals.i];
+            if (locals.kappa.length == 1) {
+                locals.normalizationFactor += locals.newWeights[locals.i];
+            } else {
+                locals.normalizationFactor += (locals.newWeights[locals.i].mul(locals.kappa[locals.i]));
+            }
             unchecked {
                 ++locals.i;
             }
@@ -107,7 +110,8 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 }
             }
 
-            locals.normalizationFactor /= locals.sumKappa;
+            locals.normalizationFactor = locals.normalizationFactor.div(locals.sumKappa);
+            
             for (locals.i = 0; locals.i < _prevWeights.length; ) {
                 // w(t − 1) + κ ·(ℓp(t) − 1/p(t) · ∂p(t)/∂t)
                 int256 res = int256(_prevWeights[locals.i]) +

@@ -81,7 +81,7 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             if (locals.kappa.length == 1) {
                 locals.normalizationFactor += locals.newWeights[locals.i];
             } else {
-                locals.normalizationFactor += (locals.newWeights[locals.i] * locals.kappa[locals.i]);
+                locals.normalizationFactor += (locals.newWeights[locals.i].mul(locals.kappa[locals.i]));
             }
             unchecked {
                 ++locals.i;
@@ -110,7 +110,8 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 }
             }
 
-            locals.normalizationFactor /= locals.sumKappa;
+            locals.normalizationFactor = locals.normalizationFactor.div(locals.sumKappa);
+            
             for (locals.i = 0; locals.i < _prevWeights.length; ) {
                 // w(t − 1) + κ ·(ℓp(t) − 1/p(t) · ∂p(t)/∂t)
                 int256 res = int256(_prevWeights[locals.i]) +

@@ -320,8 +320,8 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         data[1] = PRBMathSD59x18.fromInt(4);
 
         int256[] memory expectedResults = new int256[](2);
-        expectedResults[0] = 0.491e18;
-        expectedResults[1] = 0.47975e18;
+        expectedResults[0] = 0.5027e18;
+        expectedResults[1] = 0.4973e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
@@ -372,8 +372,8 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         data[1] = PRBMathSD59x18.fromInt(4);
 
         int256[] memory expectedResults = new int256[](2);
-        expectedResults[0] = 0.5315e18;
-        expectedResults[1] = 0.47975e18;
+        expectedResults[0] = 0.527e18;
+        expectedResults[1] = 0.473e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
@@ -530,8 +530,8 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         data[1] = PRBMathSD59x18.fromInt(4);
 
         int256[] memory expectedResults = new int256[](2);
-        expectedResults[0] = 0.491e18;
-        expectedResults[1] = 0.47975e18;
+        expectedResults[0] = 0.5027e18;
+        expectedResults[1] = 0.4973e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
@@ -580,8 +580,8 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         data[1] = PRBMathSD59x18.fromInt(4);
 
         int256[] memory expectedResults = new int256[](2);
-        expectedResults[0] = 0.523333333333333333e18;
-        expectedResults[1] = 0.47975e18;
+        expectedResults[0] = 0.5221e18;
+        expectedResults[1] = 0.4779e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(

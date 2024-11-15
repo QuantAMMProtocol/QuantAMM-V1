@@ -5,9 +5,6 @@ import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "./base/QuantammGradientBasedRule.sol";
 import "./UpdateRule.sol";
 
-import "forge-std/console.sol"; // Foundry console log
-import "@openzeppelin/contracts/utils/Strings.sol"; // OpenZeppelin Strings library
-
 /// @title PowerChannelUpdateRule contract for QuantAMM power channel update rule
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the power channel update rule
 contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
@@ -105,21 +102,9 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             locals.newWeights[locals.i] = locals.sign.mul(_pow(locals.intermediateRes.abs(), locals.q));
 
             if (locals.kappa.length == 1) {
-                console.log("x");
                 locals.normalizationFactor += locals.newWeights[locals.i];
             } else {
-                int256 weight = locals.kappa[locals.i].mul(locals.newWeights[locals.i]);
-                console.log("i");
-                console.log(locals.i);
-                console.log("kappa");
-                console.log(Strings.toString(uint256(locals.kappa[locals.i])));
-                console.log("new weight");
-                console.log(Strings.toString(uint256(locals.newWeights[locals.i])));
-                console.log("mul weight");
-                console.log(Strings.toString(uint256(weight)));
-                console.log("* weight");
-                console.log(Strings.toString(uint256(locals.newWeights[locals.i] * locals.kappa[locals.i])));
-                locals.normalizationFactor += weight;
+                locals.normalizationFactor += locals.kappa[locals.i].mul(locals.newWeights[locals.i]);
             }
 
             unchecked {

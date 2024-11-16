@@ -41,7 +41,11 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
     address internal owner;
     address internal addr1;
     address internal addr2;
-    
+
+    address internal deployerFactory;
+
+    uint256 constant TOKEN_AMOUNT = 1e3 * 1e18;
+
     function _deployOracle(int216 fixedValue, uint delay) internal returns (MockChainlinkOracle) {
         MockChainlinkOracle oracle = new MockChainlinkOracle(fixedValue, delay);
         return oracle;
@@ -123,6 +127,10 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         uint256[] memory normalizedWeights = new uint256[](tokens.length);
         normalizedWeights[0] = uint256(0.5e18);
         normalizedWeights[1] = uint256(0.5e18);
+
+        IERC20[] memory tokensIERC20 = new IERC20[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; ++i) {
+            tokensIERC20[i] = IERC20(tokens[i]);        }
         
         TokenConfig[] memory tokenConfig = new TokenConfig[](tokens.length);
         for (uint256 i = 0; i < tokens.asIERC20().length; ++i) {
@@ -174,17 +182,16 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         IRateProvider[] memory rateProviders,
         IVaultMock vault,
         address poolCreator
-    ) internal returns (address) {
-        
-        QuantAMMWeightedPoolFactory factory = deployQuantAMMWeightedPoolFactory(
+    ) internal returns (address) {        
+        deployerFactory = address(deployQuantAMMWeightedPoolFactory(
             IVault(address(vault)),
             365 days,
             "Factory v1",
             "Pool v1"
-        );
+        ));
         
         QuantAMMWeightedPool newPool = QuantAMMWeightedPool(
-            factory.create(_createPoolParams(tokens, rateProviders))
+            QuantAMMWeightedPoolFactory(deployerFactory).create(_createPoolParams(tokens, rateProviders))
         );
         vm.label(address(newPool), label);
 

@@ -79,7 +79,7 @@ contract QuantAMMWeightedPool is
     // This means they have 0.00001% resolution (i.e., any non-zero bits < 1e11 will cause precision loss).
     // Minimum values help make the math well-behaved (i.e., the swap fee should overwhelm any rounding error).
     // Maximum values protect users by preventing permissioned actors from setting excessively high swap fees.
-    uint256 private constant _MIN_SWAP_FEE_PERCENTAGE = 1e12; // 0.0001%
+    uint256 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16; // 0.0001%
     uint256 private constant _MAX_SWAP_FEE_PERCENTAGE = 10e16; // 10%
 
     uint256 private immutable _totalTokens;
@@ -127,6 +127,19 @@ contract QuantAMMWeightedPool is
     /// @dev Indicates that the maximum allowed trade size has been exceeded.
     error maxTradeSizeRatioExceeded();
 
+
+    /**
+     * @notice `getRate` from `IRateProvider` was called on a Weighted Pool.
+     * @dev It is not safe to nest Weighted Pools as WITH_RATE tokens in other pools, where they function as their own
+     * rate provider. The default `getRate` implementation from `BalancerPoolToken` computes the BPT rate using the
+     * invariant, which has a non-trivial (and non-linear) error. Without the ability to specify a rounding direction,
+     * the rate could be manipulable.
+     *
+     * It is fine to nest Weighted Pools as STANDARD tokens, or to use them with external rate providers that are
+     * stable and have at most 1 wei of rounding error (e.g., oracle-based).
+     */
+    error WeightedPoolBptRateUnsupported();
+    
     ///@dev The parameters for the rule, validated in each rule separately during set rule
     int256[][] public ruleParameters;
 
@@ -792,4 +805,8 @@ contract QuantAMMWeightedPool is
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
     }
 
+
+    function getRate() public pure override returns (uint256) {
+        revert WeightedPoolBptRateUnsupported();
+    }
 }

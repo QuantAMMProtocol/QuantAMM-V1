@@ -51,7 +51,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
     }
 
     // Test for adding oracles
-    function testUpdateWeightRunnerOwnerCanAddOracle() public {
+    function testOwnerCanAddOracle() public {
         int216 fixedValue = 1000;
         uint delay = 3600;
 
@@ -62,7 +62,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertEq(updateWeightRunner.approvedOracles(address(chainlinkOracle)), true);
     }
 
-    function testUpdateWeightRunnerNonOwnerCannotAddOracle() public {
+    function testNonOwnerCannotAddOracle() public {
         int216 fixedValue = 1000;
         uint delay = 3600;
 
@@ -75,7 +75,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
     }
 
-    function testUpdateWeightRunnerOracleCannotBeAddedTwice() public {
+    function testOracleCannotBeAddedTwice() public {
         int216 fixedValue = 1000;
         uint delay = 3600;
 
@@ -87,7 +87,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
     }
 
-    function testUpdateWeightRunnerOwnerCanRemoveOracle() public {
+    function testOwnerCanRemoveOracle() public {
         int216 fixedValue = 1000;
         uint delay = 3600;
 
@@ -100,7 +100,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertEq(updateWeightRunner.approvedOracles(address(chainlinkOracle)), false);
     }
 
-    function testUpdateWeightRunnerNonOwnerCannotRemoveOracle() public {
+    function testNonOwnerCannotRemoveOracle() public {
         int216 fixedValue = 1000;
         uint delay = 3600;
 
@@ -121,7 +121,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertEq(updateWeightRunner.getPoolApprovedActions(address(mockPool)), 3);
     }
 
-    function testUpdateWeightRunnerNonOwnabeCannotApprovePoolUses() public {
+    function testNonOwnabeCannotApprovePoolUses() public {
         vm.startPrank(owner);
         updateWeightRunner.setApprovedActionsForPool(address(mockPool), 3);
         vm.stopPrank();
@@ -132,13 +132,13 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertEq(updateWeightRunner.getPoolApprovedActions(address(mockPool)), 3);
     }
 
-    function testUpdateWeightRunnerCannotRunUpdateForNonExistingPool() public {
+    function testCannotRunUpdateForNonExistingPool() public {
         address nonPool = address(0xdead);
         vm.expectRevert("Pool not registered");
         updateWeightRunner.performUpdate(nonPool);
     }
 
-    function testUpdateWeightRunnerCannotRunUpdateBeforeUpdateInterval() public {
+    function testCannotRunUpdateBeforeUpdateInterval() public {
         uint40 blockTime = uint40(block.timestamp);
         int216 fixedValue = 1000;
         uint delay = 3600;
@@ -179,7 +179,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         updateWeightRunner.performUpdate(address(mockPool));
     }
 
-    function testUpdateWeightRunnerUpdatesSuccessfullyAfterUpdateInterval() public {
+    function testUpdatesSuccessfullyAfterUpdateInterval() public {
         vm.startPrank(owner);
         updateWeightRunner.setApprovedActionsForPool(address(mockPool), 3);
         vm.stopPrank();
@@ -246,7 +246,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertTrue(mockRule.CalculateNewWeightsCalled());
     }
 
-    function testUpdateWeightRunnerMultipleConsecutiveUpdatesSuccessful() public {
+    function testMultipleConsecutiveUpdatesSuccessful() public {
         vm.startPrank(owner);
         updateWeightRunner.setApprovedActionsForPool(address(mockPool), 3);
         vm.stopPrank();
@@ -333,7 +333,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
     }
 
 
-    function testUpdateWeightRunnerCalculateBlockMultiplierCorrectly() public {
+    function testCalculateBlockMultiplierCorrectly() public {
         vm.startPrank(owner);
         updateWeightRunner.setApprovedActionsForPool(address(mockPool), 3);
         vm.stopPrank();
@@ -426,7 +426,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
     }
 
 
-    function testUpdateWeightRunnerCalculateBlockMultiplierBeyondLimit() public {
+    function testCalculateBlockMultiplierBeyondLimit() public {
         vm.startPrank(owner);
         updateWeightRunner.setApprovedActionsForPool(address(mockPool), 3);
         vm.stopPrank();
@@ -519,7 +519,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
     }
 
 
-    function testUpdateWeightRunnerCalculateBlockMultiplierLastInterpolationTimeBeforeUpdateInterval() public {
+    function testCalculateBlockMultiplierLastInterpolationTimeBeforeUpdateInterval() public {
         vm.startPrank(owner);
         updateWeightRunner.setApprovedActionsForPool(address(mockPool), 3);
         vm.stopPrank();
@@ -612,7 +612,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertEq(mockPool.lastInterpolationTimePossible(), uint40(12));
     }
 
-    function testUpdateWeightRunnerMultipleConsecutiveUpdatesFailsIfNotApproved() public {
+    function testMultipleConsecutiveUpdatesFailsIfNotApproved() public {
         vm.warp(block.timestamp + UPDATE_INTERVAL);
         int256[] memory initialWeights = new int256[](4);
         initialWeights[0] = 0.0000000005e18;
@@ -680,7 +680,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
     }
 
-    function testUpdateWeightRunnerSetWeightsManuallyAdmin() public {
+    function testSetWeightsManuallyAdmin() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.0000000005e18;
         weights[1] = 0.0000000005e18;
@@ -698,7 +698,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
     }
 
 
-    function testUpdateWeightRunnerSetWeightsManuallyFailsAdminPermOwnerFails() public {
+    function testSetWeightsManuallyFailsAdminPermOwnerFails() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.0000000005e18;
         weights[1] = 0.0000000005e18;
@@ -712,7 +712,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
     }
 
-    function testUpdateWeightRunnerSetWeightsManuallyPoolOwner() public {
+    function testSetWeightsManuallyPoolOwner() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.0000000005e18;
         weights[1] = 0.0000000005e18;
@@ -766,7 +766,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
     }
 
 
-    function testUpdateWeightRunnerCalculateMultiplierAndSetWeightsFromRuleSuccess() public {
+    function testCalculateMultiplierAndSetWeightsFromRuleSuccess() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.5e18;
         weights[1] = 0.5e18;
@@ -860,7 +860,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
     }
 
 
-    function testUpdateWeightRunnerCalculateMultiplierAndSetWeightsFromRuleFailBadSender() public {
+    function testCalculateMultiplierAndSetWeightsFromRuleFailBadSender() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.5e18;
         weights[1] = 0.5e18;
@@ -1013,7 +1013,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
     }
 
-    function testUpdateWeightRunnerCalculateMultiplierAndSetWeightsFromRuleFailBadRegistry() public {
+    function testCalculateMultiplierAndSetWeightsFromRuleFailBadRegistry() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.5e18;
         weights[1] = 0.5e18;
@@ -1136,7 +1136,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
 
 
-    function testUpdateWeightRunnerSetWeightsManuallyFailsOwnerPermAdminFails() public {
+    function testSetWeightsManuallyFailsOwnerPermAdminFails() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.0000000005e18;
         weights[1] = 0.0000000005e18;
@@ -1150,7 +1150,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
     }
 
-    function testUpdateWeightRunnerSetWeightsManuallyInitiallyNonOwnerFails() public {
+    function testSetWeightsManuallyInitiallyNonOwnerFails() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.0000000005e18;
         weights[1] = 0.0000000005e18;
@@ -1162,7 +1162,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
     }
 
-    function testUpdateWeightRunnerSetWeightsManuallyOwnerPermedNonOwnerFails() public {
+    function testSetWeightsManuallyOwnerPermedNonOwnerFails() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.0000000005e18;
         weights[1] = 0.0000000005e18;
@@ -1175,7 +1175,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
     }
 
-    function testUpdateWeightRunnerSetWeightsManuallyAdminPermedNonOwnerFails() public {
+    function testSetWeightsManuallyAdminPermedNonOwnerFails() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.0000000005e18;
         weights[1] = 0.0000000005e18;
@@ -1188,7 +1188,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
     }
 
-    function testUpdateWeightRunnerSetIntermediateValuesManually() public {
+    function testSetIntermediateValuesManually() public {
         int256[] memory newMovingAverages = new int256[](4);
         newMovingAverages[0] = 0.0000000005e18;
         newMovingAverages[1] = 0.0000000005e18;
@@ -1241,7 +1241,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertEq(mockRule.getIntermediateValues(), newParameters);
     }
 
-    function testUpdateWeightRunnerSetIntermediateValuesManuallyInitiallyNonOwnerFails() public {
+    function testSetIntermediateValuesManuallyInitiallyNonOwnerFails() public {
         int256[] memory newMovingAverages = new int256[](4);
         newMovingAverages[0] = 0.0000000005e18;
         newMovingAverages[1] = 0.0000000005e18;

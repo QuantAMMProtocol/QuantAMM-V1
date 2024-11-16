@@ -66,7 +66,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         vm.label(address(quantAMMWeightedPoolFactory), "quantamm weighted pool factory");
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightsInitial() public {
+    function testGetNormalizedWeightsInitial() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._initialWeights[6] = 0.1e18;
         params._initialWeights[7] = 0.15e18;
@@ -85,7 +85,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         assert(weights[7] == 0.15e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightSetWeightInitial() public {
+    function testSetWeightInitial() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -113,7 +113,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         assert(weights[7] == 0.125e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightSetWeightNBlocksAfter() public {
+    function testSetWeightNBlocksAfter() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -141,7 +141,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         assert(weights[1] == 0.15e18 + 0.002e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightSetWeightAfterLimit() public {
+    function testSetWeightAfterLimit() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
@@ -213,55 +213,55 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         assert(newBalance == expected);
     }
 
-    function testQuantAMMWeightedPool8ComputeBalanceInitialToken0Token1() public {
+    function testComputeBalanceInitialToken0Token1() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(1, 0.15e18, 0.001e18);
         _computeBalanceInternal(firstWeight, secondWeight, 0, 6191.736422400061905000e18);
     }
 
-    function testQuantAMMWeightedPool8ComputeBalanceNBlocksAfterToken0Token1() public {
+    function testComputeBalanceNBlocksAfterToken0Token1() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(1, 0.15e18, 0.001e18);
         _computeBalanceInternal(firstWeight, secondWeight, 2, 5974.295859424989510000e18);
     }
 
-    function testQuantAMMWeightedPool8ComputeBalanceAfterLimitToken0Token1() public {
+    function testComputeBalanceAfterLimitToken0Token1() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(1, 0.15e18, 0.001e18);
         _computeBalanceInternal(firstWeight, secondWeight, 7, 5676.845898799479439000e18);
     }
 
-    function testQuantAMMWeightedPool8ComputeBalanceInitialToken0Token5() public {
+    function testComputeBalanceInitialToken0Token5() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _computeBalanceInternal(firstWeight, secondWeight, 0, 6191.736422400061905000e18);
     }
 
-    function testQuantAMMWeightedPool8ComputeBalanceNBlocksAfterToken0Token5() public {
+    function testComputeBalanceNBlocksAfterToken0Token5() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _computeBalanceInternal(firstWeight, secondWeight, 2, 5974.295859424989510000e18);
     }
 
-    function testQuantAMMWeightedPool8ComputeBalanceAfterLimitToken0Token5() public {
+    function testComputeBalanceAfterLimitToken0Token5() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _computeBalanceInternal(firstWeight, secondWeight, 7, 5676.845898799479439000e18);
     }
 
-    function testQuantAMMWeightedPool8ComputeBalanceInitialToken7Token5() public {
+    function testComputeBalanceInitialToken7Token5() public {
         testParam memory firstWeight = testParam(5, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(7, 0.15e18, 0.001e18);
         _computeBalanceInternal(firstWeight, secondWeight, 0, 46438.023168000464287500e18);
     }
 
-    function testQuantAMMWeightedPool8ComputeBalanceNBlocksAfterToken7Token5() public {
+    function testComputeBalanceNBlocksAfterToken7Token5() public {
         testParam memory firstWeight = testParam(5, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(7, 0.15e18, 0.001e18);
         _computeBalanceInternal(firstWeight, secondWeight, 2, 44807.218945687421325000e18);
     }
 
-    function testQuantAMMWeightedPool8ComputeBalanceAfterLimitToken7Token5() public {
+    function testComputeBalanceAfterLimitToken7Token5() public {
         testParam memory firstWeight = testParam(5, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(7, 0.15e18, 0.001e18);
         _computeBalanceInternal(firstWeight, secondWeight, 7, 42576.344240996095792500e18);
@@ -312,55 +312,55 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         assert(newBalance == expected);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapOutGivenInInitialToken0Token1() public {
+    function testGetNormalizedWeightOnSwapOutGivenInInitialToken0Token1() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(1, 0.15e18, 0.001e18);
         _onSwapOutGivenInInternal(firstWeight, secondWeight, 0, 1.332223208952048000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapOutGivenInNBlocksAfterToken0Token1() public {
+    function testGetNormalizedWeightOnSwapOutGivenInNBlocksAfterToken0Token1() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(1, 0.15e18, 0.001e18);
         _onSwapOutGivenInInternal(firstWeight, secondWeight, 2, 1.340984896364186000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapOutGivenInAfterLimitToken0Token1() public {
+    function testGetNormalizedWeightOnSwapOutGivenInAfterLimitToken0Token1() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(1, 0.15e18, 0.001e18);
         _onSwapOutGivenInInternal(firstWeight, secondWeight, 7, 1.353703406520588000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapOutGivenInInitialToken0Token5() public {
+    function testGetNormalizedWeightOnSwapOutGivenInInitialToken0Token5() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _onSwapOutGivenInInternal(firstWeight, secondWeight, 0, 4.995837033570180000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapOutGivenInNBlocksAfterToken0Token5() public {
+    function testGetNormalizedWeightOnSwapOutGivenInNBlocksAfterToken0Token5() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _onSwapOutGivenInInternal(firstWeight, secondWeight, 2, 5.028693361365697500e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapOutGivenInAfterLimitToken0Token5() public {
+    function testGetNormalizedWeightOnSwapOutGivenInAfterLimitToken0Token5() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _onSwapOutGivenInInternal(firstWeight, secondWeight, 7, 5.076387774452205000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapOutGivenInInitialToken7Token5() public {
+    function testGetNormalizedWeightOnSwapOutGivenInInitialToken7Token5() public {
         testParam memory firstWeight = testParam(7, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _onSwapOutGivenInInternal(firstWeight, secondWeight, 0, 0.999833362882522500e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapOutGivenInNBlocksAfterToken7Token5() public {
+    function testGetNormalizedWeightOnSwapOutGivenInNBlocksAfterToken7Token5() public {
         testParam memory firstWeight = testParam(7, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _onSwapOutGivenInInternal(firstWeight, secondWeight, 2, 1.006410772600252500e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapOutGivenInAfterLimitToken7Token5() public {
+    function testGetNormalizedWeightOnSwapOutGivenInAfterLimitToken7Token5() public {
         testParam memory firstWeight = testParam(7, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _onSwapOutGivenInInternal(firstWeight, secondWeight, 7, 1.015958615150850000e18);
@@ -411,55 +411,55 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         assert(newBalance == expected);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapInGivenOutInitialToken0Token1() public {
+    function testGetNormalizedWeightOnSwapInGivenOutInitialToken0Token1() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(1, 0.15e18, 0.001e18);
         _onSwapInGivenOutInternal(firstWeight, secondWeight, 0, 0.750469023601402000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapInGivenOutNBlocksAfterToken0Token1() public {
+    function testGetNormalizedWeightOnSwapInGivenOutNBlocksAfterToken0Token1() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(1, 0.15e18, 0.001e18);
         _onSwapInGivenOutInternal(firstWeight, secondWeight, 2, 0.745562169258142000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapInGivenOutAfterLimitToken0Token1() public {
+    function testGetNormalizedWeightOnSwapInGivenOutAfterLimitToken0Token1() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(1, 0.15e18, 0.001e18);
         _onSwapInGivenOutInternal(firstWeight, secondWeight, 7, 0.738552419074452000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapInGivenOutInitialToken0Token5() public {
+    function testGetNormalizedWeightOnSwapInGivenOutInitialToken0Token5() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _onSwapInGivenOutInternal(firstWeight, secondWeight, 0, 0.200033338529300000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapInGivenOutNBlocksAfterToken0Token5() public {
+    function testGetNormalizedWeightOnSwapInGivenOutNBlocksAfterToken0Token5() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _onSwapInGivenOutInternal(firstWeight, secondWeight, 2, 0.198725801188834000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapInGivenOutAfterLimitToken0Token5() public {
+    function testGetNormalizedWeightOnSwapInGivenOutAfterLimitToken0Token5() public {
         testParam memory firstWeight = testParam(0, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(5, 0.15e18, 0.001e18);
         _onSwapInGivenOutInternal(firstWeight, secondWeight, 7, 0.196857893667587000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapInGivenOutInitialToken5Token7() public {
+    function testGetNormalizedWeightOnSwapInGivenOutInitialToken5Token7() public {
         testParam memory firstWeight = testParam(5, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(7, 0.15e18, 0.001e18);
         _onSwapInGivenOutInternal(firstWeight, secondWeight, 0, 2.250562631354580000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapInGivenOutNBlocksAfterToken5Token7() public {
+    function testGetNormalizedWeightOnSwapInGivenOutNBlocksAfterToken5Token7() public {
         testParam memory firstWeight = testParam(5, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(7, 0.15e18, 0.001e18);
         _onSwapInGivenOutInternal(firstWeight, secondWeight, 2, 2.235850879332765000e18);
     }
 
-    function testQuantAMMWeightedPool8GetNormalizedWeightOnSwapInGivenOutAfterLimitToken5Token7() public {
+    function testGetNormalizedWeightOnSwapInGivenOutAfterLimitToken5Token7() public {
         testParam memory firstWeight = testParam(5, 0.1e18, 0.001e18);
         testParam memory secondWeight = testParam(7, 0.15e18, 0.001e18);
         _onSwapInGivenOutInternal(firstWeight, secondWeight, 7, 2.214834140775105000e18);

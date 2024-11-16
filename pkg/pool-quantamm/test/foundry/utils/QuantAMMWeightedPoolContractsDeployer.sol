@@ -142,6 +142,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
                     : TokenType.WITH_RATE;
             }
         }
+
         tokenConfig = sortTokenConfig(tokenConfig);
         
         retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
@@ -171,7 +172,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
             [int256(0.5e18),int256(0.5e18)].toMemoryArray(),
             [int256(0.5e18),int256(0.5e18)].toMemoryArray(),
             3600,
-            0,
+            16,//able to set weights
             new string[][](0)
         );
     }

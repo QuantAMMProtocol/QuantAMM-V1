@@ -81,7 +81,7 @@ contract QuantAMMMathGuardTest is Test {
     }
 
     // 2 tokens above epsilon max
-    function testWeightGuards2TokensAboveEpsilonMax(int256 newWeight) public view {
+    function testFuzz_WeightGuards2TokensAboveEpsilonMax(int256 newWeight) public view {
         int256[] memory prevWeights = new int256[](2);
         prevWeights[0] = 0.5e18;
         prevWeights[1] = 0.5e18;

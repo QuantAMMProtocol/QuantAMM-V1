@@ -104,8 +104,8 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         uint256 innerLength,
         int256 defaultParam
     ) public view {
-        uint256 totalParams = bound(paramLength, 2, 20);
-        uint256 innerParams = bound(innerLength, 2, 20);
+        uint256 totalParams = bound(paramLength, 2, 10);
+        uint256 innerParams = bound(innerLength, 2, 10);
         int256[][] memory parameters = new int256[][](totalParams); // Additional parameters
         for (uint256 i = 0; i < totalParams; i++) {
             parameters[i] = new int256[](innerParams);

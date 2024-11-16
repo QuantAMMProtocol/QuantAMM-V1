@@ -85,6 +85,8 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
         uint64 _epsilonMax,
         uint64 _absoluteWeightGuardRail
     ) external returns (int256[] memory updatedWeights) {
+        require(msg.sender == updateWeightRunner, "UNAUTH_CALC");
+
         QuantAMMUpdateRuleLocals memory locals;
 
         locals.numberOfAssets = _prevWeights.length;

@@ -38,7 +38,7 @@ Two part protocol
 
 The protocol design is split in two core contracts:
 
-1. Update Weight Runner – Responsible for the inter-block weight update rule process. This has one entry point of “Perform Update” whose output is to save new “previous fixed weight” and “weight multiplier per block unit” to the vault
+1. Update Weight Runner – Responsible for the inter-block weight update rule process. This has one entry point of “Perform Update” whose output is to save new “previous fixed weight” and “weight multiplier per block unit” to the QuantAMM Base Pool
 
 1. QuantAMMWeightedPool – responsible for all reserves and trading. Any deposit/withdraw functionality is inherited from balancer v3 here. 
 
@@ -83,7 +83,7 @@ Packing like this has one small draw back. Retrieval is more efficient as an all
 
 # Update weight runner
 
-The update weight runner really performs the coordination of weight updates while only performing DR and final setting functions. It is intended to be a singleton deployment that is recorded in the DAO to allow certain functionality to only be called by the vault and vice versa. 
+The update weight runner really performs the coordination of weight updates while only performing DR and final setting functions. It is intended to be a singleton deployment that is recorded in the DAO to allow certain functionality to only be called by the QuantAMM Base Pool and vice versa. 
 
 
 ![](./update_rule_trigger_workflow.jpeg)
@@ -126,7 +126,7 @@ The guard rails are in the base update rule class and functions are always calle
 
 ## Determining multipliers and getting weights
 
-A linear multiplier will always be stored from the update weight runner and the vault. Later there is possibility in the vault to provide a more advanced feature where the linear multiplier is shifted according to more sophisticated randomization or geometric interpolation. 
+A linear multiplier will always be stored from the update weight runner and the QuantAMM Base Pool. Later there is possibility in the QuantAMM Base Pool to provide a more advanced feature where the linear multiplier is shifted according to more sophisticated randomization or geometric interpolation. 
 
 While the logic to determine the multiplier is simple give the block interval and change in weight, specific logic is needed to find the block.timestamp which the first constituent will hit a guard rail. Continuing along the linear interpolation path is fine given the guard rails however once a guard rail is hit more complex logic would be needed so we freeze at that weight. 
 
@@ -140,7 +140,7 @@ Hopefully by that time an update would be triggered or another update interval r
 
 ## Pool Creation
 
-Pools are created via their respective factory methods that ensure parameter requirements are met. SetRuleForPool is called during construction of the pool however registration into the vault is DAO controlled. 
+Pools are created via their respective factory methods that ensure parameter requirements are met. SetRuleForPool is called during construction of the pool however registration into the UpdateWeightRunner is Protocol controlled. 
 
 ## Index pools hooks
 

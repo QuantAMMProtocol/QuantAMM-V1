@@ -19,7 +19,7 @@ import { RateProviderMock } from "@balancer-labs/v3-vault/contracts/test/RatePro
 import { PoolHooksMock } from "@balancer-labs/v3-vault/contracts/test/PoolHooksMock.sol";
 
 
-import { QuantAMMWeightedPoolContractsDeployer } from "./utils/QuantAMMWeightedPoolContractsDeployer.sol";
+import { QuantAMMWeightedPoolContractsDeployer } from "../utils/QuantAMMWeightedPoolContractsDeployer.sol";
 
 contract E2eSwapRateProviderWeightedTest is
     QuantAMMWeightedPoolContractsDeployer,

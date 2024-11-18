@@ -19,8 +19,8 @@ import { WeightedMath } from "@balancer-labs/v3-solidity-utils/contracts/math/We
 import { BasePoolTest } from "@balancer-labs/v3-vault/test/foundry/utils/BasePoolTest.sol";
 import { PoolHooksMock } from "@balancer-labs/v3-vault/contracts/test/PoolHooksMock.sol";
 import { IBasePoolFactory } from "@balancer-labs/v3-interfaces/contracts/vault/IBasePoolFactory.sol";
-import { QuantAMMWeightedPool } from "../../contracts/QuantAMMWeightedPool.sol";
-import { QuantAMMWeightedPoolContractsDeployer } from "./utils/QuantAMMWeightedPoolContractsDeployer.sol";
+import { QuantAMMWeightedPool } from "../../../contracts/QuantAMMWeightedPool.sol";
+import { QuantAMMWeightedPoolContractsDeployer } from "../utils/QuantAMMWeightedPoolContractsDeployer.sol";
 
 contract QuantAMMWeightedPoolBaseTest is QuantAMMWeightedPoolContractsDeployer, BasePoolTest {
     using CastingHelpers for address[];

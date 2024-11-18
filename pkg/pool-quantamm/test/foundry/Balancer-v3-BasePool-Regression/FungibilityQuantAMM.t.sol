@@ -8,7 +8,7 @@ import { IRateProvider } from "@balancer-labs/v3-interfaces/contracts/solidity-u
 
 import { FungibilityTest } from "@balancer-labs/v3-vault/test/foundry/Fungibility.t.sol";
 
-import { QuantAMMWeightedPoolContractsDeployer } from "./utils/QuantAMMWeightedPoolContractsDeployer.sol";
+import { QuantAMMWeightedPoolContractsDeployer } from "../utils/QuantAMMWeightedPoolContractsDeployer.sol";
 
 contract FungibilityQuantAMMTest is FungibilityTest, QuantAMMWeightedPoolContractsDeployer {
     /// @notice Overrides BaseVaultTest _createPool(). This pool is used by FungibilityTest.

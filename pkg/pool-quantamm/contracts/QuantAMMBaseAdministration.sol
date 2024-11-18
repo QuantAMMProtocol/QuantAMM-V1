@@ -13,21 +13,34 @@ import "@openzeppelin/contracts/governance/TimelockController.sol";
 /*
 ARCHITECTURE DESIGN NOTES
 
-Most of this functionality could be in the vault contract but it would push the contract size over the limit.
+Most of this functionality could be in the QuantAMM Base contract but it would push the contract size over the limit.
 
-The vault administration contract is responsible for the following:
-- setting the protocol trading fee
-- setting the protocol trading fee receiving address
-- setting the protocol fixed withdrawal fee
-- setting the protocol fixed withdrawal fee receiving address
-- setting the min and max trading fees for the protocol
-- setting the min and max fixed withdrawal fees for the protocol
-- setting the non protocol fees being charged by a pool
-- diluting a pool
+setUpdateWeightRunnerAddress
+Used during initialisation. There is a little bit of a chicken and egg question here. Obviously this
+could lead to deployment attacks in which case we would just scap that deployment and try
+again.
 
-Only fixed addresses of the base and update weight runner are allowed to call these functions.
-While there is a small race condition possible during deployment, if someone does come in with a different address all that is required is a redeployment. 
+setWeightsManually
+It could be that a given weight update or a large enough pause requires an update to the weight
+and multipliers. This means computation of what the weights and multipliers should be is to be
+done offchain.
+This is quite extreme and puts the calculation intermediate values that rely on a last weight and
+the pool weights off balance. However such a break glass function could be needed if a
+calculation has created a multiplier or last block multiplier that is buggy.
 
+setIntermediateValuesManually
+This is a less nuclear manual intervention. If a calculation has not been done at the update
+interval or a bad calculation has been done at the update interval, and you are expecting the
+next update to work as expected then you can set the intermediate values of the calculation and
+wait for the next update. As the intermediate value is supposed to incorporate all historical
+updates in a weighted way (see estimator wp sections) this means that any change such as a
+calculation being down for a while or bad oracle values can be mediated by just updated the
+intermediate values.
+
+setPoolUpdateWeightRunnerManually
+While interaction between pools and update weight runner is strictly controlled. Given the logic
+in the updateweightrunner is not insignificant, an update could be done via this admin function
+to patch any potential issue with the updateweight runner itself.
 
 */
 /// @title QuantAMM base administration contract for low frequency, high impact admin calls to the base
@@ -93,6 +106,11 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
         //event emitted in the update weight runner
     }
 
+    /// @notice set the intermediate values manually as a break glass function
+    /// @param _movingAverages the moving averages to set, this should include prev averages if the pool is configured with the prev flag.
+    /// @param _intermediateValues the intermediate values to set for the rules
+    /// @param _poolAddress the address of the pool to set the intermediate values for
+    /// @param numberOfAssets the number of assets in the pool, used for packing and unpacking
     function setIntermediateValuesManually(
         int256[] calldata _movingAverages,
         int256[] calldata _intermediateValues,
@@ -109,6 +127,8 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
     }
 
     /// @notice set the updateweight runner manually as a break glass function
+    /// @param _poolAddress the address of the pool to set the update weight runner for
+    /// @param _newUpdateWeightRunner the address of the new update weight runner
     function setPoolUpdateWeightRunnerManually(address _poolAddress, address _newUpdateWeightRunner) public onlyExecutor(){
         IQuantAMMWeightedPool(_poolAddress).setUpdateWeightRunnerAddress(_newUpdateWeightRunner);
         updateWeightRunner = _newUpdateWeightRunner;

@@ -17,7 +17,11 @@ contract MockQuantAMMStorage is ScalarRuleQuantAMMStorage, ScalarQuantAMMBaseSto
     function ExternalEncodeArray(int256[] memory sourceArray) external pure returns (int256[] memory result) {
         result = _quantAMMPack128Array(sourceArray);
     }
-
+    
+    function ExternalQuantAMMPack32Array(int256[] memory sourceArray) external pure returns (int256[] memory result) {
+        result = quantAMMPack32Array(sourceArray);
+    }
+    
     function ExternalEncodeDecode128Array(
         int256[] memory sourceArray,
         uint targetLength

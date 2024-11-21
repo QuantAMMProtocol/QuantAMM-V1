@@ -240,20 +240,11 @@ contract QuantAMMWeightedPool is
         uint256 timeSinceLastUpdate = uint256(multiplierTime - variables.lastUpdateIntervalTime);
 
         // if both tokens are within the first storage elem
-        if (request.indexIn < 4 && request.indexOut < 4) {
+        if ((request.indexIn < 4 && request.indexOut < 4)
+            || (request.indexIn >= 4 && request.indexOut >= 4)) {
             QuantAMMNormalisedTokenPair memory tokenWeights = _getNormalisedWeightPair(
                 request.indexIn,
                 request.indexOut,
-                timeSinceLastUpdate,
-                totalTokens
-            );
-            tokenInWeight = tokenWeights.firstTokenWeight;
-            tokenOutWeight = tokenWeights.secondTokenWeight;
-        } else if (request.indexIn > 4 && request.indexOut < 4) {
-            //if the tokens are in different storage elems
-            QuantAMMNormalisedTokenPair memory tokenWeights = _getNormalisedWeightPair(
-                request.indexOut,
-                request.indexIn,
                 timeSinceLastUpdate,
                 totalTokens
             );
@@ -317,7 +308,8 @@ contract QuantAMMWeightedPool is
         uint256 secondTokenIndex = tokenIndexTwo;
         uint256 totalTokensInPacked = totalTokens;
         int256 targetWrappedToken;
-        if (tokenIndexTwo > 4) {
+        //because we are in get pair we can assume that we are in the same storage int
+        if (tokenIndexTwo >= 4) {
             firstTokenIndex = tokenIndexOne - 4;
             secondTokenIndex = tokenIndexTwo - 4;
             totalTokensInPacked -= 4;
@@ -380,7 +372,7 @@ contract QuantAMMWeightedPool is
         int256 targetWrappedToken;
         uint256 tokenIndexInPacked = totalTokens;
 
-        if (tokenIndex > 4) {
+        if (tokenIndex >= 4) {
             //get the index in the second storage int
             index = tokenIndex - 4;
             targetWrappedToken = _normalizedSecondFourWeights;
@@ -448,7 +440,7 @@ contract QuantAMMWeightedPool is
             } else {
                 return normalizedWeights;
             }
-            if (totalTokens > 3) {
+            if (totalTokens > 3) {               
                 normalizedWeights[3] = calculateBlockNormalisedWeight(
                     firstFourWeights[3],
                     firstFourWeights[tokenIndex + 3],
@@ -457,7 +449,7 @@ contract QuantAMMWeightedPool is
             } else {
                 return normalizedWeights;
             }
-
+            
             int256[] memory secondFourWeights = quantAMMUnpack32(_normalizedSecondFourWeights);
 
             if (totalTokens > 4) {

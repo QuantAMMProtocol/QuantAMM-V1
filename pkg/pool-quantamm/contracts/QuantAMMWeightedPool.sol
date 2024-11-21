@@ -449,11 +449,15 @@ contract QuantAMMWeightedPool is
             } else {
                 return normalizedWeights;
             }
-            
+
+            //avoid unneccessary SLOAD
+            if(totalTokens == 4){
+                return normalizedWeights;
+            }
+
             int256[] memory secondFourWeights = quantAMMUnpack32(_normalizedSecondFourWeights);
 
             if (totalTokens > 4) {
-                tokenIndex -= 4;
                 normalizedWeights[4] = calculateBlockNormalisedWeight(
                     secondFourWeights[0],
                     secondFourWeights[tokenIndex],

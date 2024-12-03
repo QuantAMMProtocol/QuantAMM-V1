@@ -81,28 +81,50 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         vm.label(address(quantAMMWeightedPoolFactory), "quantamm weighted pool factory");
     }
 
-    function testGetNormalizedWeightsInitial() public {
-        _testGetNormalizedWeights(0);
+    function testGetNormalizedWeightsInitial_Fuzz(int256 defaultMultiplier) public {
+        int256 min = -(int256(type(uint256).min)) / int256(5e18);
+        int256 max = int256(type(uint256).max) / int256(5e18);
+        int256 boundMultiplier = bound(defaultMultiplier, min, max);
+        _testGetNormalizedWeights(0, 0.125e18, boundMultiplier);
     }
 
-    function testGetNormalizedWeightsNBlocksAfter() public {
-        _testGetNormalizedWeights(2);
+    function testGetNormalizedWeightsNBlocksAfter_Fuzz(uint delay, int256 defaultMultiplier) public {
+        uint boundDelay = bound(delay, 1, 5);
+        int256 min = -(int256(type(uint256).min)) / int256(5e18);
+        int256 max = int256(type(uint256).max)  / int256(5e18);
+        int256 boundMultiplier = bound(defaultMultiplier, min, max);
+        _testGetNormalizedWeights(boundDelay, 0.125e18, boundMultiplier);
     }
 
-    function testGetNormalizedWeightsAfterLimit() public {
-        _testGetNormalizedWeights(7);
+    function testGetNormalizedWeightsAfterLimit_Fuzz(uint delay, int256 defaultMultiplier) public {
+        uint boundDelay = bound(delay, 6, type(uint40).max);
+        int256 min = -(int256(type(uint256).min)) / int256(5e18);
+        int256 max = int256(type(uint256).max)  / int256(5e18);
+        int256 boundMultiplier = bound(defaultMultiplier, min, max);
+        _testGetNormalizedWeights(boundDelay, 0.125e18, boundMultiplier);
     }
 
-    function testGetDynamicDataWeightsInitial() public {
-        _testGetNormalizedWeights(0);
+    function testGetDynamicDataWeightsInitial_Fuzz(int256 defaultMultiplier) public {
+        int256 min = -(int256(type(uint256).min)) / int256(5e18);
+        int256 max = int256(type(uint256).max) / int256(5e18);
+        int256 boundMultiplier = bound(defaultMultiplier, min, max);
+        _testGetNormalizedWeights(0, 0.125e18, boundMultiplier);
     }
 
-    function testGetDynamicDataWeightsNBlocksAfter() public {
-        _testGetNormalizedWeights(2);
+    function testGetDynamicDataWeightsNBlocksAfter_Fuzz(uint delay, int256 defaultMultiplier) public {
+        uint boundDelay = bound(delay, 1, 5);
+        int256 min = -(int256(type(uint256).min)) / int256(5e18);
+        int256 max = int256(type(uint256).max)  / int256(5e18);
+        int256 boundMultiplier = bound(defaultMultiplier, min, max);
+        _testGetNormalizedWeights(boundDelay, 0.125e18, boundMultiplier);
     }
 
-    function testGetDynamicDataWeightsAfterLimit() public {
-        _testGetNormalizedWeights(7);
+    function testGetDynamicDataWeightsAfterLimit_Fuzz(uint delay, int256 defaultMultiplier) public {
+        uint boundDelay = bound(delay, 6, type(uint40).max);
+        int256 min = -(int256(type(uint256).min)) / int256(5e18);
+        int256 max = int256(type(uint256).max)  / int256(5e18);
+        int256 boundMultiplier = bound(defaultMultiplier, min, max);
+        _testGetNormalizedWeights(boundDelay, 0.125e18, boundMultiplier);
     }
     //the other tests go through individual use cases, this makes sure no combo of weight in and out makes a difference
     function testBalancesInitial() public {
@@ -153,12 +175,14 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
     }
 
 
-    function _testGetNormalizedWeights(uint delay) internal {
+    function _testGetNormalizedWeights(uint delay, int256 defaultWeight, int256 defaultMultiplier) internal {
         uint40 timestamp = uint40(block.timestamp);
         VariationTestVariables memory variables;
         variables.firstWeight = testParam(0, 0.1e18, 0.001e18);
         variables.secondWeight = testParam(0, 0.15e18, 0.001e18);
-        variables.params = _createPoolParams();
+        variables.params = _createPoolParams(defaultWeight, delay);
+        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+        
         uint expectedDelay = delay;
         if(delay > 5){
             expectedDelay = 5;
@@ -167,9 +191,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
             for(uint j = 0; j < 8; j++){
                 if(i != j){
                     vm.warp(timestamp);
-                    _setupVariables(variables, i, j, delay);
-                    
-                    address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+                    _setupVariables(variables, i, j, delay, defaultMultiplier);
 
                     vm.prank(address(updateWeightRunner));
                     
@@ -179,21 +201,38 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                         uint40(timestamp + 5)
                     );
 
+                    variables.testUint256 = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
+                    
                     if(delay > 0){
                         vm.warp(timestamp + delay);
                     }
-
+                    
                     variables.testUint256 = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
-
+                    
                     for(uint k = 0; k < 8; k++){
                         if(k == variables.firstWeight.index){
-                            assertEq(variables.testUint256[variables.firstWeight.index], uint256(variables.firstWeight.weight) + (uint256(variables.firstWeight.multiplier) * expectedDelay));
+                            if(variables.firstWeight.multiplier > 0){
+                                assertEq(variables.testUint256[k], uint256(variables.firstWeight.weight) + (uint256(variables.firstWeight.multiplier) * expectedDelay));
+                            }
+                            else{
+                                assertEq(variables.testUint256[k], uint256(variables.firstWeight.weight) - (uint256(-variables.firstWeight.multiplier) * uint256(expectedDelay)));
+                            }
                         }
                         else if(k == variables.secondWeight.index){
-                            assertEq(variables.testUint256[variables.secondWeight.index], uint256(variables.secondWeight.weight) + (uint256(variables.secondWeight.multiplier) * expectedDelay));
+                            if(variables.secondWeight.multiplier > 0){
+                                assertEq(variables.testUint256[k], uint256(variables.secondWeight.weight) + (uint256(variables.secondWeight.multiplier) * expectedDelay));
+                            }
+                            else{
+                                assertEq(variables.testUint256[k], uint256(variables.secondWeight.weight) - (uint256(-variables.secondWeight.multiplier) * uint256(expectedDelay)));
+                            }
                         }
                         else{
-                            assertEq(variables.testUint256[k], 0.125e18 + (0.025e18 * expectedDelay));
+                            if(defaultMultiplier > 0){
+                                assertEq(variables.testUint256[k], uint256(defaultWeight) + (uint256(defaultMultiplier) * expectedDelay));
+                            }
+                            else{
+                                assertEq(variables.testUint256[k], uint256(defaultWeight) - (uint256(-defaultMultiplier) * uint256(expectedDelay)));
+                            }
                         }
                     }
                 }
@@ -201,13 +240,13 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         }
     }
 
-
-    function _testGetDynamicData(uint delay) internal {
+    function _testGetDynamicData(uint delay, int256 multiplier) internal {
         uint40 timestamp = uint40(block.timestamp);
         VariationTestVariables memory variables;
         variables.firstWeight = testParam(0, 0.1e18, 0.001e18);
         variables.secondWeight = testParam(0, 0.15e18, 0.001e18);
-        variables.params = _createPoolParams();
+        variables.params = _createPoolParams(0.125e18, delay);
+        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
         uint expectedDelay = delay;
         if(delay > 5){
             expectedDelay = 5;
@@ -216,9 +255,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
             for(uint j = 0; j < 8; j++){
                 if(i != j){
                     vm.warp(timestamp);
-                    _setupVariables(variables, i, j, delay);
-                    
-                    address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+                    _setupVariables(variables, i, j, delay, multiplier);
 
                     vm.prank(address(updateWeightRunner));
                     
@@ -245,7 +282,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                         }
                         else{
                             assertEq(variables.dynamicData.weightsAtLastUpdateInterval[k], 0.125e18);
-                            assertEq(variables.dynamicData.weightBlockMultipliers[k], 0.025e18);
+                            assertEq(variables.dynamicData.weightBlockMultipliers[k], multiplier);
                         }
                     }
 
@@ -261,7 +298,8 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         VariationTestVariables memory variables;
         variables.firstWeight = testParam(0, 0.1e18, 0.001e18);
         variables.secondWeight = testParam(0, 0.15e18, 0.001e18);
-        variables.params = _createPoolParams();
+        variables.params = _createPoolParams(0.125e18, delay);
+        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
         uint expectedDelay = delay;
         if(delay > 5){
             expectedDelay = 5;
@@ -270,10 +308,8 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
             for(uint j = 0; j < 8; j++){
                 if(i != j){
                     vm.warp(timestamp);
-                    _setupVariables(variables, i, j, delay);
+                    _setupVariables(variables, i, j, delay, 0.025e18);
                     
-                    address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
-
                     vm.prank(address(updateWeightRunner));
 
                     QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
@@ -304,7 +340,9 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         VariationTestVariables memory variables;
         variables.firstWeight = testParam(0, 0.1e18, 0.001e18);
         variables.secondWeight = testParam(0, 0.15e18, 0.001e18);
-        variables.params = _createPoolParams();
+        variables.params = _createPoolParams(0.125e18, delay);
+        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+
         uint expectedDelay = delay;
         if(delay > 5){
             expectedDelay = 5;
@@ -313,9 +351,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
             for(uint j = 0; j < 8; j++){
                 if(i != j){
                     vm.warp(timestamp);
-                    _setupVariables(variables, i, j, delay);
-
-                    address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+                    _setupVariables(variables, i, j, delay, 0.025e18);
 
                     vm.prank(address(updateWeightRunner));
 
@@ -352,7 +388,8 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         VariationTestVariables memory variables;
         variables.firstWeight = testParam(0, 0.1e18, 0.001e18);
         variables.secondWeight = testParam(0, 0.15e18, 0.001e18);
-        variables.params = _createPoolParams();
+        variables.params = _createPoolParams(0.125e18, delay);
+        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
         uint expectedDelay = delay;
         if(delay > 5){
             expectedDelay = 5;
@@ -361,8 +398,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
             for(uint j = 0; j < 8; j++){
                 if(i != j){
                     vm.warp(timestamp);
-                    _setupVariables(variables, i, j, delay);
-                    address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+                    _setupVariables(variables, i, j, delay, 0.025e18);
 
                     vm.prank(address(updateWeightRunner));
 
@@ -395,11 +431,11 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         }
     }
 
-    function _setupVariables(VariationTestVariables memory variables, uint i, uint j, uint delay) internal returns(VariationTestVariables memory) {
+    function _setupVariables(VariationTestVariables memory variables, uint i, uint j, uint delay, int256 defaultMultiplier) internal pure {
         variables.firstWeight.index = i;
         variables.secondWeight.index = j;                    
         variables.params.salt = keccak256(abi.encodePacked(delay, "i", i,"_","j_", j));
-        variables.newWeights = _getDefaultWeightAndMultiplier();
+        variables.newWeights = _getDefaultWeightAndMultiplier(defaultMultiplier);
         
         variables.newWeights[variables.firstWeight.index] = variables.firstWeight.weight;
         variables.newWeights[variables.secondWeight.index] = variables.secondWeight.weight;
@@ -424,7 +460,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         balances[7] = 5000e18;
     }
 
-    function _getDefaultWeightAndMultiplier() internal pure returns (int256[] memory weights) {
+    function _getDefaultWeightAndMultiplier(int256 multipliers) internal pure returns (int256[] memory weights) {
         weights = new int256[](16);
         weights[0] = 0.125e18;
         weights[1] = 0.125e18;
@@ -434,17 +470,17 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         weights[5] = 0.125e18;
         weights[6] = 0.125e18;
         weights[7] = 0.125e18;
-        weights[8] = 0.025e18;
-        weights[9] = 0.025e18;
-        weights[10] = 0.025e18;
-        weights[11] = 0.025e18;
-        weights[12] = 0.025e18;
-        weights[13] = 0.025e18;
-        weights[14] = 0.025e18;
-        weights[15] = 0.025e18;
+        weights[8] = multipliers;
+        weights[9] = multipliers;
+        weights[10] = multipliers;
+        weights[11] = multipliers;
+        weights[12] = multipliers;
+        weights[13] = multipliers;
+        weights[14] = multipliers;
+        weights[15] = multipliers;
     }
 
-    function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
+    function _createPoolParams(int256 weight, uint delay) internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
         PoolRoleAccounts memory roleAccounts;
         IERC20[] memory tokens = [
             address(dai),
@@ -459,34 +495,34 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         MockMomentumRule momentumRule = new MockMomentumRule(owner);
 
         uint32[] memory weights = new uint32[](8);
-        weights[0] = uint32(uint256(0.125e18));
-        weights[1] = uint32(uint256(0.125e18));
-        weights[2] = uint32(uint256(0.125e18));
-        weights[3] = uint32(uint256(0.125e18));
-        weights[4] = uint32(uint256(0.125e18));
-        weights[5] = uint32(uint256(0.125e18));
-        weights[6] = uint32(uint256(0.125e18));
-        weights[7] = uint32(uint256(0.125e18));
+        weights[0] = uint32(uint256(weight));
+        weights[1] = uint32(uint256(weight));
+        weights[2] = uint32(uint256(weight));
+        weights[3] = uint32(uint256(weight));
+        weights[4] = uint32(uint256(weight));
+        weights[5] = uint32(uint256(weight));
+        weights[6] = uint32(uint256(weight));
+        weights[7] = uint32(uint256(weight));
 
         int256[] memory initialWeights = new int256[](8);
-        initialWeights[0] = 0.125e18;
-        initialWeights[1] = 0.125e18;
-        initialWeights[2] = 0.125e18;
-        initialWeights[3] = 0.125e18;
-        initialWeights[4] = 0.125e18;
-        initialWeights[5] = 0.125e18;
-        initialWeights[6] = 0.125e18;
-        initialWeights[7] = 0.125e18;
+        initialWeights[0] = weight;
+        initialWeights[1] = weight;
+        initialWeights[2] = weight;
+        initialWeights[3] = weight;
+        initialWeights[4] = weight;
+        initialWeights[5] = weight;
+        initialWeights[6] = weight;
+        initialWeights[7] = weight;
 
         uint256[] memory initialWeightsUint = new uint256[](8);
-        initialWeightsUint[0] = 0.125e18;
-        initialWeightsUint[1] = 0.125e18;
-        initialWeightsUint[2] = 0.125e18;
-        initialWeightsUint[3] = 0.125e18;
-        initialWeightsUint[4] = 0.125e18;
-        initialWeightsUint[5] = 0.125e18;
-        initialWeightsUint[6] = 0.125e18;
-        initialWeightsUint[7] = 0.125e18;
+        initialWeightsUint[0] = uint256(weight);
+        initialWeightsUint[1] = uint256(weight);
+        initialWeightsUint[2] = uint256(weight);
+        initialWeightsUint[3] = uint256(weight);
+        initialWeightsUint[4] = uint256(weight);
+        initialWeightsUint[5] = uint256(weight);
+        initialWeightsUint[6] = uint256(weight);
+        initialWeightsUint[7] = uint256(weight);
 
         uint64[] memory lambdas = new uint64[](1);
         lambdas[0] = 0.2e18;
@@ -499,7 +535,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         oracles[0] = new address[](1);
         oracles[0][0] = address(chainlinkOracle);
 
-        retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
+        return QuantAMMWeightedPoolFactory.NewPoolParams(
             "Pool With Donation",
             "PwD",
             vault.buildTokenConfig(tokens),
@@ -509,7 +545,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
             address(0),
             true,
             false, // Do not disable unbalanced add/remove liquidity
-            ZERO_BYTES32,
+            keccak256(abi.encodePacked(delay)),
             initialWeights,
             IQuantAMMWeightedPool.PoolSettings(
                 new IERC20[](8),

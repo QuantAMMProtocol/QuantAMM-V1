@@ -440,7 +440,7 @@ contract QuantAMMWeightedPool is
             } else {
                 return normalizedWeights;
             }
-            if (totalTokens > 3) {               
+            if (totalTokens > 3) {           
                 normalizedWeights[3] = calculateBlockNormalisedWeight(
                     firstFourWeights[3],
                     firstFourWeights[tokenIndex + 3],
@@ -512,7 +512,7 @@ contract QuantAMMWeightedPool is
         if (multiplier > 0) {
             return uint256(weight) + FixedPoint.mulDown(uint256(multiplierScaled18), timeSinceLastUpdate);
         } else {
-            return uint256(weight) - FixedPoint.mulUp(uint256(multiplierScaled18), timeSinceLastUpdate);
+            return uint256(weight) - FixedPoint.mulUp(uint256(-multiplierScaled18), timeSinceLastUpdate);
         }
     }
 
@@ -553,10 +553,11 @@ contract QuantAMMWeightedPool is
         int256[] memory firstFourWeights = quantAMMUnpack32(_normalizedFirstFourWeights);
         int256[] memory secondFourWeights = quantAMMUnpack32(_normalizedSecondFourWeights);
 
+        uint firstTokenOffset = tokenCount < 4 ? tokenCount : 4;
         for (uint i; i < tokenCount; i++) {
             if (i < 4) {
                 data.weightsAtLastUpdateInterval[i] = firstFourWeights[i];
-                data.weightBlockMultipliers[i] = firstFourWeights[i + 4];
+                data.weightBlockMultipliers[i] = firstFourWeights[i + firstTokenOffset];
             } else {
                 data.weightsAtLastUpdateInterval[i] = secondFourWeights[i - 4];
                 data.weightBlockMultipliers[i] = secondFourWeights[i];
@@ -704,12 +705,14 @@ contract QuantAMMWeightedPool is
                 i++;
             }
         }
+
         splitWeights[1] = new int256[](8);
+        
         uint256 moreThan4Tokens = tokenLength - 4;
         for (uint i = 0; i < moreThan4Tokens; ) {
             uint256 i4 = i + 4;
             splitWeights[1][i] = weights[i4];
-            splitWeights[1][i4] = weights[i4 + tokenLength];
+            splitWeights[1][i + moreThan4Tokens] = weights[i4 + tokenLength];
 
             unchecked {
                 i++;

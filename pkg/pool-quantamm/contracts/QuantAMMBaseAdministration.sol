@@ -134,4 +134,33 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
         updateWeightRunner = _newUpdateWeightRunner;
         emit UpdateWeightRunnerUpdated(_poolAddress, _newUpdateWeightRunner, msg.sender);
     }
+
+    /// @notice add an oracle to the update weight runner
+    /// @param _oracle the address of the oracle to add
+    function addOracle(address _oracle) public onlyExecutor {
+        UpdateWeightRunner(updateWeightRunner).addOracle(OracleWrapper(_oracle));
+        //event emitted in the update weight runner
+    }
+
+    /// @notice remove an oracle from the update weight runner
+    /// @param _oracle the address of the oracle to remove
+    function removeOracle(address _oracle) public onlyExecutor {
+        UpdateWeightRunner(updateWeightRunner).removeOracle(OracleWrapper(_oracle));
+        //event emitted in the update weight runner
+    }
+
+    /// @notice set approved actions for a specific pool in the update weight runner
+    /// @param _poolAddress the address of the pool to set the approved actions for
+    /// @param _actions the actions to approve
+    function setApprovedActionsForPool(address _poolAddress, uint256 _actions) public onlyExecutor {
+        UpdateWeightRunner(updateWeightRunner).setApprovedActionsForPool(_poolAddress, _actions);
+        //event emitted in the update weight runner
+    }
+
+    /// @notice set the ETH/USD oracle in the update weight runner
+    /// @param _ethUsdOracle the address of the ETH/USD oracle to set
+    function setETHUSDOracle(address _ethUsdOracle) public onlyExecutor {
+        UpdateWeightRunner(updateWeightRunner).setETHUSDOracle(_ethUsdOracle);
+        //event emitted in the update weight runner
+    }
 }

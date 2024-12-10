@@ -12,7 +12,7 @@ contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
         name = "MinimumVariance";
 
         parameterDescriptions = new string[](1);
-        parameterDescriptions[0] = "Mixing Variance: TODO";
+        parameterDescriptions[0] = "Mixing Lambda (Λ): Mixing Lambda controls how the weight smoothing is done.";
     }
 
     using PRBMathSD59x18 for int256;

@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
-import "./QuantAMMBaseAdministration.sol";
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "./rules/UpdateRule.sol";
 

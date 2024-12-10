@@ -45,14 +45,14 @@ to patch any potential issue with the updateweight runner itself.
 */
 /// @title QuantAMM base administration contract for low frequency, high impact admin calls to the base
 /// @notice Responsible for considerable critical setting management. Separated from the base contract due to contract size limits.
-contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage, Ownable2Step {
+contract QuantAMMBaseAdministration is DaoOperations, Ownable2Step {
     event UpdateWeightRunnerUpdated(address indexed pool, address indexed newUpdateWeightRunner, address indexed caller);
-    event UpdateWeightRunnerAddressUpdated(address indexed oldAddress, address indexed newAddress);
+    
 
     /// @notice Address of the contract that will be allowed to update weights
     address public updateWeightRunner;
 
-    TimelockController private timelock;
+    TimelockController public timelock;
     
     constructor(
         address _daoRunner,
@@ -74,15 +74,14 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
         }
     }
 
-    // Modifier to check for EXECUTOR_ROLE using `timelock`
-    modifier onlyExecutor() {
-        require(timelock.hasRole(timelock.EXECUTOR_ROLE(), msg.sender), "Not an executor");
+   modifier onlyTimelock() {
+    require(msg.sender == address(timelock), "Caller is not the timelock");
         _;
     }
 
     /// @notice one time only call during deployment to set the update weight runner address
     /// @param _updateWeightRunner the address of the update weight runner
-    function setUpdateWeightRunnerAddress(address _updateWeightRunner) public onlyExecutor() {
+    function setUpdateWeightRunnerAddress(address _updateWeightRunner) public onlyTimelock() {
         require(updateWeightRunner == address(0), "Update weight runner already set");
         require(_updateWeightRunner != address(0), "address cannot be default");
         updateWeightRunner = _updateWeightRunner;
@@ -97,7 +96,7 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
         int256[] calldata _weights,
         address _poolAddress,
         uint40 _lastInterpolationTimePossible
-    ) public onlyExecutor() {
+    ) public onlyTimelock() {
         UpdateWeightRunner(updateWeightRunner).setWeightsManually(
             _weights,
             _poolAddress,
@@ -116,7 +115,7 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
         int256[] calldata _intermediateValues,
         address _poolAddress,
         uint numberOfAssets
-    ) public onlyExecutor() {
+    ) public onlyTimelock() {
         UpdateWeightRunner(updateWeightRunner).setIntermediateValuesManually(
             _poolAddress,
             _movingAverages,
@@ -129,7 +128,7 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
     /// @notice set the updateweight runner manually as a break glass function
     /// @param _poolAddress the address of the pool to set the update weight runner for
     /// @param _newUpdateWeightRunner the address of the new update weight runner
-    function setPoolUpdateWeightRunnerManually(address _poolAddress, address _newUpdateWeightRunner) public onlyExecutor(){
+    function setPoolUpdateWeightRunnerManually(address _poolAddress, address _newUpdateWeightRunner) public onlyTimelock(){
         IQuantAMMWeightedPool(_poolAddress).setUpdateWeightRunnerAddress(_newUpdateWeightRunner);
         updateWeightRunner = _newUpdateWeightRunner;
         emit UpdateWeightRunnerUpdated(_poolAddress, _newUpdateWeightRunner, msg.sender);
@@ -137,14 +136,14 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
 
     /// @notice add an oracle to the update weight runner
     /// @param _oracle the address of the oracle to add
-    function addOracle(address _oracle) public onlyExecutor {
+    function addOracle(address _oracle) public onlyTimelock {
         UpdateWeightRunner(updateWeightRunner).addOracle(OracleWrapper(_oracle));
         //event emitted in the update weight runner
     }
 
     /// @notice remove an oracle from the update weight runner
     /// @param _oracle the address of the oracle to remove
-    function removeOracle(address _oracle) public onlyExecutor {
+    function removeOracle(address _oracle) public onlyTimelock {
         UpdateWeightRunner(updateWeightRunner).removeOracle(OracleWrapper(_oracle));
         //event emitted in the update weight runner
     }
@@ -152,14 +151,14 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
     /// @notice set approved actions for a specific pool in the update weight runner
     /// @param _poolAddress the address of the pool to set the approved actions for
     /// @param _actions the actions to approve
-    function setApprovedActionsForPool(address _poolAddress, uint256 _actions) public onlyExecutor {
+    function setApprovedActionsForPool(address _poolAddress, uint256 _actions) public onlyTimelock {
         UpdateWeightRunner(updateWeightRunner).setApprovedActionsForPool(_poolAddress, _actions);
         //event emitted in the update weight runner
     }
 
     /// @notice set the ETH/USD oracle in the update weight runner
     /// @param _ethUsdOracle the address of the ETH/USD oracle to set
-    function setETHUSDOracle(address _ethUsdOracle) public onlyExecutor {
+    function setETHUSDOracle(address _ethUsdOracle) public onlyTimelock {
         UpdateWeightRunner(updateWeightRunner).setETHUSDOracle(_ethUsdOracle);
         //event emitted in the update weight runner
     }

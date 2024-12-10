@@ -16,6 +16,7 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         parameterDescriptions = new string[](3);
         parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change TODO";
         parameterDescriptions[1] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
+        parameterDescriptions[2] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
     }
 
     using PRBMathSD59x18 for int256;

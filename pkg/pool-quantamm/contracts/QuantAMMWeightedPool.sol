@@ -510,6 +510,7 @@ contract QuantAMMWeightedPool is
         if (multiplier > 0) {
             return uint256(weight) + FixedPoint.mulDown(uint256(multiplierScaled18), timeSinceLastUpdate);
         } else {
+            //CYFRIN H02
             return uint256(weight) - FixedPoint.mulUp(uint256(-multiplierScaled18), timeSinceLastUpdate);
         }
     }

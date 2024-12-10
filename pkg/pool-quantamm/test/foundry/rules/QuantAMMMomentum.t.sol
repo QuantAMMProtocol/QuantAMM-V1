@@ -174,7 +174,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         prevWeights[0] = 0.5e18;
         prevWeights[1] = 0.5e18;
 
-        int256[] memory data = new int256[](2);        
+        int256[] memory data = new int256[](2);
         data[0] = PRBMathSD59x18.fromInt(3);
         data[1] = PRBMathSD59x18.fromInt(4);
 

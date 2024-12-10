@@ -127,7 +127,6 @@ contract QuantAMMWeightedPool is
     /// @dev Indicates that the maximum allowed trade size has been exceeded.
     error maxTradeSizeRatioExceeded();
 
-
     /**
      * @notice `getRate` from `IRateProvider` was called on a Weighted Pool.
      * @dev It is not safe to nest Weighted Pools as WITH_RATE tokens in other pools, where they function as their own
@@ -139,7 +138,7 @@ contract QuantAMMWeightedPool is
      * stable and have at most 1 wei of rounding error (e.g., oracle-based).
      */
     error WeightedPoolBptRateUnsupported();
-    
+
     ///@dev The parameters for the rule, validated in each rule separately during set rule
     int256[][] public ruleParameters;
 
@@ -240,8 +239,7 @@ contract QuantAMMWeightedPool is
         uint256 timeSinceLastUpdate = uint256(multiplierTime - variables.lastUpdateIntervalTime);
 
         // if both tokens are within the first storage elem
-        if ((request.indexIn < 4 && request.indexOut < 4)
-            || (request.indexIn >= 4 && request.indexOut >= 4)) {
+        if ((request.indexIn < 4 && request.indexOut < 4) || (request.indexIn >= 4 && request.indexOut >= 4)) {
             QuantAMMNormalisedTokenPair memory tokenWeights = _getNormalisedWeightPair(
                 request.indexIn,
                 request.indexOut,
@@ -440,7 +438,7 @@ contract QuantAMMWeightedPool is
             } else {
                 return normalizedWeights;
             }
-            if (totalTokens > 3) {           
+            if (totalTokens > 3) {
                 normalizedWeights[3] = calculateBlockNormalisedWeight(
                     firstFourWeights[3],
                     firstFourWeights[tokenIndex + 3],
@@ -451,7 +449,7 @@ contract QuantAMMWeightedPool is
             }
 
             //avoid unneccessary SLOAD
-            if(totalTokens == 4){
+            if (totalTokens == 4) {
                 return normalizedWeights;
             }
 
@@ -570,7 +568,11 @@ contract QuantAMMWeightedPool is
     }
 
     /// @inheritdoc IQuantAMMWeightedPool
-    function getQuantAMMWeightedPoolImmutableData() external view returns (QuantAMMWeightedPoolImmutableData memory data) {
+    function getQuantAMMWeightedPoolImmutableData()
+        external
+        view
+        returns (QuantAMMWeightedPoolImmutableData memory data)
+    {
         data.tokens = _vault.getPoolTokens(address(this));
         data.oracleStalenessThreshold = oracleStalenessThreshold;
         data.poolRegistry = poolRegistry;
@@ -707,7 +709,7 @@ contract QuantAMMWeightedPool is
         }
 
         splitWeights[1] = new int256[](8);
-        
+
         uint256 moreThan4Tokens = tokenLength - 4;
         for (uint i = 0; i < moreThan4Tokens; ) {
             uint256 i4 = i + 4;
@@ -803,7 +805,6 @@ contract QuantAMMWeightedPool is
         require(msg.sender == quantammAdmin, "ONLYADMIN");
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
     }
-
 
     function getRate() public pure override returns (uint256) {
         revert WeightedPoolBptRateUnsupported();

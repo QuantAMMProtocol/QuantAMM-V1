@@ -118,6 +118,11 @@ interface IQuantAMMWeightedPool {
         uint40 _lastInterpolationTimePossible
     ) external;
     
+    /// @notice get pool details such as strategy name and description
+    /// @param category the category of detail
+    /// @param name the name of the detail to be retrieved
+    function getPoolDetail(string memory category, string memory name) external view returns (string memory, string memory);
+
     /// @notice the acceptable number of blocks behind the current that an oracle value can be
     function getOracleStalenessThreshold() external view returns (uint);
 

@@ -171,6 +171,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         );
         vm.stopPrank();
 
+        mockPool.setPoolRegistry(8);
+
         vm.startPrank(addr2);
         updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
         vm.stopPrank();
@@ -191,6 +193,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         // Set initial weights
         mockPool.setInitialWeights(initialWeights);
+        mockPool.setPoolRegistry(8);
 
         int216 fixedValue = 1000;
         chainlinkOracle = deployOracle(fixedValue, 3601);
@@ -345,6 +348,9 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         // Set initial weights
         mockPool.setInitialWeights(initialWeights);
+
+        //set pool registry
+        mockPool.setPoolRegistry(8);
         
         int256[] memory newCalculatedWeights = new int256[](2);
         newCalculatedWeights[0] = 0.7e18;
@@ -438,6 +444,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         // Set initial weights
         mockPool.setInitialWeights(initialWeights);
+        //admin perms
+        mockPool.setPoolRegistry(8);
         
         int256[] memory newCalculatedWeights = new int256[](2);
         newCalculatedWeights[0] = 0.9e18;
@@ -532,6 +540,9 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         // Set initial weights
         mockPool.setInitialWeights(initialWeights);
         
+        //set pool registry
+        mockPool.setPoolRegistry(8);
+
         int256[] memory newCalculatedWeights = new int256[](2);
         newCalculatedWeights[0] = 0.9e18;
         newCalculatedWeights[1] = 0.1e18;
@@ -1300,7 +1311,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
     function testInitialisePoolLastRunTimeOwnerPermedSuccess() public {
         uint40 blockTime = uint40(block.timestamp);
-int256[] memory weights = new int256[](4);
+        int256[] memory weights = new int256[](4);
         weights[0] = 0.5e18;
         weights[1] = 0.5e18;
         weights[2] = 0;

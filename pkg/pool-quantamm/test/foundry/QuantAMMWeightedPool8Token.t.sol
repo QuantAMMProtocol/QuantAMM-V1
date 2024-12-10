@@ -75,14 +75,14 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
-        assert(weights[0] == 0.125e18);
-        assert(weights[1] == 0.125e18);
-        assert(weights[2] == 0.125e18);
-        assert(weights[3] == 0.125e18);
-        assert(weights[4] == 0.125e18);
-        assert(weights[5] == 0.125e18);
-        assert(weights[6] == 0.1e18);
-        assert(weights[7] == 0.15e18);
+        assertEq(weights[0], 0.125e18);
+        assertEq(weights[1], 0.125e18);
+        assertEq(weights[2], 0.125e18);
+        assertEq(weights[3], 0.125e18);
+        assertEq(weights[4], 0.125e18);
+        assertEq(weights[5], 0.125e18);
+        assertEq(weights[6], 0.1e18);
+        assertEq(weights[7], 0.15e18);
     }
 
     function testSetWeightInitial() public {
@@ -103,14 +103,14 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
-        assert(weights[0] == 0.1e18);
-        assert(weights[1] == 0.15e18);
-        assert(weights[2] == 0.125e18);
-        assert(weights[3] == 0.125e18);
-        assert(weights[4] == 0.125e18);
-        assert(weights[5] == 0.125e18);
-        assert(weights[6] == 0.125e18);
-        assert(weights[7] == 0.125e18);
+        assertEq(weights[0], 0.1e18);
+        assertEq(weights[1], 0.15e18);
+        assertEq(weights[2], 0.125e18);
+        assertEq(weights[3], 0.125e18);
+        assertEq(weights[4], 0.125e18);
+        assertEq(weights[5], 0.125e18);
+        assertEq(weights[6], 0.125e18);
+        assertEq(weights[7], 0.125e18);
     }
 
     function testSetWeightNBlocksAfter() public {
@@ -137,8 +137,8 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
-        assert(weights[0] == 0.1e18 + 0.002e18);
-        assert(weights[1] == 0.15e18 + 0.002e18);
+        assertEq(weights[0], 0.1e18 + 0.002e18);
+        assertEq(weights[1], 0.15e18 + 0.002e18);
     }
 
     function testSetWeightAfterLimit() public {
@@ -164,8 +164,8 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
-        assert(weights[0] == 0.1e18 + 0.005e18);
-        assert(weights[1] == 0.15e18 + 0.005e18);
+        assertEq(weights[0], 0.1e18 + 0.005e18);
+        assertEq(weights[1], 0.15e18 + 0.005e18);
     }
 
     struct testParam {
@@ -210,7 +210,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
             uint256(1.2e18)
         );
 
-        assert(newBalance == expected);
+        assertEq(newBalance, expected);
     }
 
     function testComputeBalanceInitialToken0Token1() public {
@@ -309,7 +309,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
 
-        assert(newBalance == expected);
+        assertEq(newBalance, expected);
     }
 
     function testGetNormalizedWeightOnSwapOutGivenInInitialToken0Token1() public {
@@ -408,7 +408,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
 
-        assert(newBalance == expected);
+        assertEq(newBalance, expected);
     }
 
     function testGetNormalizedWeightOnSwapInGivenOutInitialToken0Token1() public {

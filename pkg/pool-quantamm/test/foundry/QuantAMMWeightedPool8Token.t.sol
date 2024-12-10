@@ -124,8 +124,8 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         newWeights[0] = 0.1e18;
         newWeights[1] = 0.15e18;
 
-        newWeights[8] = 0.001111111e18;
-        newWeights[9] = 0.001111111e18;
+        newWeights[8] = 0.001e18;
+        newWeights[9] = 0.001e18;
 
         QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
             newWeights,
@@ -137,8 +137,8 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
-        assert(weights[0] == 0.1e18 + 0.002e18);
-        assert(weights[1] == 0.15e18 + 0.002e18);
+        assertEq(weights[0], 0.1e18 + 0.002e18);
+        assertEq(weights[1],0.15e18 + 0.002e18);
     }
 
     function testSetWeightAfterLimit() public {

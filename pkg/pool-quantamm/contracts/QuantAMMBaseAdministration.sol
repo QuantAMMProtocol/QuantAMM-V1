@@ -93,15 +93,18 @@ contract QuantAMMBaseAdministration is DaoOperations, ScalarQuantAMMBaseStorage,
     /// @param _weights the weights to set that sum to 1 and interpolation values
     /// @param _poolAddress the address of the pool to set the weights for
     /// @param _lastInterpolationTimePossible the last time that the weights can be updated given the block multiplier before one weight hits the guardrail
+    /// @param _numberOfAssets the number of assets in the pool
     function setWeightsManually(
         int256[] calldata _weights,
         address _poolAddress,
-        uint40 _lastInterpolationTimePossible
+        uint40 _lastInterpolationTimePossible,
+        uint _numberOfAssets
     ) public onlyExecutor() {
         UpdateWeightRunner(updateWeightRunner).setWeightsManually(
             _weights,
             _poolAddress,
-            _lastInterpolationTimePossible
+            _lastInterpolationTimePossible,
+            _numberOfAssets
         );
         //event emitted in the update weight runner
     }

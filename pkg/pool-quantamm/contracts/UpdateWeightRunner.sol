@@ -105,9 +105,6 @@ contract UpdateWeightRunner is Ownable2Step {
     /// @notice Mask to check if a pool is allowed to get data
     uint256 private constant MASK_POOL_GET_DATA = 2;
 
-    /// @notice Mask to check if a potential quantamm dao can update weights
-    uint256 private constant MASK_POOL_DAO_WEIGHT_UPDATES = 4;
-
     /// @notice Mask to check if a pool owner can update weights
     uint256 private constant MASK_POOL_OWNER_UPDATES = 8;
 
@@ -291,11 +288,8 @@ contract UpdateWeightRunner is Ownable2Step {
     function InitialisePoolLastRunTime(address _poolAddress, uint40 _time) external {
         uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
 
-        //current breakglass settings allow for dao or pool creator trigger. This is subject to review
-        if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
-            address daoRunner = QuantAMMBaseAdministration(quantammAdmin).daoRunner();
-            require(msg.sender == daoRunner, "ONLYDAO");
-        } else if (poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0) {
+        //current breakglass settings allow pool creator trigger. This is subject to review
+        if (poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0) {
             require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
         }
         poolRuleSettings[_poolAddress].timingSettings.lastPoolUpdateRun = _time;
@@ -519,7 +513,7 @@ contract UpdateWeightRunner is Ownable2Step {
         _calculateMultiplerAndSetWeights(params);
     }
 
-    /// @notice Breakglass function to allow the DAO or the pool manager to set the quantammAdmins weights manually
+    /// @notice Breakglass function to allow the admin or the pool manager to set the quantammAdmins weights manually
     /// @param _weights the new weights
     /// @param _poolAddress the target pool
     /// @param _lastInterpolationTimePossible the last time that the interpolation will work
@@ -529,10 +523,7 @@ contract UpdateWeightRunner is Ownable2Step {
         uint40 _lastInterpolationTimePossible
     ) external {
         uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
-        if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
-            address daoRunner = QuantAMMBaseAdministration(quantammAdmin).daoRunner();
-            require(msg.sender == daoRunner, "ONLYDAO");
-        } else if(poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0){
+        if(poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0){
             require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
         }else if(poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0){
             require(msg.sender == quantammAdmin, "ONLYADMIN");
@@ -546,7 +537,7 @@ contract UpdateWeightRunner is Ownable2Step {
         emit SetWeightManual(msg.sender, _poolAddress, _weights, _lastInterpolationTimePossible);
     }
 
-    /// @notice Breakglass function to allow the DAO or the pool manager to set the intermediate values of the rule manually
+    /// @notice Breakglass function to allow the admin or the pool manager to set the intermediate values of the rule manually
     /// @param _poolAddress the target pool
     /// @param _newMovingAverages manual new moving averages
     /// @param _newParameters manual new parameters
@@ -560,10 +551,7 @@ contract UpdateWeightRunner is Ownable2Step {
         uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
 
         //Who can trigger these very powerful breakglass features is under review
-        if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
-            address daoRunner = QuantAMMBaseAdministration(quantammAdmin).daoRunner();
-            require(msg.sender == daoRunner, "ONLYDAO");
-        } else if(poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0){
+        if(poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0){
             require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
         } else if(poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0){
             require(msg.sender == quantammAdmin, "ONLYADMIN");

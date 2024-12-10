@@ -1258,4 +1258,103 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.expectRevert("No permission to set intermediate values");
         updateWeightRunner.setIntermediateValuesManually(address(mockPool), newMovingAverages, newParameters, 4);
     }
+
+    function testInitialisePoolLastRunTimeOwnerPermedNonOwnerFails() public {
+        uint40 blockTime = uint40(block.timestamp);
+        mockPool.setPoolRegistry(8);
+        vm.startPrank(addr1);
+        vm.expectRevert("ONLYMANAGER");
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
+    }
+
+    function testInitialisePoolLastRunTimeAdminPermedNonOwnerFails() public {
+        uint40 blockTime = uint40(block.timestamp);
+        mockPool.setPoolRegistry(16);
+        vm.startPrank(addr1);
+        vm.expectRevert("ONLYADMIN");
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
+    }
+
+    function testInitialisePoolLastRunTimeInitiallyNonOwnerFails() public {
+        uint40 blockTime = uint40(block.timestamp);
+        vm.startPrank(addr1);
+        vm.expectRevert("No permission to set last run time");
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
+    }
+
+    function testInitialisePoolLastRunTimeOwnerPermFailsAdmin() public {
+        uint40 blockTime = uint40(block.timestamp);
+        mockPool.setPoolRegistry(8);
+        vm.startPrank(owner);
+        vm.expectRevert("ONLYMANAGER");
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
+    }
+
+    function testInitialisePoolLastRunTimeAdminPermFailsOwner() public {
+        uint40 blockTime = uint40(block.timestamp);
+        mockPool.setPoolRegistry(16);
+        vm.startPrank(addr2);
+        vm.expectRevert("ONLYADMIN");
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
+    }
+
+    function testInitialisePoolLastRunTimeOwnerPermedSuccess() public {
+        uint40 blockTime = uint40(block.timestamp);
+int256[] memory weights = new int256[](4);
+        weights[0] = 0.5e18;
+        weights[1] = 0.5e18;
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(8);
+        
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = deployOracle(fixedValue, delay);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(address(mockPool));
+        address[][] memory oracles = new address[][](1);
+        oracles[0] = new address[](1);
+        oracles[0][0] = address(chainlinkOracle);
+
+        uint64[] memory lambda = new uint64[](1);
+        lambda[0] = 0.0000000005e18;
+
+        mockPool.setPoolRegistry(8);
+        vm.startPrank(address(mockPool));
+        updateWeightRunner.setRuleForPool(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: mockRule,
+                oracles: oracles,
+                updateInterval: 1,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
+        vm.stopPrank();
+        assertEq(updateWeightRunner.getPoolRuleSettings(address(mockPool)).timingSettings.lastPoolUpdateRun, blockTime);
+    }
+
+    function testInitialisePoolLastRunTimeAdminPermedSuccess() public {
+        uint40 blockTime = uint40(block.timestamp);
+
+        mockPool.setPoolRegistry(16);
+        
+        vm.startPrank(owner);
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
+        vm.stopPrank();
+        assertEq(updateWeightRunner.getPoolRuleSettings(address(mockPool)).timingSettings.lastPoolUpdateRun, blockTime);
+    }
 }

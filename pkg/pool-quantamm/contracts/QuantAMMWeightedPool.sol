@@ -454,11 +454,12 @@ contract QuantAMMWeightedPool is
             }
 
             int256[] memory secondFourWeights = quantAMMUnpack32(_normalizedSecondFourWeights);
+            uint256 moreThan4Tokens = totalTokens - 4;
 
             if (totalTokens > 4) {
                 normalizedWeights[4] = calculateBlockNormalisedWeight(
                     secondFourWeights[0],
-                    secondFourWeights[tokenIndex],
+                    secondFourWeights[moreThan4Tokens],
                     timeSinceLastUpdate
                 );
             } else {
@@ -467,7 +468,7 @@ contract QuantAMMWeightedPool is
             if (totalTokens > 5) {
                 normalizedWeights[5] = calculateBlockNormalisedWeight(
                     secondFourWeights[1],
-                    secondFourWeights[tokenIndex + 1],
+                    secondFourWeights[moreThan4Tokens + 1],
                     timeSinceLastUpdate
                 );
             } else {
@@ -476,7 +477,7 @@ contract QuantAMMWeightedPool is
             if (totalTokens > 6) {
                 normalizedWeights[6] = calculateBlockNormalisedWeight(
                     secondFourWeights[2],
-                    secondFourWeights[tokenIndex + 2],
+                    secondFourWeights[moreThan4Tokens + 2],
                     timeSinceLastUpdate
                 );
             } else {
@@ -485,7 +486,7 @@ contract QuantAMMWeightedPool is
             if (totalTokens > 7) {
                 normalizedWeights[7] = calculateBlockNormalisedWeight(
                     secondFourWeights[3],
-                    secondFourWeights[tokenIndex + 3],
+                    secondFourWeights[moreThan4Tokens + 3],
                     timeSinceLastUpdate
                 );
             } else {

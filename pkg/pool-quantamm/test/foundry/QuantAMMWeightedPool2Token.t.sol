@@ -26,7 +26,7 @@ import { MockChainlinkOracle } from "../../contracts/mock/MockChainlinkOracles.s
 
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 
-contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, BaseVaultTest {
+contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer, BaseVaultTest {
     using CastingHelpers for address[];
     using ArrayHelpers for *;
 
@@ -77,8 +77,8 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
-        assert(weights[0] == 0.6e18);
-        assert(weights[1] == 0.4e18);
+        assertEq(weights[0], 0.6e18);
+        assertEq(weights[1], 0.4e18);
     }
 
     function testGetNormalizedWeightSetWeightInitial() public {
@@ -101,8 +101,8 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
-        assert(weights[0] == 0.6e18);
-        assert(weights[1] == 0.4e18);
+        assertEq(weights[0], 0.6e18);
+        assertEq(weights[1], 0.4e18);
     }
 
     function testSetWeightNBlocksAfter() public {
@@ -127,8 +127,8 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
-        assert(weights[0] == 0.6e18 + 0.002e18);
-        assert(weights[1] == 0.4e18 + 0.002e18);
+        assertEq(weights[0], 0.6e18 + 0.002e18);
+        assertEq(weights[1], 0.4e18 + 0.002e18);
     }
 
     function testSetWeightAfterLimit() public {
@@ -153,8 +153,8 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
-        assert(weights[0] == 0.6e18 + 0.005e18);
-        assert(weights[1] == 0.4e18 + 0.005e18);
+        assertEq(weights[0], 0.6e18 + 0.005e18);
+        assertEq(weights[1], 0.4e18 + 0.005e18);
     }
 
     function testComputeBalanceInitial() public {
@@ -181,7 +181,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
 
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).computeBalance(balances, 0, uint256(1.2e18));
 
-        assert(newBalance == 1355.091881588694578000e18);
+        assertEq(newBalance, 1355.091881588694578000e18);
     }
 
     function testComputeBalanceNBlocksAfter() public {
@@ -210,7 +210,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
 
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).computeBalance(balances, 0, uint256(1.2e18));
 
-        assert(newBalance == 1353.724562681596718000e18);
+        assertEq(newBalance, 1353.724562681596718000e18);
     }
 
     function testComputeBalanceAfterLimit() public {
@@ -239,7 +239,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
 
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).computeBalance(balances, 0, uint256(1.2e18));
 
-        assert(newBalance == 1351.693086891767401000e18);
+        assertEq(newBalance, 1351.693086891767401000e18);
     }
 
     function testOnSwapOutGivenInInitial() public {
@@ -276,7 +276,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
 
-        assert(newBalance == 266.431655917087542000e18);
+        assertEq(newBalance, 266.431655917087542000e18);
     }
 
     function testOnSwapOutGivenInNBlocksAfter() public {
@@ -315,7 +315,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
 
-        assert(newBalance == 266.020595471997916000e18);
+        assertEq(newBalance, 266.020595471997916000e18);
     }
 
     function testOnSwapOutGivenInAfterLimit() public {
@@ -354,7 +354,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
 
-        assert(newBalance == 265.411437865277198000e18);
+        assertEq(newBalance, 265.411437865277198000e18);
     }
 
     function testOnSwapInGivenOutInitial() public {
@@ -391,7 +391,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
 
-        assert(newBalance == 34.786918412177192000e18);
+        assertEq(newBalance, 34.786918412177192000e18);
     }
 
     function testOnSwapInGivenOutNBlocksAfter() public {
@@ -430,7 +430,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
 
-        assert(newBalance == 34.845699295402889000e18);
+        assertEq(newBalance, 34.845699295402889000e18);
     }
 
     function testOnSwapInGivenOutAfterLimit() public {
@@ -469,7 +469,7 @@ contract QuantAMMWeightedPoolTest is QuantAMMWeightedPoolContractsDeployer, Base
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
 
-        assert(newBalance == 34.933148109829107000e18);
+        assertEq(newBalance, 34.933148109829107000e18);
     }
 
     function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {

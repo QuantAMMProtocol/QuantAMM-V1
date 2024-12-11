@@ -84,6 +84,9 @@ contract QuantAMMWeightedPool is
 
     uint256 private immutable _totalTokens;
 
+    ///@dev First elem = category, second elem is name, third variable type, fourth elem detail
+    string[][] private poolDetails;
+
     /// @dev The weights are stored as 32-bit integers, packed into 256-bit integers. 9 d.p. was shown to have roughly same performance
     // packed: [weight1,weight2,weight3,weight4,multiplier1,multiplier2,multiplier3,multiplier4]
     int256 internal _normalizedFirstFourWeights;
@@ -166,8 +169,6 @@ contract QuantAMMWeightedPool is
     ///@dev The assets of the pool. If the pool is a composite pool, contains the LP tokens of those pools
     IERC20[] public assets;
 
-    string[][] public poolDetails;
-
     constructor(
         NewPoolParams memory params,
         IVault vault
@@ -176,6 +177,12 @@ contract QuantAMMWeightedPool is
         updateWeightRunner = UpdateWeightRunner(params.updateWeightRunner);
         quantammAdmin = updateWeightRunner.quantammAdmin();
         poolRegistry = params.poolRegistry;
+
+        require(params.poolDetails.length <= 50, "Limit exceeds array length");
+        for(uint i; i < params.poolDetails.length; i++){
+            require(params.poolDetails[i].length == 4, "detail needs all 4 [category, name, type, detail]");
+        }
+
         poolDetails = params.poolDetails;
     }
 
@@ -205,6 +212,19 @@ contract QuantAMMWeightedPool is
                     invariantRatio
                 );
         }
+    }
+
+    /// @inheritdoc IQuantAMMWeightedPool
+    function getPoolDetail(string memory category, string memory name) external view returns (string memory, string memory) {
+        for(uint i = 0; i < poolDetails.length; i++){
+            string[] memory detail = poolDetails[i];
+            if(keccak256(abi.encodePacked(detail[0])) == keccak256(abi.encodePacked(category)) 
+                && keccak256(abi.encodePacked(detail[1])) == keccak256(abi.encodePacked(name))){
+                return (detail[2], detail[3]);
+            }
+        }
+        
+        return ("error", "detail not found");
     }
 
     /// @inheritdoc IBasePool

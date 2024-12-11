@@ -10,111 +10,164 @@ import "./UpdateRule.sol";
 /// @title MeanReversionChannelUpdateRule contract for QuantAMM mean reversion channel weight updates
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the mean reversion channel strategy
 contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
-    constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
+     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
         name = "MeanReversionChannel";
-
-        parameterDescriptions = new string ;
-        parameterDescriptions[0] = "K: Scaling factor for weight updates";
+        
+        parameterDescriptions = new string[](6);
+        parameterDescriptions[0] = "Kappa: Scaling factor for weight updates";
         parameterDescriptions[1] = "Width: Width parameter for the mean reversion channel";
         parameterDescriptions[2] = "Amplitude: Amplitude of the mean reversion effect";
-        parameterDescriptions[3] = "Exponents: Exponent for the trend following portion";
-        parameterDescriptions[4] = "Inverse scaling factor for the channel portion";
-        parameterDescriptions[5] = "Pre-exp scaling factor applied before exponentiation";
+        parameterDescriptions[3] = "Exponents: Exponents for the trend following portion";
+        parameterDescriptions[4] = "Use raw price: 0 = use moving average, 1 = use raw price";
+        parameterDescriptions[5] = "Lambda: Lambda dictates the estimator weighting and price smoothing";
     }
 
     using PRBMathSD59x18 for int256;
 
-    int256 private constant ONE = 1 * 1e18; // Fixed-point representation of 1
+    int256 private constant ONE = 1e18;
+    int256 private constant PI = 3141592653589793238 * 1e18 / 1e18; // π scaled to 18 decimals
+    int256 private constant INV_SCALING = 5415e14; // 0.5415 in fixed point
+    int256 private constant PRE_EXP_SCALING = 5e17; // 0.5 in fixed point
+    uint16 private constant REQUIRES_PREV_MAVG = 0;
 
-    /// @dev Struct to avoid stack too deep issues
-    /// @notice Struct to store local variables for the mean reversion calculation
-    struct QuantAMMReversionLocals {
-        int256[] kStore;
+    struct QuantAMMMeanReversionLocals {
+        int256[] kappaStore;
         int256[] newWeights;
+        int256[] signals;
         int256 normalizationFactor;
-        uint256 assetCount;
-        int256[] signal;
-        int256 envelope;
-        int256 scaledGradient;
-        int256 channelPortion;
-        int256 trendPortion;
-        uint256 i;
+        uint256 prevWeightLength;
+        bool useRawPrice;
+        uint i;
+        int256 denominator;
+        int256 sumKappa;
+        int256 res;
+        int256 width;
+        int256 amplitude;
+        int256 exponent;
     }
 
-    /// @notice Calculates the new weights using the mean reversion channel strategy
-    /// @param _prevWeights The previous weights retrieved from the vault
-    /// @param _data The latest data from the signal, usually price gradients
-    /// @param _parameters The parameters of the rule
     function _getWeights(
         int256[] calldata _prevWeights,
         int256[] calldata _data,
-        int256[][] calldata _parameters, // [0]=k, [1]=width, [2]=amplitude, [3]=exponents, [4]=inverseScaling, [5]=preExpScaling
+        int256[][] calldata _parameters,
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {
-        QuantAMMReversionLocals memory locals;
+        QuantAMMMeanReversionLocals memory locals;
 
-        locals.kStore = _parameters[0];
-        int256 width = _parameters[1][0];
-        int256 amplitude = _parameters[2][0];
-        int256 exponents = _parameters[3][0];
-        int256 inverseScaling = _parameters[4][0];
-        int256 preExpScaling = _parameters[5][0];
+        locals.kappaStore = _parameters[0];
+        locals.width = _parameters[1][0];
+        locals.amplitude = _parameters[2][0];
+        locals.exponent = _parameters[3][0];
+        
+        locals.useRawPrice = false;
+        if (_parameters.length > 4) {
+            locals.useRawPrice = _parameters[4][0] == ONE;
+        }
 
-        locals.assetCount = _prevWeights.length;
-        locals.newWeights = new int256[](locals.assetCount);
-        locals.signal = new int256[](locals.assetCount);
+        _poolParameters.numberOfAssets = _prevWeights.length;
+        locals.prevWeightLength = _prevWeights.length;
+        
+        // Calculate gradients
+        locals.newWeights = _calculateQuantAMMGradient(_data, _poolParameters);
+        locals.signals = new int256[](locals.prevWeightLength);
 
-        for (locals.i = 0; locals.i < locals.assetCount; ) {
-            // Envelope: exp(-(price_gradient^2) / (2 * width^2))
-            locals.envelope = int256(
-                PRBMathSD59x18.exp(
-                    -(_data[locals.i].mul(_data[locals.i])).div(width.mul(width).mul(2))
-                )
-            );
+        // Calculate signals for each asset
+        for (locals.i = 0; locals.i < locals.prevWeightLength;) {
+            locals.denominator = _poolParameters.movingAverage[locals.i];
+            if (locals.useRawPrice) {
+                locals.denominator = _data[locals.i];
+            }
 
-            // Scaled gradient: π * price_gradient / (3 * width)
-            locals.scaledGradient = _data[locals.i].mul(3141592653589793238).div(width.mul(3)); // π as 3.141592653589793238e18
-
-            // Channel portion: -amplitude * envelope * (scaledGradient - (scaledGradient^3) / 6) / inverseScaling
-            int256 scaledGradientCubed = locals.scaledGradient.mul(locals.scaledGradient).mul(locals.scaledGradient).div(6);
-            locals.channelPortion = amplitude
-                .mul(locals.envelope)
-                .mul(locals.scaledGradient - scaledGradientCubed)
-                .div(inverseScaling);
-
-            // Trend portion: (1 - envelope) * sign(price_gradient) * abs(price_gradient / (2.0 * preExpScaling))^exponents
-            int256 absGradient = _data[locals.i].abs();
-            int256 trendFactor = absGradient.div(preExpScaling.mul(2)).pow(uint256(exponents));
-            locals.trendPortion = (ONE - locals.envelope)
-                .mul(_data[locals.i] > 0 ? ONE : -ONE) // Sign of price gradient
-                .mul(trendFactor);
-
-            // Signal: channelPortion + trendPortion
-            locals.signal[locals.i] = locals.channelPortion + locals.trendPortion;
-
-            // Normalization factor for offset calculation
-            locals.normalizationFactor += locals.kStore[locals.i].mul(locals.signal[locals.i]);
+            int256 priceGradient = ONE.div(locals.denominator).mul(locals.newWeights[locals.i]);
+            
+            // Calculate envelope: exp(-(price_gradient^2)/(2 * width^2))
+            int256 gradientSquared = priceGradient.mul(priceGradient);
+            int256 widthSquared = locals.width.mul(locals.width);
+            int256 envelope = PRBMathSD59x18.exp(-(gradientSquared.div(widthSquared.mul(2 * ONE))));
+            
+            // Calculate scaled price gradient: π * price_gradient / (3 * width)
+            int256 scaledGradient = PI.mul(priceGradient).div(locals.width.mul(3 * ONE));
+            
+            // Channel portion calculation
+            int256 cubicTerm = scaledGradient.mul(scaledGradient).mul(scaledGradient).div(6 * ONE);
+            int256 channelPortion = locals.amplitude.mul(envelope).mul(
+                scaledGradient - cubicTerm
+            ).div(INV_SCALING);
+            channelPortion = -channelPortion; // Negative for mean reversion
+            
+            // Trend portion calculation
+            int256 trendPortion;
+            {
+                int256 sign = priceGradient >= 0 ? ONE : -ONE;
+                int256 scaledAbs = priceGradient.abs().mul(ONE).div(2 * PRE_EXP_SCALING);
+                int256 powered = PRBMathSD59x18.pow(scaledAbs, locals.exponent);
+                trendPortion = (ONE - envelope).mul(sign).mul(powered).div(ONE);
+            }
+            
+            // Combine portions
+            locals.signals[locals.i] = channelPortion + trendPortion;
+            
+            // Calculate normalization factor
+            if (locals.kappaStore.length == 1) {
+                locals.normalizationFactor += locals.signals[locals.i];
+            } else {
+                locals.normalizationFactor += locals.signals[locals.i].mul(locals.kappaStore[locals.i]);
+            }
 
             unchecked {
                 ++locals.i;
             }
         }
 
-        locals.normalizationFactor = locals.normalizationFactor.div(int256(locals.assetCount));
+        newWeightsConverted = new int256[](locals.prevWeightLength);
 
-        newWeightsConverted = new int256[](locals.assetCount);
-        for (locals.i = 0; locals.i < locals.assetCount; ) {
-            // Final weight updates: k * (signal + offset)
-            int256 offset = locals.signal[locals.i] - locals.normalizationFactor;
-            newWeightsConverted[locals.i] = _prevWeights[locals.i] + locals.kStore[locals.i].mul(offset);
+        // Apply kappa and normalize
+        if (locals.kappaStore.length == 1) {
+            locals.normalizationFactor /= int256(locals.prevWeightLength);
+            
+            for (locals.i = 0; locals.i < locals.prevWeightLength;) {
+                int256 res = int256(_prevWeights[locals.i]) +
+                    locals.kappaStore[0].mul(locals.signals[locals.i] - locals.normalizationFactor);
+                newWeightsConverted[locals.i] = res;
+                
+                unchecked {
+                    ++locals.i;
+                }
+            }
+        } else {
+            int256 sumKappa;
+            for (locals.i = 0; locals.i < locals.kappaStore.length;) {
+                sumKappa += locals.kappaStore[locals.i];
+                unchecked {
+                    ++locals.i;
+                }
+            }
 
-            require(newWeightsConverted[locals.i] >= 0, "Invalid weight");
+            locals.normalizationFactor = locals.normalizationFactor.div(sumKappa);
 
-            unchecked {
-                ++locals.i;
+            for (locals.i = 0; locals.i < _prevWeights.length;) {
+                locals.res = int256(_prevWeights[locals.i]) +
+                    locals.kappaStore[locals.i].mul(locals.signals[locals.i] - locals.normalizationFactor);
+                require(locals.res >= 0, "Invalid weight");
+                newWeightsConverted[locals.i] = locals.res;
+                unchecked {
+                    ++locals.i;
+                }
             }
         }
 
         return newWeightsConverted;
+    }
+
+    function _requiresPrevMovingAverage() internal pure override returns (uint16) {
+        return REQUIRES_PREV_MAVG;
+    }
+
+    function _setInitialIntermediateValues(
+        address _poolAddress,
+        int256[] memory _initialValues,
+        uint _numberOfAssets
+    ) internal override {
+        _setGradient(_poolAddress, _initialValues, _numberOfAssets);
     }
 }

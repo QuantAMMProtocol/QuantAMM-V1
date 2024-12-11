@@ -298,7 +298,13 @@ contract UpdateWeightRunner is Ownable2Step {
             require(msg.sender == daoRunner, "ONLYDAO");
         } else if (poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0) {
             require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
+        } else if(poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0){
+            require(msg.sender == quantammAdmin, "ONLYADMIN");
+        }        
+        else{
+            revert("No permission to set last run time");
         }
+        
         poolRuleSettings[_poolAddress].timingSettings.lastPoolUpdateRun = _time;
         emit PoolLastRunSet(_poolAddress, _time);
     }

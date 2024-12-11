@@ -81,6 +81,29 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         vm.label(address(quantAMMWeightedPoolFactory), "quantamm weighted pool factory");
     }
 
+    function testGetNormalizedWeightsInitial() public {
+        _testGetNormalizedWeights(0);
+    }
+
+    function testGetNormalizedWeightsNBlocksAfter() public {
+        _testGetNormalizedWeights(2);
+    }
+
+    function testGetNormalizedWeightsAfterLimit() public {
+        _testGetNormalizedWeights(7);
+    }
+
+    function testGetDynamicDataWeightsInitial() public {
+        _testGetNormalizedWeights(0);
+    }
+
+    function testGetDynamicDataWeightsNBlocksAfter() public {
+        _testGetNormalizedWeights(2);
+    }
+
+    function testGetDynamicDataWeightsAfterLimit() public {
+        _testGetNormalizedWeights(7);
+    }
     //the other tests go through individual use cases, this makes sure no combo of weight in and out makes a difference
     function testBalancesInitial() public {
         uint256 initialBalanceExpected = 34364.13714432034357275e18;
@@ -127,6 +150,110 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
     function testSwapExactOutAfterLimit() public {
         uint256 afterLimitExactOutExpected = 1.054589808567700500e18;
         _testSwapExactOut(7, afterLimitExactOutExpected);   
+    }
+
+
+    function _testGetNormalizedWeights(uint delay) internal {
+        uint40 timestamp = uint40(block.timestamp);
+        VariationTestVariables memory variables;
+        variables.firstWeight = testParam(0, 0.1e18, 0.001e18);
+        variables.secondWeight = testParam(0, 0.15e18, 0.001e18);
+        variables.params = _createPoolParams();
+        uint expectedDelay = delay;
+        if(delay > 5){
+            expectedDelay = 5;
+        }
+        for(uint i = 0 ; i < 8; i++){
+            for(uint j = 0; j < 8; j++){
+                if(i != j){
+                    vm.warp(timestamp);
+                    _setupVariables(variables, i, j, delay);
+                    
+                    address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+
+                    vm.prank(address(updateWeightRunner));
+                    
+                    QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+                        variables.newWeights,
+                        quantAMMWeightedPool,
+                        uint40(timestamp + 5)
+                    );
+
+                    if(delay > 0){
+                        vm.warp(timestamp + delay);
+                    }
+
+                    variables.testUint256 = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
+
+                    for(uint k = 0; k < 8; k++){
+                        if(k == variables.firstWeight.index){
+                            assertEq(variables.testUint256[variables.firstWeight.index], uint256(variables.firstWeight.weight) + (uint256(variables.firstWeight.multiplier) * expectedDelay));
+                        }
+                        else if(k == variables.secondWeight.index){
+                            assertEq(variables.testUint256[variables.secondWeight.index], uint256(variables.secondWeight.weight) + (uint256(variables.secondWeight.multiplier) * expectedDelay));
+                        }
+                        else{
+                            assertEq(variables.testUint256[k], 0.125e18 + (0.025e18 * expectedDelay));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    function _testGetDynamicData(uint delay) internal {
+        uint40 timestamp = uint40(block.timestamp);
+        VariationTestVariables memory variables;
+        variables.firstWeight = testParam(0, 0.1e18, 0.001e18);
+        variables.secondWeight = testParam(0, 0.15e18, 0.001e18);
+        variables.params = _createPoolParams();
+        uint expectedDelay = delay;
+        if(delay > 5){
+            expectedDelay = 5;
+        }
+        for(uint i = 0 ; i < 8; i++){
+            for(uint j = 0; j < 8; j++){
+                if(i != j){
+                    vm.warp(timestamp);
+                    _setupVariables(variables, i, j, delay);
+                    
+                    address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+
+                    vm.prank(address(updateWeightRunner));
+                    
+                    QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
+                        variables.newWeights,
+                        quantAMMWeightedPool,
+                        uint40(timestamp + 5)
+                    );
+
+                    if(delay > 0){
+                        vm.warp(timestamp + delay);
+                    }
+                    
+                    variables.dynamicData = QuantAMMWeightedPool(quantAMMWeightedPool).getQuantAMMWeightedPoolDynamicData();
+
+                    for(uint k = 0; k < 8; k++){
+                        if(k == variables.firstWeight.index){
+                            assertEq(variables.dynamicData.weightsAtLastUpdateInterval[variables.firstWeight.index], variables.firstWeight.weight);
+                            assertEq(variables.dynamicData.weightBlockMultipliers[variables.firstWeight.index], variables.firstWeight.multiplier);
+                        }
+                        else if(k == variables.secondWeight.index){
+                            assertEq(variables.dynamicData.weightsAtLastUpdateInterval[variables.secondWeight.index], variables.secondWeight.weight);
+                            assertEq(variables.dynamicData.weightBlockMultipliers[variables.secondWeight.index], variables.secondWeight.multiplier);
+                        }
+                        else{
+                            assertEq(variables.dynamicData.weightsAtLastUpdateInterval[k], 0.125e18);
+                            assertEq(variables.dynamicData.weightBlockMultipliers[k], 0.025e18);
+                        }
+                    }
+
+                    assertEq(variables.dynamicData.lastUpdateIntervalTime, uint40(timestamp));
+                    assertEq(variables.dynamicData.lastInterpolationTimePossible, uint40(timestamp + 5));
+                }
+            }
+        }
     }
 
     function _testBalances(uint delay, uint256 balanceExpected) internal {

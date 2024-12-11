@@ -24,6 +24,56 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         }
     }
 
+    function testOverFlowCheckForPack32(int256 val, uint256 arrayLength) public {
+        uint256 boundArrayLength = bound(arrayLength, 1, 16);
+        int256 boundOverMax32 = bound(val, int256(type(int32).max) * 1e10, (int256(type(int32).max)) * 1e18);
+        int256[] memory targetValues = new int256[](boundArrayLength);
+        for (uint256 i = 0; i < boundArrayLength; i++) {
+            targetValues[i] = 1e9;
+        }
+
+        for(uint256 i = 0; i < boundArrayLength; i++) {
+            targetValues[i] = boundOverMax32;
+            vm.expectRevert("Overflow");
+            mockQuantAMMStorage.ExternalQuantAMMPack32Array(targetValues);
+            targetValues[i] = 1e9;
+        }
+    }
+
+    function testUnderFlowCheckForPack32(int256 val, uint256 arrayLength) public {
+        uint256 boundArrayLength = bound(arrayLength, 1, 16);
+        int256 boundUnder32 = bound(val, int256(type(int32).min) * 1e27, int256(type(int32).min) * 1e18 - 1);
+        int256[] memory targetValues = new int256[](boundArrayLength);
+        for (uint256 i = 0; i < boundArrayLength; i++) {
+            targetValues[i] = 1e9;
+        }
+
+        for(uint256 i = 0; i < boundArrayLength; i++) {
+            targetValues[i] = boundUnder32;
+            vm.expectRevert("Overflow");
+            mockQuantAMMStorage.ExternalQuantAMMPack32Array(targetValues);
+            targetValues[i] = 1e9;
+        }
+    }
+
+    function testMaxMinCheckForPack32(uint256 arrayLength) public view {
+        uint256 boundArrayLength = bound(arrayLength, 1, 16);
+        int256[] memory targetValues = new int256[](boundArrayLength);
+        for (uint256 i = 0; i < boundArrayLength; i++) {
+            targetValues[i] = 1e9;
+        }
+
+        for(uint256 i = 0; i < boundArrayLength; i++) {
+            targetValues[i] = type(int32).max;
+            mockQuantAMMStorage.ExternalQuantAMMPack32Array(targetValues);
+
+            targetValues[i] = type(int32).min;
+            mockQuantAMMStorage.ExternalQuantAMMPack32Array(targetValues);
+
+            targetValues[i] = 1e9;
+        }
+    }
+
     // Test 1: Encoding and Decoding of 128-bit Arrays (Smallest Array)
     function testSmallestArray() public view {
         // Define the target values

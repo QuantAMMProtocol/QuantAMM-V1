@@ -554,12 +554,13 @@ contract QuantAMMWeightedPool is
         int256[] memory secondFourWeights = quantAMMUnpack32(_normalizedSecondFourWeights);
 
         uint firstTokenOffset = tokenCount < 4 ? tokenCount : 4;
+        uint256 moreThan4Tokens = tokenCount  < 0 ? 0 : tokenCount - 4;
         for (uint i; i < tokenCount; i++) {
             if (i < 4) {
                 data.weightsAtLastUpdateInterval[i] = firstFourWeights[i];
                 data.weightBlockMultipliers[i] = firstFourWeights[i + firstTokenOffset];
             } else {
-                data.weightsAtLastUpdateInterval[i] = secondFourWeights[i - 4];
+                data.weightsAtLastUpdateInterval[i] = secondFourWeights[i - 4 + moreThan4Tokens];
                 data.weightBlockMultipliers[i] = secondFourWeights[i];
             }
         }

@@ -560,8 +560,8 @@ contract QuantAMMWeightedPool is
                 data.weightsAtLastUpdateInterval[i] = firstFourWeights[i];
                 data.weightBlockMultipliers[i] = firstFourWeights[i + firstTokenOffset];
             } else {
-                data.weightsAtLastUpdateInterval[i] = secondFourWeights[i - 4 + moreThan4Tokens];
-                data.weightBlockMultipliers[i] = secondFourWeights[i];
+                data.weightsAtLastUpdateInterval[i] = secondFourWeights[i - 4];
+                data.weightBlockMultipliers[i] = secondFourWeights[i - 4 + moreThan4Tokens];
             }
         }
         //just a get but still more efficient to do it here

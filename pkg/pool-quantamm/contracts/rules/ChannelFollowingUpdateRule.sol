@@ -81,7 +81,7 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             
             // Calculate channel portion
             int256 channelPortion = locals.amplitude[0].mul(envelope).mul(
-                scaledGradient.sub(scaledGradient.pow(3).div(6))
+                scaledGradient - (scaledGradient.pow(3).div(6))
             ).div(locals.inverseScaling);
             channelPortion = -channelPortion; // Negative amplitude effect
 
@@ -170,12 +170,12 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         // Must have at least kappa, width, amplitude and exponents
         if (_parameters.length < 4) return false;
 
-        // All parameter arrays must have same length or be length 1 (scalar)
+        // All parameter arrays must have same length
         uint baseLength = _parameters[0].length;
         if (baseLength == 0) return false;
 
         for (uint i = 1; i < 4; i++) {
-            if (_parameters[i].length != baseLength && _parameters[i].length != 1) {
+            if (_parameters[i].length != baseLength) {
                 return false;
             }
         }
@@ -185,11 +185,11 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         if (_parameters.length > 5 && _parameters[5].length != 1) return false;
 
         // Validate parameter values
-        for (uint i = 0; i < _parameters[0].length; i++) {
+        for (uint i = 0; i < baseLength; i++) {
             if (_parameters[0][i] <= 0) return false; // kappa must be positive
             if (_parameters[1][i] <= 0) return false; // width must be positive
             if (_parameters[2][i] <= 0) return false; // amplitude must be positive
-            if (_parameters[3][i] <= ONE) return false; // exponents must be > 1
+            if (_parameters[3][i] <= 0) return false; // exponents must be positive
         }
 
         return true;

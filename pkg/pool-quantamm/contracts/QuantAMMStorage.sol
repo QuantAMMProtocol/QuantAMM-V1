@@ -72,15 +72,15 @@ abstract contract ScalarQuantAMMBaseStorage {
                 _thirdInt <= MAX32 &&
                 _thirdInt >= MIN32 &&
                 _fourthInt <= MAX32 &&
-                _firstInt >= MIN32 &&
+                _fourthInt >= MIN32 &&
                 _fifthInt <= MAX32 &&
-                _firstInt >= MIN32 &&
+                _fifthInt >= MIN32 &&
                 _sixthInt <= MAX32 &&
-                _firstInt >= MIN32 &&
+                _sixthInt >= MIN32 &&
                 _seventhInt <= MAX32 &&
-                _firstInt >= MIN32 &&
+                _seventhInt >= MIN32 &&
                 _eighthInt <= MAX32 &&
-                _firstInt >= MIN32,
+                _eighthInt >= MIN32,
             "Overflow"
         );
 

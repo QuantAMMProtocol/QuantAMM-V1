@@ -150,10 +150,12 @@ interface IUpdateWeightRunner {
     /// @param _weights the new weights
     /// @param _poolAddress the target pool
     /// @param _lastInterpolationTimePossible the last time that the interpolation will work
+    /// @param _numberOfAssets the number of assets in the pool
     function setWeightsManually(
         int256[] calldata _weights,
         address _poolAddress,
-        uint40 _lastInterpolationTimePossible
+        uint40 _lastInterpolationTimePossible,
+        uint _numberOfAssets
     ) external ;
 
     /// @notice Breakglass function to allow the DAO or the pool manager to set the intermediate values of the rule manually

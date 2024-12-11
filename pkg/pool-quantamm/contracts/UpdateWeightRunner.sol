@@ -527,10 +527,12 @@ contract UpdateWeightRunner is Ownable2Step {
     /// @param _weights the new weights
     /// @param _poolAddress the target pool
     /// @param _lastInterpolationTimePossible the last time that the interpolation will work
+    /// @param _numberOfAssets the number of assets in the pool
     function setWeightsManually(
         int256[] calldata _weights,
         address _poolAddress,
-        uint40 _lastInterpolationTimePossible
+        uint40 _lastInterpolationTimePossible,
+        uint _numberOfAssets
     ) external {
         uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
         if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
@@ -543,6 +545,17 @@ contract UpdateWeightRunner is Ownable2Step {
         }
         else {
             revert("No permission to set weight values");
+        }
+
+        //though we try to keep manual overrides as open as possible for unknown unknows
+        //given how the math library works weights it is easiest to define weights as 18dp
+        //even though technically G3M works of the ratio between them so it is not strictly necessary
+        //CYFRIN L-02
+        for(uint i; i < _weights.length; i++){
+            if(i < _numberOfAssets){
+                require(_weights[i] > 0, "Negative weight not allowed");
+                require(_weights[i] < 1e18, "greater than 1 weight not allowed");
+            }
         }
 
         IQuantAMMWeightedPool(_poolAddress).setWeights(_weights, _poolAddress, _lastInterpolationTimePossible);

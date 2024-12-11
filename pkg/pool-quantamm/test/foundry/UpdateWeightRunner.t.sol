@@ -778,6 +778,75 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
     }
 
+    function testSetWeightsManuallyNegativeFails_Fuzz(int256 negativeWeight) public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = bound(negativeWeight, type(int256).min, 0e18);
+        weights[1] = 0.0000000005e18;
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(16);
+
+        vm.startPrank(owner);
+        vm.expectRevert("Negative weight not allowed");
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
+    function testSetWeightsManuallyBetween0And1Allowed_Fuzz(int256 firstWeight, int256 secondWeight) public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = bound(firstWeight, 0.000000001e18, 0.999999999e18);
+        weights[1] = bound(secondWeight, 0.000000001e18, 0.999999999e18);
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(16);
+
+        vm.startPrank(owner);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
+    function testSetWeightsManuallyNegativeFails2ndWeight_Fuzz(int256 negativeWeight) public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = 0.0000000005e18;
+        weights[1] = bound(negativeWeight, type(int256).min, -0.000000001e18);
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(16);
+
+        vm.startPrank(owner);
+        vm.expectRevert("Negative weight not allowed");
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
+    function testSetWeightsManuallyGreaterThanOneFails_Fuzz(int256 moreThanOneWeight) public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = bound(moreThanOneWeight, 1e18, type(int256).max);
+        weights[1] = 0.0000000005e18;
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(16);
+
+        vm.startPrank(owner);
+        vm.expectRevert("greater than 1 weight not allowed");
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
+    function testSetWeightsManuallyGreaterThanOne2ndWeightFails_Fuzz(int256 moreThanOneWeight) public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = 0.0000000005e18;
+        weights[1] = bound(moreThanOneWeight, 1e18, type(int256).max);
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(16);
+
+        vm.startPrank(owner);
+        vm.expectRevert("greater than 1 weight not allowed");
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
     function testSetWeightsManuallyAdmin() public {
         int256[] memory weights = new int256[](4);
         weights[0] = 0.0000000005e18;
@@ -787,7 +856,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         mockPool.setPoolRegistry(16);
 
         vm.startPrank(owner);
-        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
         uint256[] memory poolWeights = new uint256[](2);
         poolWeights[0] = 0.0000000005e18;
@@ -806,7 +875,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         vm.startPrank(addr2);
         vm.expectRevert("ONLYADMIN");
-        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
     }
 
@@ -855,7 +924,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
         
         vm.startPrank(addr2);
-        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
         uint256[] memory poolWeights = new uint256[](2);
         poolWeights[0] = 0.0000000005e18;
@@ -909,7 +978,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
         
         vm.startPrank(addr2);
-        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
 
         mockPool.setPoolRegistry(32);
@@ -1018,7 +1087,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
         
         vm.startPrank(addr2);
-        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
 
         mockPool.setPoolRegistry(32);
@@ -1156,7 +1225,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
         
         vm.startPrank(addr2);
-        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
 
         int256[] memory poolWeights = new int256[](2);
@@ -1244,7 +1313,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         vm.startPrank(owner);
         vm.expectRevert("ONLYMANAGER");
-        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
     }
 
@@ -1257,7 +1326,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         vm.startPrank(addr1);
         vm.expectRevert("No permission to set weight values");
-        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
     }
 
     function testSetWeightsManuallyOwnerPermedNonOwnerFails() public {
@@ -1270,7 +1339,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         vm.startPrank(addr1);
         vm.expectRevert("ONLYMANAGER");
-        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
     }
 
     function testSetWeightsManuallyAdminPermedNonOwnerFails() public {
@@ -1283,7 +1352,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         vm.startPrank(addr1);
         vm.expectRevert("ONLYADMIN");
-        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6);
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
     }
 
     function testSetIntermediateValuesManually() public {

@@ -487,8 +487,11 @@ contract UpdateWeightRunner is Ownable2Step {
 
         uint40 lastTimestampThatInterpolationWorks = uint40(type(uint40).max);
 
-        //next expected update + time beyond that
-        currentLastInterpolationPossible += int40(uint40(block.timestamp));
+        //L01 possible if multiplier is 0
+        if (currentLastInterpolationPossible < int256(type(int40).max) - int256(int40(uint40(block.timestamp)))){
+            //next expected update + time beyond that
+            currentLastInterpolationPossible += int40(uint40(block.timestamp));
+        }
 
         //needed to prevent silent overflows
         if (currentLastInterpolationPossible < int256(type(int40).max)){

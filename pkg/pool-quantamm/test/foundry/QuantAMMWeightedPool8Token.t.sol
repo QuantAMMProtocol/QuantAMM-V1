@@ -137,8 +137,8 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
-        assert(weights[0] == 0.1e18 + 0.002e18);
-        assert(weights[1] == 0.15e18 + 0.002e18);
+        assertEq(weights[0], 0.1e18 + 0.002e18);
+        assertEq(weights[1], 0.15e18 + 0.002e18);
     }
 
     function testSetWeightAfterLimit() public {
@@ -308,7 +308,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         });
         vm.prank(address(vault));
         uint256 newBalance = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(swapParams);
-        
+
         assertEq(newBalance, expected);
     }
 
@@ -366,7 +366,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         _onSwapOutGivenInInternal(firstWeight, secondWeight, 7, 1.015958615150850000e18);
     }
 
-        // cross swap not working correctly
+    // cross swap not working correctly
     function testGetNormalizedWeightOnSwapOutGivenInitialToken7Token0() public {
         testParam memory firstWeight = testParam(7, 0.1e18, 0.001e18); // indexIn > 4
         testParam memory secondWeight = testParam(3, 0.15e18, 0.001e18); // indexOut < 4

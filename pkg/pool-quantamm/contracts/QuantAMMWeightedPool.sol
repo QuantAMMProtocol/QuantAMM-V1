@@ -84,6 +84,9 @@ contract QuantAMMWeightedPool is
 
     uint256 private immutable _totalTokens;
 
+    ///@dev First elem = category, second elem is name, third variable type, fourth elem detail
+    string[][] private poolDetails;
+
     /// @dev The weights are stored as 32-bit integers, packed into 256-bit integers. 9 d.p. was shown to have roughly same performance
     // packed: [weight1,weight2,weight3,weight4,multiplier1,multiplier2,multiplier3,multiplier4]
     int256 internal _normalizedFirstFourWeights;
@@ -130,7 +133,6 @@ contract QuantAMMWeightedPool is
     /// @dev Indicates that the maximum allowed trade size has been exceeded.
     error maxTradeSizeRatioExceeded();
 
-
     /**
      * @notice `getRate` from `IRateProvider` was called on a Weighted Pool.
      * @dev It is not safe to nest Weighted Pools as WITH_RATE tokens in other pools, where they function as their own
@@ -142,7 +144,7 @@ contract QuantAMMWeightedPool is
      * stable and have at most 1 wei of rounding error (e.g., oracle-based).
      */
     error WeightedPoolBptRateUnsupported();
-    
+
     ///@dev The parameters for the rule, validated in each rule separately during set rule
     int256[][] public ruleParameters;
 
@@ -170,8 +172,6 @@ contract QuantAMMWeightedPool is
     ///@dev The assets of the pool. If the pool is a composite pool, contains the LP tokens of those pools
     IERC20[] public assets;
 
-    string[][] public poolDetails;
-
     constructor(
         NewPoolParams memory params,
         IVault vault
@@ -180,6 +180,12 @@ contract QuantAMMWeightedPool is
         updateWeightRunner = UpdateWeightRunner(params.updateWeightRunner);
         quantammAdmin = updateWeightRunner.quantammAdmin();
         poolRegistry = params.poolRegistry;
+
+        require(params.poolDetails.length <= 50, "Limit exceeds array length");
+        for(uint i; i < params.poolDetails.length; i++){
+            require(params.poolDetails[i].length == 4, "detail needs all 4 [category, name, type, detail]");
+        }
+
         poolDetails = params.poolDetails;
     }
 
@@ -209,6 +215,19 @@ contract QuantAMMWeightedPool is
                     invariantRatio
                 );
         }
+    }
+
+    /// @inheritdoc IQuantAMMWeightedPool
+    function getPoolDetail(string memory category, string memory name) external view returns (string memory, string memory) {
+        for(uint i = 0; i < poolDetails.length; i++){
+            string[] memory detail = poolDetails[i];
+            if(keccak256(abi.encodePacked(detail[0])) == keccak256(abi.encodePacked(category)) 
+                && keccak256(abi.encodePacked(detail[1])) == keccak256(abi.encodePacked(name))){
+                return (detail[2], detail[3]);
+            }
+        }
+        
+        return ("error", "detail not found");
     }
 
     /// @inheritdoc IBasePool
@@ -243,20 +262,10 @@ contract QuantAMMWeightedPool is
         uint256 timeSinceLastUpdate = uint256(multiplierTime - variables.lastUpdateIntervalTime);
 
         // if both tokens are within the first storage elem
-        if (request.indexIn < 4 && request.indexOut < 4) {
+        if ((request.indexIn < 4 && request.indexOut < 4) || (request.indexIn >= 4 && request.indexOut >= 4)) {
             QuantAMMNormalisedTokenPair memory tokenWeights = _getNormalisedWeightPair(
                 request.indexIn,
                 request.indexOut,
-                timeSinceLastUpdate,
-                totalTokens
-            );
-            tokenInWeight = tokenWeights.firstTokenWeight;
-            tokenOutWeight = tokenWeights.secondTokenWeight;
-        } else if (request.indexIn > 4 && request.indexOut < 4) {
-            //if the tokens are in different storage elems
-            QuantAMMNormalisedTokenPair memory tokenWeights = _getNormalisedWeightPair(
-                request.indexOut,
-                request.indexIn,
                 timeSinceLastUpdate,
                 totalTokens
             );
@@ -320,7 +329,8 @@ contract QuantAMMWeightedPool is
         uint256 secondTokenIndex = tokenIndexTwo;
         uint256 totalTokensInPacked = totalTokens;
         int256 targetWrappedToken;
-        if (tokenIndexTwo > 4) {
+        //because we are in get pair we can assume that we are in the same storage int
+        if (tokenIndexTwo >= 4) {
             firstTokenIndex = tokenIndexOne - 4;
             secondTokenIndex = tokenIndexTwo - 4;
             totalTokensInPacked -= 4;
@@ -383,7 +393,7 @@ contract QuantAMMWeightedPool is
         int256 targetWrappedToken;
         uint256 tokenIndexInPacked = totalTokens;
 
-        if (tokenIndex > 4) {
+        if (tokenIndex >= 4) {
             //get the index in the second storage int
             index = tokenIndex - 4;
             targetWrappedToken = _normalizedSecondFourWeights;
@@ -461,13 +471,18 @@ contract QuantAMMWeightedPool is
                 return normalizedWeights;
             }
 
+            //avoid unneccessary SLOAD
+            if (totalTokens == 4) {
+                return normalizedWeights;
+            }
+
             int256[] memory secondFourWeights = quantAMMUnpack32(_normalizedSecondFourWeights);
+            uint256 moreThan4Tokens = totalTokens - 4;
 
             if (totalTokens > 4) {
-                tokenIndex -= 4;
                 normalizedWeights[4] = calculateBlockNormalisedWeight(
                     secondFourWeights[0],
-                    secondFourWeights[tokenIndex],
+                    secondFourWeights[moreThan4Tokens],
                     timeSinceLastUpdate
                 );
             } else {
@@ -476,7 +491,7 @@ contract QuantAMMWeightedPool is
             if (totalTokens > 5) {
                 normalizedWeights[5] = calculateBlockNormalisedWeight(
                     secondFourWeights[1],
-                    secondFourWeights[tokenIndex + 1],
+                    secondFourWeights[moreThan4Tokens + 1],
                     timeSinceLastUpdate
                 );
             } else {
@@ -485,7 +500,7 @@ contract QuantAMMWeightedPool is
             if (totalTokens > 6) {
                 normalizedWeights[6] = calculateBlockNormalisedWeight(
                     secondFourWeights[2],
-                    secondFourWeights[tokenIndex + 2],
+                    secondFourWeights[moreThan4Tokens + 2],
                     timeSinceLastUpdate
                 );
             } else {
@@ -494,7 +509,7 @@ contract QuantAMMWeightedPool is
             if (totalTokens > 7) {
                 normalizedWeights[7] = calculateBlockNormalisedWeight(
                     secondFourWeights[3],
-                    secondFourWeights[tokenIndex + 3],
+                    secondFourWeights[moreThan4Tokens + 3],
                     timeSinceLastUpdate
                 );
             } else {
@@ -519,7 +534,8 @@ contract QuantAMMWeightedPool is
         if (multiplier > 0) {
             return uint256(weight) + FixedPoint.mulDown(uint256(multiplierScaled18), timeSinceLastUpdate);
         } else {
-            return uint256(weight) - FixedPoint.mulUp(uint256(multiplierScaled18), timeSinceLastUpdate);
+            //CYFRIN H02
+            return uint256(weight) - FixedPoint.mulUp(uint256(-multiplierScaled18), timeSinceLastUpdate);
         }
     }
 
@@ -560,13 +576,15 @@ contract QuantAMMWeightedPool is
         int256[] memory firstFourWeights = quantAMMUnpack32(_normalizedFirstFourWeights);
         int256[] memory secondFourWeights = quantAMMUnpack32(_normalizedSecondFourWeights);
 
+        uint firstTokenOffset = tokenCount < 4 ? tokenCount : 4;
+        uint256 moreThan4Tokens = tokenCount  < 4 ? 0 : tokenCount - 4;
         for (uint i; i < tokenCount; i++) {
             if (i < 4) {
                 data.weightsAtLastUpdateInterval[i] = firstFourWeights[i];
-                data.weightBlockMultipliers[i] = firstFourWeights[i + 4];
+                data.weightBlockMultipliers[i] = firstFourWeights[i + firstTokenOffset];
             } else {
                 data.weightsAtLastUpdateInterval[i] = secondFourWeights[i - 4];
-                data.weightBlockMultipliers[i] = secondFourWeights[i];
+                data.weightBlockMultipliers[i] = secondFourWeights[i - 4 + moreThan4Tokens];
             }
         }
         //just a get but still more efficient to do it here
@@ -576,7 +594,11 @@ contract QuantAMMWeightedPool is
     }
 
     /// @inheritdoc IQuantAMMWeightedPool
-    function getQuantAMMWeightedPoolImmutableData() external view returns (QuantAMMWeightedPoolImmutableData memory data) {
+    function getQuantAMMWeightedPoolImmutableData()
+        external
+        view
+        returns (QuantAMMWeightedPoolImmutableData memory data)
+    {
         data.tokens = _vault.getPoolTokens(address(this));
         data.oracleStalenessThreshold = oracleStalenessThreshold;
         data.poolRegistry = poolRegistry;
@@ -711,12 +733,14 @@ contract QuantAMMWeightedPool is
                 i++;
             }
         }
+
         splitWeights[1] = new int256[](8);
+
         uint256 moreThan4Tokens = tokenLength - 4;
         for (uint i = 0; i < moreThan4Tokens; ) {
             uint256 i4 = i + 4;
             splitWeights[1][i] = weights[i4];
-            splitWeights[1][i4] = weights[i4 + tokenLength];
+            splitWeights[1][i + moreThan4Tokens] = weights[i4 + tokenLength];
 
             unchecked {
                 i++;
@@ -808,7 +832,6 @@ contract QuantAMMWeightedPool is
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
         emit UpdateWeightRunnerAddressUpdated(address(updateWeightRunner), _updateWeightRunner);
     }
-
 
     function getRate() public pure override returns (uint256) {
         revert WeightedPoolBptRateUnsupported();

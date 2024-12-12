@@ -791,19 +791,6 @@ contract QuantAMMWeightedPool is
         //0 is hodl, 1 is trade whole pool which invariant doesnt let you do anyway
         require(_poolSettings.maxTradeSizeRatio > 0 && _poolSettings.maxTradeSizeRatio <= 0.3e18, "INVMAXTRADE"); //Invalid max trade size
 
-        int256 sumWeights;
-        for (uint i; i < _initialWeights.length; ) {
-            sumWeights += int256(_initialWeights[i]);
-            unchecked {
-                ++i;
-            }
-        }
-
-        require(
-            sumWeights == 1e18, // 1 for int32 sum
-            "SWGT!=1"
-        ); //Initial weights must sum to 1
-
         lambda = _poolSettings.lambda;
         epsilonMax = _poolSettings.epsilonMax;
         absoluteWeightGuardRail = _poolSettings.absoluteWeightGuardRail;

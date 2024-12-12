@@ -183,7 +183,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         IRateProvider[] memory rateProviders,
         IVaultMock vault,
         address poolCreator
-    ) internal returns (address newPoolAddress, bytes memory poolArgs) {        
+    ) internal returns (address newPoolAddress, bytes memory poolArgsRet) {        
         deployerFactory = address(deployQuantAMMWeightedPoolFactory(
             IVault(address(vault)),
             365 days,
@@ -191,19 +191,15 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
             "Pool v1"
         ));
         QuantAMMWeightedPoolFactory.NewPoolParams memory poolCreateSettings = _createPoolParams(tokens, rateProviders);
-        poolArgs = abi.encode(poolCreateSettings);
-        QuantAMMWeightedPool newPool = QuantAMMWeightedPool(
-            QuantAMMWeightedPoolFactory(deployerFactory).create(poolCreateSettings)
-        );
-        vm.label(address(newPool), label);
+        (newPoolAddress, poolArgsRet) =  QuantAMMWeightedPoolFactory(deployerFactory).create(poolCreateSettings);
+       
+        vm.label(newPoolAddress, label);
 
         // Cannot set the pool creator directly on a standard Balancer stable pool factory.
-        vault.manualSetPoolCreator(address(newPool), poolCreator);
+        vault.manualSetPoolCreator(newPoolAddress, poolCreator);
 
         ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
-        feeController.manualSetPoolCreator(address(newPool), poolCreator);
-
-        return (address(newPool), poolArgs);
+        feeController.manualSetPoolCreator(newPoolAddress, poolCreator);
     }
 
     function deployQuantAMMWeightedMathMock() internal returns (QuantAMMWeightedMathMock) {

@@ -515,7 +515,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         // create pool params
         variables.params = _createPoolParams(params.numTokens, params.poolParams, params.ruleParams);
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params); //@note new pool params
+        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.createWithoutArgs(variables.params); //@note new pool params
 
         uint expectedDelay = params.delay;
         if (params.delay > params.interpolationTime) {
@@ -622,7 +622,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         // create pool params
         variables.params = _createPoolParams(params.numTokens, params.poolParams, params.ruleParams);
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.createWithoutArgs(variables.params);
 
         uint expectedDelay = params.delay;
         if (params.delay > params.interpolationTime) {
@@ -721,7 +721,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         );
 
         variables.params = _createPoolParams(params.numTokens, params.poolParams, params.ruleParams);
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.createWithoutArgs(variables.params);
 
         uint expectedDelay = params.delay;
         if (params.delay > params.interpolationTime) {
@@ -811,7 +811,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         // create pool params
         variables.params = _createPoolParams(params.numTokens, params.poolParams, params.ruleParams);
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.createWithoutArgs(variables.params);
 
         swapParams.exactOut = 0; // this is an exact in swap
 
@@ -884,7 +884,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         // create pool params
         variables.params = _createPoolParams(params.numTokens, params.poolParams, params.ruleParams);
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
+        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.createWithoutArgs(variables.params);
 
         swapParams.exactIn = 0; // this is an exact out swap
 

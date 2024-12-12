@@ -333,7 +333,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         params.name = supportsDonation ? "Pool With Donation" : "Pool Without Donation";
         params.symbol = supportsDonation ? "PwD" : "PwoD";
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
         // Initialize pool.
         vm.prank(lp);

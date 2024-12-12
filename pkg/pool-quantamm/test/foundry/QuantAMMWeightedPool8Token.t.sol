@@ -71,7 +71,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         params._initialWeights[6] = 0.1e18;
         params._initialWeights[7] = 0.15e18;
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
         uint256[] memory weights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
 
@@ -88,7 +88,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
     function testSetWeightInitial() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
         int256[] memory newWeights = _getDefaultWeightAndMultiplier();
         newWeights[0] = 0.1e18;
@@ -116,7 +116,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
     function testSetWeightNBlocksAfter() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
         vm.prank(address(updateWeightRunner));
 
@@ -144,7 +144,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
     function testSetWeightAfterLimit() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
         vm.prank(address(updateWeightRunner));
         int256[] memory newWeights = _getDefaultWeightAndMultiplier();
@@ -182,7 +182,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
     ) internal {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
         vm.prank(address(updateWeightRunner));
         int256[] memory newWeights = _getDefaultWeightAndMultiplier();
@@ -275,7 +275,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
     ) internal {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
         vm.prank(address(updateWeightRunner));
         int256[] memory newWeights = _getDefaultWeightAndMultiplier();
@@ -398,7 +398,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
     ) internal {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
         vm.prank(address(updateWeightRunner));
         int256[] memory newWeights = _getDefaultWeightAndMultiplier();

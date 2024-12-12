@@ -82,11 +82,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         return _poolVersion;
     }
 
-    /**
-     * @notice Deploys a new `WeightedPool`.
-     * @dev Tokens must be sorted for pool registration.
-     */
-    function create(NewPoolParams memory params) external returns (address pool) {
+    function createWithoutArgs(NewPoolParams memory params) external returns (address pool) {
         if (params.roleAccounts.poolCreator != address(0)) {
             revert StandardPoolWithCreator();
         }
@@ -95,9 +91,8 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         liquidityManagement.enableDonation = params.enableDonation;
         // disableUnbalancedLiquidity must be set to true if a hook has the flag enableHookAdjustedAmounts = true.
         liquidityManagement.disableUnbalancedLiquidity = params.disableUnbalancedLiquidity;
-
-        pool = _create(
-            abi.encode(
+        
+        pool = _create(abi.encode(
                 QuantAMMWeightedPool.NewPoolParams({
                     name: params.name,
                     symbol: params.symbol,
@@ -108,9 +103,54 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
                     poolDetails: params.poolDetails
                 }),
                 getVault()
-            ),
-            params.salt
+            ), params.salt);
+
+        QuantAMMWeightedPool(pool).initialize(
+            params._initialWeights,
+            params._poolSettings,
+            params._initialMovingAverages,
+            params._initialIntermediateValues,
+            params._oracleStalenessThreshold
         );
+
+        _registerPoolWithVault(
+            pool,
+            params.tokens,
+            params.swapFeePercentage,
+            false, // not exempt from protocol fees
+            params.roleAccounts,
+            params.poolHooksContract,
+            liquidityManagement
+        );
+    }
+
+    /**
+     * @notice Deploys a new `WeightedPool`.
+     * @dev Tokens must be sorted for pool registration.
+     */
+    function create(NewPoolParams memory params) external returns (address pool, bytes memory poolArgs) {
+        if (params.roleAccounts.poolCreator != address(0)) {
+            revert StandardPoolWithCreator();
+        }
+
+        LiquidityManagement memory liquidityManagement = getDefaultLiquidityManagement();
+        liquidityManagement.enableDonation = params.enableDonation;
+        // disableUnbalancedLiquidity must be set to true if a hook has the flag enableHookAdjustedAmounts = true.
+        liquidityManagement.disableUnbalancedLiquidity = params.disableUnbalancedLiquidity;
+        poolArgs = abi.encode(
+                QuantAMMWeightedPool.NewPoolParams({
+                    name: params.name,
+                    symbol: params.symbol,
+                    numTokens: params.normalizedWeights.length,
+                    version: "version",
+                    updateWeightRunner: _updateWeightRunner,
+                    poolRegistry: params.poolRegistry,
+                    poolDetails: params.poolDetails
+                }),
+                getVault()
+            );
+
+        pool = _create(poolArgs, params.salt);
 
         QuantAMMWeightedPool(pool).initialize(
             params._initialWeights,

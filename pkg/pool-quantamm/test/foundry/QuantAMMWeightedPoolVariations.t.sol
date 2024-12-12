@@ -310,7 +310,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         }
     }
 
-    function _calculateInterpolatedWeight(TestParam memory param, uint256 delay) internal view returns (uint256) {
+    function _calculateInterpolatedWeight(TestParam memory param, uint256 delay) internal pure returns (uint256) {
         int256 scaledMultiplier = param.multiplier * 1e18;
         if (param.multiplier > 0) {
             return uint256(param.weight) + FixedPoint.mulDown(uint256(scaledMultiplier), delay);

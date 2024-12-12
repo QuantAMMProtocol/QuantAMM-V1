@@ -11,9 +11,10 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
         name = "Momentum";
         
-        parameterDescriptions = new string[](2);
+        parameterDescriptions = new string[](3);
         parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of the rule's response to a signal change (here, price gradient)";
         parameterDescriptions[1] = "Use raw price: 0 = use moving average, 1 = use raw price";
+        parameterDescriptions[2] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
     }
 
     using PRBMathSD59x18 for int256;

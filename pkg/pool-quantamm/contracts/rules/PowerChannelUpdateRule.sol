@@ -11,10 +11,11 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
         name = "PowerChannel";
 
-        parameterDescriptions = new string[](3);
+        parameterDescriptions = new string[](4);
         parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change";
         parameterDescriptions[1] = "Q: Q dictates the harshness of the channel boundry";
         parameterDescriptions[2] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
+        parameterDescriptions[3] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
     }
 
     using PRBMathSD59x18 for int256;

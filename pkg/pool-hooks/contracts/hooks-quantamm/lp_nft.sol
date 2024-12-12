@@ -10,14 +10,14 @@ contract LPNFT is ERC721 {
     uint256 numMinted;
 
     /// @notice the address of the QuantAMM pool this token is for
-    address public pool;
+    address public vault;
 
     /// @notice Exception to be thrown when a transfer is attempted
     error NonTransferable();
 
     /// @notice Modifier for only allowing the pool to call certain functions
-    modifier onlyPool() {
-        require(msg.sender == pool, "POOLONLY"); //Action only allowed by pool
+    modifier onlyVault() {
+        require(msg.sender == vault, "VAULTONLY"); //Action only allowed by pool
         _;
     }
 
@@ -25,19 +25,19 @@ contract LPNFT is ERC721 {
     constructor(
         string memory _name,
         string memory _symbol,
-        address _pool
+        address _vault
     ) ERC721(_name, _symbol) {
-        pool = _pool;
+        vault = _vault;
     }
 
     /// @param _to the address to mint the NFT to
-    function mint(address _to) public onlyPool returns (uint256 tokenId) {
+    function mint(address _to) public onlyVault returns (uint256 tokenId) {
         tokenId = ++numMinted; // We start minting at 1
         _mint(_to, tokenId);
     }
 
     /// @param _tokenId the id of the NFT to burn
-    function burn(uint256 _tokenId) public onlyPool {
+    function burn(uint256 _tokenId) public onlyVault {
         _burn(_tokenId);
     }
 }

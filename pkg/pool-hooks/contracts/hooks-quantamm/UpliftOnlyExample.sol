@@ -44,16 +44,16 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
     using FixedPoint for uint256;
     
     /// @notice The withdrawal fee in basis points (1/10000) for the pool
-    uint16 public withdrawalFeeBps;
+    uint16 public immutable withdrawalFeeBps;
 
     /// @notice The maximum withdrawal fee in basis points (1/10000) for the pool 
-    uint16 public withdrawalMaxFeeBps;
+    uint16 public immutable withdrawalMaxFeeBps;
 
     /// @notice The address to send withdrawal fees to
-    address public withdrawalFeeRecipient;
+    address public immutable withdrawalFeeRecipient;
 
     /// @notice The numerator for the withdrawal fee calculation based on the wp definition
-    uint32 public withdrawalFeeNumerator;
+    uint32 public immutable withdrawalFeeNumerator;
 
     /// @notice The fee data for a given owner and deposit
     struct FeeData {
@@ -76,7 +76,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
     // NFT unique identifier.
     uint256 private _nextTokenId;
     
-    address private _updateWeightRunner;
+    address private immutable _updateWeightRunner;
 
     /**
      * @notice A new `NftLiquidityPositionExample` contract has been registered successfully for a given pool.
@@ -122,6 +122,15 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
      */
     error TooManyDeposits();
 
+    /**
+     * @notice Attempted withdrawal of an NFT-associated position by an address that is not the owner.
+     * @param withdrawer The address attempting to withdraw
+     * @param pool The attempted target pool
+     * @param nftId The id of the Pool NFT
+     */
+    error WithdrawalByNonOwner(address withdrawer, address pool, uint256 nftId);
+
+
     modifier onlySelfRouter(address router) {
         _ensureSelfRouter(router);
         _;
@@ -131,9 +140,32 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
         IVault vault,
         IWETH weth,
         IPermit2 permit2,
-        string memory version
+        uint16 _withdrawalFeeBps,
+        uint16 _withdrawalMaxFeeBps,
+        uint32 _withdrawalFeeNumerator,
+        address _updateWeightRunnerParam,
+        string memory version,
+        string memory name,
+        string memory symbol
     ) MinimalRouter(vault, weth, permit2, version) {
+         require(
+            bytes(name).length > 0 &&
+                bytes(symbol).length > 0,
+            "NAMEREQ"
+        ); //Must provide a name / symbol
+        
+        lpNFT = new LPNFT(
+            name,
+            symbol,
+            address(vault)
+        );
+
         // solhint-disable-previous-line no-empty-blocks
+        withdrawalFeeBps = _withdrawalFeeBps;
+        withdrawalMaxFeeBps = _withdrawalMaxFeeBps;
+        withdrawalFeeNumerator = _withdrawalFeeNumerator;
+        _updateWeightRunner = _updateWeightRunnerParam;
+
     }
 
     /***************************************************************************
@@ -178,6 +210,37 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
         });
 
         poolsFeeData[pool][msg.sender].push(feeDataDeposit); 
+    }
+
+    function removeLiquidityProportional(
+        uint256 tokenId,
+        uint256[] memory minAmountsOut,
+        bool wethIsEth,
+        address pool
+    ) external payable saveSender(msg.sender) returns (uint256[] memory amountsOut) {
+       
+        uint depositLength = poolsFeeData[pool][msg.sender].length;
+        if(depositLength > 0){
+            revert WithdrawalByNonOwner(msg.sender, pool, tokenId);
+        }
+
+        uint256 bptAmountIn;
+        for(uint i = 0; i < depositLength; i++){
+            if(poolsFeeData[pool][msg.sender][i].tokenID == tokenId){
+                bptAmountIn += poolsFeeData[pool][msg.sender][i].amount;
+            }
+        }
+
+        // Do removeLiquidity operation - tokens sent to msg.sender.
+        amountsOut = _removeLiquidityProportional(
+            pool,
+            address(this),
+            msg.sender,
+            bptAmountIn,
+            minAmountsOut,
+            wethIsEth,
+            abi.encode(tokenId) // tokenId is passed to index fee data in hook
+        );
     }
 
     /***************************************************************************
@@ -343,6 +406,41 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
 
         return (true, hookAdjustedAmountsOutRaw);
     }
+
+
+    /// @param _from the owner to transfer from
+    /// @param _to the owner to transfer to
+    /// @param _tokenID the token ID to transfer
+    /// @notice aftertokentransfer is called by mint/burn and transfer however override checks that this is only called on transfer
+    function afterTokenTransfer(
+        address _from,
+        address _to,
+        uint256 _tokenID
+    ) public {
+        require(msg.sender == address(lpNFT), "ONLYNFT");
+        int256[] memory prices = updateWeightRunner.getData(address(this));
+        uint256 lpTokenDepositValueNow = getPoolLPTokenValue(prices);
+        FeeData[] storage feeDataArray = feeData[_from];
+        uint256 feeDataArrayLength = feeDataArray.length;
+        for (uint256 i; i < feeDataArrayLength; ++i) {
+            if (feeDataArray[i].tokenID == _tokenID) {
+                // Update the deposit value to the current value of the pool in base currency (e.g. USD) and the block index to the current block number    
+                vault.transferLPTokens(_from, _to, feeDataArray[i].amount);
+                feeDataArray[i].lpTokenDepositValue = lpTokenDepositValueNow;
+                feeDataArray[i].blockIndexDeposit = uint32(block.number);
+                feeDataArray[i].withdrawalFeeBps = withdrawalFeeBps;
+                feeDataArray[i].withdrawalMaxFeeBps = withdrawalMaxFeeBps;
+                feeDataArray[i].withdrawalFeeNumerator = withdrawalFeeNumerator;
+                if (_to != address(0)) {
+                    // Don't push when burning
+                    feeData[_to].push(feeDataArray[i]);
+                }
+                //replaced the burned with the last therefore can pop
+                feeDataArray[i] = feeDataArray[feeDataArrayLength - 1];
+                feeDataArray.pop();
+                break;
+            }
+        }
 
     /***************************************************************************
                                 Off-chain Getters

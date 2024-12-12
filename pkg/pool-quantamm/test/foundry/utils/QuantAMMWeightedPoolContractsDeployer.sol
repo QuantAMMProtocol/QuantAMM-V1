@@ -183,16 +183,17 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         IRateProvider[] memory rateProviders,
         IVaultMock vault,
         address poolCreator
-    ) internal returns (address) {        
+    ) internal returns (address newPoolAddress, bytes memory poolArgs) {        
         deployerFactory = address(deployQuantAMMWeightedPoolFactory(
             IVault(address(vault)),
             365 days,
             "Factory v1",
             "Pool v1"
         ));
-        
+        QuantAMMWeightedPoolFactory.NewPoolParams memory poolCreateSettings = _createPoolParams(tokens, rateProviders);
+        poolArgs = abi.encode(poolCreateSettings);
         QuantAMMWeightedPool newPool = QuantAMMWeightedPool(
-            QuantAMMWeightedPoolFactory(deployerFactory).create(_createPoolParams(tokens, rateProviders))
+            QuantAMMWeightedPoolFactory(deployerFactory).create(poolCreateSettings)
         );
         vm.label(address(newPool), label);
 
@@ -202,7 +203,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
         feeController.manualSetPoolCreator(address(newPool), poolCreator);
 
-        return address(newPool);
+        return (address(newPool), poolArgs);
     }
 
     function deployQuantAMMWeightedMathMock() internal returns (QuantAMMWeightedMathMock) {

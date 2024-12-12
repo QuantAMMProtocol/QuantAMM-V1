@@ -46,7 +46,7 @@ contract QuantAMMWeightedPoolBaseTest is QuantAMMWeightedPoolContractsDeployer, 
         poolMaxSwapFeePercentage = 10e16;
     }
 
-    function createPool() internal override returns (address) {
+    function createPool() internal override returns (address newPool, bytes memory poolArgs)  {
 
         address[] memory tokenAddresses = [address(dai), address(usdc)].toMemoryArray();
         IERC20[] memory sortedTokens = InputHelpers.sortTokens(
@@ -62,9 +62,9 @@ contract QuantAMMWeightedPoolBaseTest is QuantAMMWeightedPoolContractsDeployer, 
         string memory label = "Pool v1";
 
         IRateProvider[] memory rateProviders;
-        address poolAddr = createQuantAMMPool(tokenAddresses, label, rateProviders, vault, lp);
         factory = IBasePoolFactory(deployerFactory);
-        return poolAddr;
+
+        return  createQuantAMMPool(tokenAddresses, label, rateProviders, vault, lp);
     }
 
     function initPool() internal override {

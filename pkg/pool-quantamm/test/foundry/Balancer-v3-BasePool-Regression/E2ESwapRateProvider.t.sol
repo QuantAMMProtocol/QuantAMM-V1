@@ -38,7 +38,7 @@ contract E2eSwapRateProviderWeightedTest is
         super.setUp();
     }
 
-    function _createPool(address[] memory tokens, string memory label) internal override returns (address) {
+    function _createPool(address[] memory tokens, string memory label) internal override returns (address newPool, bytes memory poolArgs)  {
         rateProviderTokenA = deployRateProviderMock();
         rateProviderTokenB = deployRateProviderMock();
         // Mock rates, so all tests that keep the rate constant use a rate different than 1.
@@ -49,7 +49,7 @@ contract E2eSwapRateProviderWeightedTest is
         rateProviders[tokenAIdx] = IRateProvider(address(rateProviderTokenA));
         rateProviders[tokenBIdx] = IRateProvider(address(rateProviderTokenB));
 
-        address newPool = address(createQuantAMMPool(tokens, label, rateProviders, vault, lp));
+        (newPool, poolArgs)  = createQuantAMMPool(tokens, label, rateProviders, vault, lp);
         vm.label(newPool, label);
 
         // Cannot set the pool creator directly on a standard Balancer weighted pool factory.
@@ -57,8 +57,6 @@ contract E2eSwapRateProviderWeightedTest is
 
         ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
         feeController.manualSetPoolCreator(newPool, lp);
-
-        return newPool;
     }
 
     function calculateMinAndMaxSwapAmounts() internal override {

@@ -331,7 +331,6 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
 
     function testGetNormalizedWeightsNBlocksAfter_Fuzz(FuzzParams memory params) public {
         params.delay = bound(params.delay, 1, _INTERPOLATION_TIME);
-        _logFuzzParams(params);
         _testGetNormalizedWeights(params);
     }
 

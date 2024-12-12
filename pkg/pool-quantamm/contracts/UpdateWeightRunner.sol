@@ -202,6 +202,8 @@ contract UpdateWeightRunner is Ownable2Step {
         emit OracleRemved(address(_oracleToRemove));
     }
 
+    /// @notice Set the actions a pool is approved for
+    /// @param _pool Pool to set actions for
     function setApprovedActionsForPool(address _pool, uint256 _actions) external {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
         approvedPoolActions[_pool] = _actions;
@@ -290,7 +292,7 @@ contract UpdateWeightRunner is Ownable2Step {
     /// @param _poolAddress the target pool address
     /// @param _time the time to initialise the last update run to
     function InitialisePoolLastRunTime(address _poolAddress, uint40 _time) external {
-        uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
+        uint256 poolRegistryEntry = approvedPoolActions[_poolAddress];
 
         //current breakglass settings allow for dao or pool creator trigger. This is subject to review
         if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
@@ -318,11 +320,17 @@ contract UpdateWeightRunner is Ownable2Step {
         oracleResult.timestamp = timestamp;
     }
 
-    /// @notice Get the data for a pool from the oracles and return it in the same order as the assets in the pool
+    /// @notice Wrapper for if someone wants to get the oracle data the rule is using from an external source
     /// @param _pool Pool to get data for
     function getData(address _pool) public returns (int256[] memory outputData) {
-        bool internalCall = msg.sender != address(this);
-        require(internalCall || approvedPoolActions[_pool] & MASK_POOL_GET_DATA > 0, "Not allowed to get data");
+        return _getData(_pool, false);
+    }
+
+    /// @notice Get the data for a pool from the oracles and return it in the same order as the assets in the pool
+    /// @param _pool Pool to get data for
+    /// @param internalCall Internal call flag to detect if the function was called internally for emission and permissions
+    function _getData(address _pool, bool internalCall) private returns (int256[] memory outputData) {
+        require(internalCall || (approvedPoolActions[_pool] & MASK_POOL_GET_DATA > 0), "Not allowed to get data");
         //optimised == happy path, optimised into a different array to save gas
         address[] memory optimisedOracles = poolOracles[_pool];
         uint oracleLength = optimisedOracles.length;
@@ -376,7 +384,7 @@ contract UpdateWeightRunner is Ownable2Step {
         int256[] memory _currentWeights,
         PoolRuleSettings memory _ruleSettings
     ) private returns (int256[] memory updatedWeights, int256[] memory data) {
-        data = getData(_pool);
+        data = _getData(_pool, true);
 
         updatedWeights = rules[_pool].CalculateNewWeights(
             _currentWeights,
@@ -540,7 +548,7 @@ contract UpdateWeightRunner is Ownable2Step {
         uint40 _lastInterpolationTimePossible,
         uint _numberOfAssets
     ) external {
-        uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
+        uint256 poolRegistryEntry = approvedPoolActions[_poolAddress];
         if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {
             address daoRunner = QuantAMMBaseAdministration(quantammAdmin).daoRunner();
             require(msg.sender == daoRunner, "ONLYDAO");
@@ -580,7 +588,7 @@ contract UpdateWeightRunner is Ownable2Step {
         int256[] memory _newParameters,
         uint _numberOfAssets
     ) external {
-        uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
+        uint256 poolRegistryEntry = approvedPoolActions[_poolAddress];
 
         //Who can trigger these very powerful breakglass features is under review
         if (poolRegistryEntry & MASK_POOL_DAO_WEIGHT_UPDATES > 0) {

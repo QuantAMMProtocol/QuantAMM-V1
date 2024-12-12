@@ -48,7 +48,7 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     /// @param _prevWeights the previous weights retrieved from the vault
     /// @param _data the latest data from the signal, usually price
     /// @param _parameters the parameters of the rule that are not lambda
-    /// @param _poolParameters pool parameters
+    /// @param _poolParameters pool parameters [0]=kappa can be per token (vector) or single for all tokens (scalar), [1][0]=useRawPrice
     /// @notice w(t) = w(t − 1) + κ ·(ℓp(t) − 1/p(t) · ∂p(t)/∂t) where ℓp(t) = 1/N * ∑(1/p(t)i * (∂p(t)/∂t)i)
     function _getWeights(
         int256[] calldata _prevWeights,

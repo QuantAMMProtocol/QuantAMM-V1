@@ -24,12 +24,12 @@ contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
     /// @param _prevWeights the previous weights retrieved from the vault
     /// @param _data the latest data from the signal, usually price
     /// @param _parameters the parameters of the rule that are not lambda
-    /// @param _poolParameters pool parameters
+    /// @param _poolParameters pool parameters [0]=Λ
     /// @notice w(t) = (Λ * w(t − 1)) + ((1 − Λ)*Σ^−1(t)) / N,j=1∑ Σ^−1 j(t) - see whitepaper
     function _getWeights(
         int256[] calldata _prevWeights,
         int256[] calldata _data,
-        int256[][] calldata _parameters, //[0]=Λ
+        int256[][] calldata _parameters, //
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {
         _poolParameters.numberOfAssets = _prevWeights.length;

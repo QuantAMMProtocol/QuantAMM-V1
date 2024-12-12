@@ -62,9 +62,8 @@ contract QuantAMMWeightedPoolBaseTest is QuantAMMWeightedPoolContractsDeployer, 
         string memory label = "Pool v1";
 
         IRateProvider[] memory rateProviders;
+        (newPool, poolArgs) = createQuantAMMPool(tokenAddresses, label, rateProviders, vault, lp);
         factory = IBasePoolFactory(deployerFactory);
-
-        return  createQuantAMMPool(tokenAddresses, label, rateProviders, vault, lp);
     }
 
     function initPool() internal override {

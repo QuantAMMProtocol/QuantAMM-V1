@@ -497,12 +497,7 @@ contract UpdateWeightRunner is Ownable2Step {
         //L01 possible if multiplier is 0
         if (currentLastInterpolationPossible < int256(type(int40).max) - int256(int40(uint40(block.timestamp)))){
             //next expected update + time beyond that
-            currentLastInterpolationPossible += int40(uint40(block.timestamp));
-        }
-
-        //needed to prevent silent overflows
-        if (currentLastInterpolationPossible < int256(type(int40).max)){
-            lastTimestampThatInterpolationWorks = uint40(int40(currentLastInterpolationPossible));
+            lastTimestampThatInterpolationWorks = uint40(int40(currentLastInterpolationPossible + int40(uint40(block.timestamp))));
         }
 
         //the main point of interaction between the update weight runner and the quantammAdmin is here

@@ -29,13 +29,15 @@ import { WeightedMath } from "@balancer-labs/v3-solidity-utils/contracts/math/We
 
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 
-contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContractsDeployer, BaseVaultTest {
+contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVaultTest {
     using CastingHelpers for address[];
     using ArrayHelpers for *;
     using FixedPoint for uint256;
 
+    //@audit taken from QuantAMMWeightedPool
+    uint256 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16; // 0.001%
     // Maximum swap fee of 10%
-    uint64 public constant MAX_SWAP_FEE_PERCENTAGE = 10e16;
+    uint64 public constant _MAX_SWAP_FEE_PERCENTAGE = 10e16;
 
     QuantAMMWeightedPoolFactory internal quantAMMWeightedPoolFactory;
 
@@ -50,6 +52,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
     int256 private constant _MIN_WEIGHT = int256(uint256(_ABSOLUTE_WEIGHT_GUARD_RAIL)); // 0.01e18
     int256 private constant _MAX_WEIGHT =
         1e18 - (int256(_NUM_TOKENS) - 1) * int256(uint256(_ABSOLUTE_WEIGHT_GUARD_RAIL)); // 1e18- (8-1) * 0.01e18 = 0.93e18
+    uint16 private constant _UPDATE_INTERVAL = 60; // 60 seconds
 
     uint64 private constant _LAMBDA = 0.2e18; // 20% lambda
     int256 private constant _KAPPA = 0.2e18; // 20% kappa
@@ -58,8 +61,8 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
     int256 private constant _DEFAULT_MULTIPLIER = 0.001e18; // 0.1% default multiplier
 
     //@audit taken from WeightedMath.sol
-    uint256 private constant _MAX_INVARIANT_RATIO = 130e16; // 300%
-    uint256 private constant _MIN_INVARIANT_RATIO = 80e16; // 70%
+    uint256 private constant _MAX_INVARIANT_RATIO = 300e16; // 300%
+    uint256 private constant _MIN_INVARIANT_RATIO = 70e16; // 70%
 
     //@audit taken from WeightedMath.sol for Swap limits
     uint256 internal constant _MAX_IN_RATIO = 30e16; // 30%
@@ -78,10 +81,40 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         int256 firstMultiplier;
         int256 secondMultiplier;
         int256 otherMultiplier; // multiplier for all other weights
+        uint256 interpolationTime; // time at which we are doing the swap
+        uint256 numTokens;
         uint256 delay;
+        PoolFuzzParams poolParams;
+        RuleFuzzParams ruleParams;
+        BalanceFuzzParams balanceParams;
+    }
+
+    struct PoolFuzzParams {
+        uint64 lambda;
+        uint64 maxSwapfee;
+        uint64 epsilonMax;
+        uint64 absoluteWeightGuardRail;
+        uint64 maxTradeSizeRatio;
+        uint16 updateInterval;
+    }
+
+    struct RuleFuzzParams {
+        uint8 ruleType; // 0 - momentum rule, 1 - anti momentum rule, 2 - min variance rule, 4 - power channel rule
+        int256 kappa;
     }
 
     struct BalanceFuzzParams {
+        uint256 balance0;
+        uint256 balance1;
+        uint256 balance2;
+        uint256 balance3;
+        uint256 balance4;
+        uint256 balance5;
+        uint256 balance6;
+        uint256 balance7;
+    }
+
+    struct LiquidityFuzzParams {
         uint256 tokenIndex;
         uint256 invariantRatio;
     }
@@ -132,77 +165,152 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         vm.label(address(quantAMMWeightedPoolFactory), "quantamm weighted pool factory");
     }
 
-    function _createPoolParams(
-        int256 weight,
-        uint delay
-    ) internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
-        PoolRoleAccounts memory roleAccounts;
-        IERC20[] memory tokens = [
-            address(dai),
-            address(usdc),
-            address(weth),
-            address(wsteth),
-            address(veBAL),
-            address(waDAI),
-            address(usdt),
-            address(waUSDC)
-        ].toMemoryArray().asIERC20();
-        //@note This is hardcoded to 8 right now - if NUM_TOKENS is changed, this array needs to change
+    function _getTokens(uint256 numTokens) internal view returns (IERC20[] memory) {
+        IERC20[] memory tokens_ = new IERC20[](numTokens);
+        require(numTokens > 1 && numTokens <= 8, "Atleast 2 tokens and at max 8 tokens");
+
+        tokens_[0] = IERC20(address(dai));
+        tokens_[1] = IERC20(address(usdc));
+
+        if (numTokens > 2) {
+            tokens_[2] = IERC20(address(weth));
+        }
+        if (numTokens > 3) {
+            tokens_[3] = IERC20(address(wsteth));
+        }
+        if (numTokens > 4) {
+            tokens_[4] = IERC20(address(veBAL));
+        }
+        if (numTokens > 5) {
+            tokens_[5] = IERC20(address(waDAI));
+        }
+        if (numTokens > 6) {
+            tokens_[6] = IERC20(address(usdt));
+        }
+        if (numTokens > 7) {
+            tokens_[7] = IERC20(address(waUSDC));
+        }
+        return tokens_;
+    }
+
+    function _createRule(RuleFuzzParams memory ruleParams) internal returns (IUpdateRule, int256[][] memory) {
+        //@note for now - hardcoded. will change this to a dynamic rule later
         MockMomentumRule momentumRule = new MockMomentumRule(owner);
-        //@note using momentum rule- maybe also test with other rules
 
-        uint32[] memory weights = new uint32[](uint256(_NUM_TOKENS));
-        int256[] memory initialWeights = new int256[](uint256(_NUM_TOKENS));
-        uint256[] memory initialWeightsUint = new uint256[](8);
+        int256[][] memory parameters = new int256[][](1);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = ruleParams.kappa;
 
-        for (uint i; i < uint256(_NUM_TOKENS); i++) {
-            weights[i] = uint32(uint256(weight));
+        return (IUpdateRule(address(momentumRule)), parameters);
+    }
+
+    function _createPoolParams(
+        uint256 numTokens,
+        PoolFuzzParams memory poolParams,
+        RuleFuzzParams memory ruleParams
+    ) internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory) {
+        // Create base params first
+        QuantAMMWeightedPoolFactory.NewPoolParams memory baseParams = _createBaseParams(
+            numTokens,
+            poolParams.maxSwapfee
+        );
+
+        // Update with pool settings
+        baseParams._poolSettings = _createPoolSettings(numTokens, poolParams, ruleParams);
+
+        return baseParams;
+    }
+
+    function _createBaseParams(
+        uint256 numTokens,
+        uint64 maxSwapFee
+    ) internal view returns (QuantAMMWeightedPoolFactory.NewPoolParams memory) {
+        PoolRoleAccounts memory roleAccounts;
+        IERC20[] memory poolTokens = _getTokens(numTokens);
+
+        (uint256[] memory initialWeightsUint, int256[] memory initialWeights) = _createInitialWeights(numTokens);
+
+        return
+            QuantAMMWeightedPoolFactory.NewPoolParams({
+                name: "Pool With Donation",
+                symbol: "PwD",
+                tokens: vault.buildTokenConfig(poolTokens),
+                normalizedWeights: initialWeightsUint,
+                roleAccounts: roleAccounts,
+                swapFeePercentage: maxSwapFee,
+                poolHooksContract: address(0),
+                enableDonation: true,
+                disableUnbalancedLiquidity: false,
+                salt: keccak256(abi.encodePacked(uint256(1))),
+                _initialWeights: initialWeights,
+                _poolSettings: IQuantAMMWeightedPool.PoolSettings({
+                    assets: new IERC20[](0),
+                    rule: IUpdateRule(address(0)),
+                    oracles: new address[][](0),
+                    updateInterval: 0,
+                    lambda: new uint64[](0),
+                    epsilonMax: 0,
+                    absoluteWeightGuardRail: 0,
+                    maxTradeSizeRatio: 0,
+                    ruleParameters: new int256[][](0),
+                    poolManager: address(0)
+                }),
+                _initialMovingAverages: initialWeights,
+                _initialIntermediateValues: initialWeights,
+                _oracleStalenessThreshold: 3600,
+                poolRegistry: 0,
+                poolDetails: new string[][](0)
+            });
+    }
+
+    function _createInitialWeights(
+        uint256 numTokens
+    ) internal pure returns (uint256[] memory initialWeightsUint, int256[] memory initialWeights) {
+        initialWeightsUint = new uint256[](numTokens);
+        initialWeights = new int256[](numTokens);
+
+        int256 weight = 1e18 / int256(numTokens);
+
+        for (uint i; i < numTokens; i++) {
+            if (i == numTokens - 1) {
+                // Account for odd number of tokens by adjusting final weight
+                weight = 1e18 - (int256(numTokens - 1) * weight);
+            }
+
             initialWeights[i] = weight;
             initialWeightsUint[i] = uint256(weight);
         }
 
-        uint64[] memory lambdas = new uint64[](1);
-        lambdas[0] = _LAMBDA;
+        return (initialWeightsUint, initialWeights);
+    }
 
-        int256[][] memory parameters = new int256[][](1);
-        parameters[0] = new int256[](1);
-        parameters[0][0] = _KAPPA;
+    function _createPoolSettings(
+        uint256 numTokens,
+        PoolFuzzParams memory poolParams,
+        RuleFuzzParams memory ruleParams
+    ) internal returns (IQuantAMMWeightedPool.PoolSettings memory) {
+        (IUpdateRule rule, int256[][] memory ruleParameters) = _createRule(ruleParams);
+
+        uint64[] memory lambdas = new uint64[](1);
+        lambdas[0] = poolParams.lambda;
 
         address[][] memory oracles = new address[][](1);
         oracles[0] = new address[](1);
-        oracles[0][0] = address(chainlinkOracle); //@note single oracle - set to price 1000
+        oracles[0][0] = address(chainlinkOracle);
 
         return
-            QuantAMMWeightedPoolFactory.NewPoolParams(
-                "Pool With Donation",
-                "PwD",
-                vault.buildTokenConfig(tokens), //@note creates a sorted array of TokenConfig
-                initialWeightsUint, //@note initial set of weights - common for all
-                roleAccounts,
-                MAX_SWAP_FEE_PERCENTAGE,
-                address(0), //@note no hook contract
-                true, //@note enable donation - true
-                false, // Do not disable unbalanced add/remove liquidity //@note disable unbalanced liquidity -> false
-                keccak256(abi.encodePacked(delay)), //@follow-up why is this salt? how is delay connected here?
-                initialWeights,
-                IQuantAMMWeightedPool.PoolSettings(
-                    new IERC20[](uint256(_NUM_TOKENS)),
-                    IUpdateRule(momentumRule),
-                    oracles,
-                    60, //@note update interval = 60 secs
-                    lambdas, //@note scalar lambda
-                    _EPSILON_MAX,
-                    _ABSOLUTE_WEIGHT_GUARD_RAIL,
-                    _MAX_TRADE_SIZE_RATIO,
-                    parameters, //@notre rul parameters
-                    address(0) //@note no pool manager
-                ),
-                initialWeights, //@note initial moving averages
-                initialWeights, //@note initial intermediate values
-                3600, //@note oracle staleness threshold - 1 hour
-                0, //@note no pool registry
-                new string[][](0) //@note no pool detaiols
-            );
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](numTokens),
+                rule: rule,
+                oracles: oracles,
+                updateInterval: poolParams.updateInterval,
+                lambda: lambdas,
+                epsilonMax: poolParams.epsilonMax,
+                absoluteWeightGuardRail: poolParams.absoluteWeightGuardRail,
+                maxTradeSizeRatio: poolParams.maxTradeSizeRatio,
+                ruleParameters: ruleParameters,
+                poolManager: address(0)
+            });
     }
 
     function _setupVariables(
@@ -215,13 +323,16 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         variables.secondWeight.index = j;
         variables.params.salt = keccak256(abi.encodePacked(params.delay, "i", i, "_", "j_", j));
 
-        // Add bounds for first weight
-        variables.firstWeight.weight = truncateTo32Bit(bound(params.firstWeight, _MIN_WEIGHT, _MAX_WEIGHT));
+        int256 minWeight = int256(uint256(params.poolParams.absoluteWeightGuardRail));
+        int256 maxWeight = 1e18 - (int256(params.numTokens - 1) * minWeight);
 
-        int256 maxSecondWeight = 1e18 - variables.firstWeight.weight - (_MIN_WEIGHT * int256(_NUM_TOKENS - 2));
-        if (maxSecondWeight > _MAX_WEIGHT) maxSecondWeight = _MAX_WEIGHT;
+        // Add bounds for first weight
+        variables.firstWeight.weight = truncateTo32Bit(bound(params.firstWeight, minWeight, maxWeight));
+
+        int256 maxSecondWeight = 1e18 - variables.firstWeight.weight - (minWeight * int256(params.numTokens - 2));
+        if (maxSecondWeight > maxWeight) maxSecondWeight = maxWeight;
         // Add bound for second weight
-        variables.secondWeight.weight = truncateTo32Bit(bound(params.secondWeight, _MIN_WEIGHT, maxSecondWeight));
+        variables.secondWeight.weight = truncateTo32Bit(bound(params.secondWeight, minWeight, maxSecondWeight));
 
         // Bound multiplier to safe range over interpolation time
         // default multiplier is designed to traverse min-> max -> this is causing an underflow in calculateBlockNormalisedWeight
@@ -230,8 +341,8 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         variables.firstWeight.multiplier = truncateTo32Bit(
             bound(
                 params.firstMultiplier,
-                (_MIN_WEIGHT - variables.firstWeight.weight) / int256(_INTERPOLATION_TIME),
-                (_MAX_WEIGHT - variables.firstWeight.weight) / int256(_INTERPOLATION_TIME)
+                (minWeight - variables.firstWeight.weight) / int256(params.interpolationTime),
+                (maxWeight - variables.firstWeight.weight) / int256(params.interpolationTime)
             )
         );
 
@@ -239,26 +350,28 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         variables.secondWeight.multiplier = truncateTo32Bit(
             bound(
                 params.secondMultiplier,
-                (_MIN_WEIGHT - variables.secondWeight.weight) / int256(_INTERPOLATION_TIME),
-                (_MAX_WEIGHT - variables.secondWeight.weight) / int256(_INTERPOLATION_TIME)
+                (minWeight - variables.secondWeight.weight) / int256(params.interpolationTime),
+                (maxWeight - variables.secondWeight.weight) / int256(params.interpolationTime)
             )
         );
 
         // @audit for other tokens, calculate safe range by using the residual weight
-        int256 otherWeight = truncateTo32Bit(
-            (1e18 - variables.firstWeight.weight - variables.secondWeight.weight) / int256(_NUM_TOKENS - 2)
-        );
-        int256 otherMultiplier = variables.firstWeight.multiplier > variables.secondWeight.multiplier
-            ? variables.secondWeight.multiplier
-            : variables.firstWeight.multiplier;
+        int256 otherWeight = params.numTokens == 2
+            ? int256(0)
+            : truncateTo32Bit(
+                (1e18 - variables.firstWeight.weight - variables.secondWeight.weight) / int256(params.numTokens - 2)
+            );
+        int256 otherMultiplier = _min(variables.secondWeight.multiplier, variables.firstWeight.multiplier);
 
-        otherMultiplier = truncateTo32Bit(
-            bound(
-                otherMultiplier,
-                (_MIN_WEIGHT - otherWeight) / int256(_INTERPOLATION_TIME),
-                (_MAX_WEIGHT - otherWeight) / int256(_INTERPOLATION_TIME)
-            )
-        );
+        otherMultiplier = params.numTokens == 2
+            ? int256(0)
+            : truncateTo32Bit(
+                bound(
+                    otherMultiplier,
+                    (minWeight - otherWeight) / int256(params.interpolationTime),
+                    (maxWeight - otherWeight) / int256(params.interpolationTime)
+                )
+            );
 
         // store them in other weights as we need to use them later
         variables.otherWeights.weight = otherWeight;
@@ -267,35 +380,58 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         variables.newWeights = _getDefaultWeightAndMultiplierForRemainingTokens(
             variables.firstWeight,
             variables.secondWeight,
-            variables.otherWeights
+            variables.otherWeights,
+            params.numTokens
         );
 
-        variables.balances = _getDefaultBalances();
-        variables.balances[variables.firstWeight.index] = 5550e18;
-        variables.balances[variables.secondWeight.index] = 7770e18;
+        variables.balances = _getBalances(params.numTokens, params.balanceParams);
     }
 
-    function _getDefaultBalances() internal pure returns (uint256[] memory balances) {
-        balances = new uint256[](8);
-        balances[0] = 1000e18;
-        balances[1] = 2000e18;
-        balances[2] = 500e18;
-        balances[3] = 350e18;
-        balances[4] = 750e18;
-        balances[5] = 7500e18;
-        balances[6] = 8000e18;
-        balances[7] = 5000e18;
+    function _getBalances(
+        uint256 numTokens,
+        BalanceFuzzParams memory balanceParams
+    ) internal pure returns (uint256[] memory) {
+        uint256[] memory balances = new uint256[](numTokens);
+
+        balances[0] = bound(balanceParams.balance0, 100e18, type(uint128).max);
+        balances[1] = bound(balanceParams.balance1, 100e18, type(uint128).max);
+
+        if (numTokens > 2) {
+            balances[2] = bound(balanceParams.balance2, 100e18, type(uint128).max);
+        }
+        if (numTokens > 3) {
+            balances[3] = bound(balanceParams.balance3, 100e18, type(uint128).max);
+        }
+
+        if (numTokens > 4) {
+            balances[4] = bound(balanceParams.balance4, 100e18, type(uint128).max);
+        }
+
+        if (numTokens > 5) {
+            balances[5] = bound(balanceParams.balance5, 100e18, type(uint128).max);
+        }
+
+        if (numTokens > 6) {
+            balances[6] = bound(balanceParams.balance6, 100e18, type(uint128).max);
+        }
+
+        if (numTokens > 7) {
+            balances[7] = bound(balanceParams.balance7, 100e18, type(uint128).max);
+        }
+
+        return balances;
     }
 
     function _getDefaultWeightAndMultiplierForRemainingTokens(
         TestParam memory firstWeightParam,
         TestParam memory secondWeightParam,
-        TestParam memory otherWeightParams
+        TestParam memory otherWeightParams,
+        uint256 numTokens
     ) internal pure returns (int256[] memory weights) {
-        weights = new int256[](uint256(_NUM_TOKENS * 2));
+        weights = new int256[](uint256(numTokens * 2));
 
         // Set weights
-        for (uint i = 0; i < uint256(_NUM_TOKENS); i++) {
+        for (uint i = 0; i < uint256(numTokens); i++) {
             if (i == firstWeightParam.index) {
                 weights[i] = firstWeightParam.weight;
             } else if (i == secondWeightParam.index) {
@@ -304,18 +440,18 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                 weights[i] = otherWeightParams.weight;
             }
             // Set multipliers
-            weights[i + uint256(_NUM_TOKENS)] = i == firstWeightParam.index
+            weights[i + uint256(numTokens)] = i == firstWeightParam.index
                 ? firstWeightParam.multiplier
                 : (i == secondWeightParam.index ? secondWeightParam.multiplier : otherWeightParams.multiplier);
         }
     }
 
     function _calculateInterpolatedWeight(TestParam memory param, uint256 delay) internal pure returns (uint256) {
-        int256 scaledMultiplier = param.multiplier * 1e18;
+        int256 multiplierScaled18 = param.multiplier * 1e18;
         if (param.multiplier > 0) {
-            return uint256(param.weight) + FixedPoint.mulDown(uint256(scaledMultiplier), delay);
+            return uint256(param.weight) + FixedPoint.mulDown(uint256(multiplierScaled18), delay);
         } else {
-            return uint256(param.weight) - FixedPoint.mulUp(uint256(-scaledMultiplier), delay);
+            return uint256(param.weight) - FixedPoint.mulUp(uint256(-multiplierScaled18), delay);
         }
     }
 
@@ -323,83 +459,50 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         return (value / 1e9) * 1e9;
     }
 
-    //@audit except for delay, other fuzzing param bounds are configured in setVariables
-    function testGetNormalizedWeightsInitial_Fuzz(FuzzParams memory params) public {
-        params.delay = 0; // forcing it to zero for this test
-        _testGetNormalizedWeights(params);
+    function _logFuzzParams(
+        FuzzParams memory params,
+        bool logPoolParams,
+        bool logRuleParams,
+        bool logBalanceParams
+    ) internal view {
+        // top level fuzz params
+        console.logString(string.concat("Interpolation time: ", vm.toString(params.interpolationTime)));
+        console.logString(string.concat("Delay: ", vm.toString(params.delay)));
+        console.logString(string.concat("Number of Tokens: ", vm.toString(params.numTokens)));
+
+        if (logPoolParams) {
+            console.logString(string.concat("Lambda", vm.toString(params.poolParams.lambda)));
+            console.logString(string.concat("Max Swap Fee", vm.toString(params.poolParams.maxSwapfee)));
+            console.logString(string.concat("Epsilon Max", vm.toString(params.poolParams.epsilonMax)));
+            console.logString(
+                string.concat("Abs Weight Guard Rail", vm.toString(params.poolParams.absoluteWeightGuardRail))
+            );
+            console.logString(string.concat("Max Trade Size Ratio", vm.toString(params.poolParams.maxTradeSizeRatio)));
+            console.logString(string.concat("Update Interval", vm.toString(params.poolParams.updateInterval)));
+        }
+
+        if (logRuleParams) {
+            console.logString(string.concat("Rule Type", vm.toString(params.ruleParams.ruleType)));
+            console.logString(string.concat("Kappa", vm.toString(params.ruleParams.kappa)));
+        }
+        if (logBalanceParams) {
+            console.logString(string.concat("Balance 0", vm.toString(params.balanceParams.balance0)));
+            console.logString(string.concat("Balance 1", vm.toString(params.balanceParams.balance1)));
+            console.logString(string.concat("Balance 2", vm.toString(params.balanceParams.balance2)));
+            console.logString(string.concat("Balance 3", vm.toString(params.balanceParams.balance3)));
+            console.logString(string.concat("Balance 4", vm.toString(params.balanceParams.balance4)));
+            console.logString(string.concat("Balance 5", vm.toString(params.balanceParams.balance5)));
+            console.logString(string.concat("Balance 6", vm.toString(params.balanceParams.balance6)));
+            console.logString(string.concat("Balance 7", vm.toString(params.balanceParams.balance7)));
+        }
     }
 
-    function testGetNormalizedWeightsNBlocksAfter_Fuzz(FuzzParams memory params) public {
-        params.delay = bound(params.delay, 1, _INTERPOLATION_TIME);
-        _testGetNormalizedWeights(params);
+    function _min(uint256 a, uint256 b) private pure returns (uint256) {
+        return a < b ? a : b;
     }
 
-    function testGetNormalizedWeightsAfterLimit_Fuzz(FuzzParams memory params) public {
-        params.delay = bound(params.delay, _INTERPOLATION_TIME + 1, type(uint40).max);
-        _testGetNormalizedWeights(params);
-    }
-
-    function testGetDynamicDataWeightsInitial_Fuzz(FuzzParams memory params) public {
-        params.delay = bound(params.delay, 0, 0); // forcing it to zero for this test
-        _testGetDynamicData(params);
-    }
-
-    function testGetDynamicDataWeightsNBlocksAfter_Fuzz(FuzzParams memory params) public {
-        params.delay = bound(params.delay, 1, _INTERPOLATION_TIME);
-        _testGetDynamicData(params);
-    }
-
-    function testGetDynamicDataWeightsAfterLimit_Fuzz(FuzzParams memory params) public {
-        params.delay = bound(params.delay, _INTERPOLATION_TIME + 1, type(uint40).max);
-        _testGetDynamicData(params);
-    }
-
-    //the other tests go through individual use cases, this makes sure no combo of weight in and out makes a difference
-    function testBalancesInitial_Fuzz(FuzzParams memory params, BalanceFuzzParams memory balanceParams) public {
-        params.delay = bound(params.delay, 0, 0); // forcing it to zero for this test
-        _testBalances(params, balanceParams);
-    }
-
-    function testBalancesNBlocksAfter_Fuzz(FuzzParams memory params, BalanceFuzzParams memory balanceParams) public {
-        params.delay = bound(params.delay, 1, _INTERPOLATION_TIME);
-        _testBalances(params, balanceParams);
-    }
-
-    function testBalancesAfterLimit_Fuzz(FuzzParams memory params, BalanceFuzzParams memory balanceParams) public {
-        params.delay = bound(params.delay, _INTERPOLATION_TIME + 1, type(uint40).max);
-        _testBalances(params, balanceParams);
-    }
-
-    //the other tests go through individual use cases, this makes sure no combo of weight in and out makes a difference
-    function testSwapExactInInitial_Fuzz(FuzzParams memory params, SwapFuzzParams memory swapParams) public {
-        params.delay = bound(params.delay, 0, 0); // forcing it to zero for this test
-        _testSwapExactIn(params, swapParams);
-    }
-
-    function testSwapExactInNBlocksAfter_Fuzz(FuzzParams memory params, SwapFuzzParams memory swapParams) public {
-        params.delay = bound(params.delay, 1, _INTERPOLATION_TIME);
-        _testSwapExactIn(params, swapParams);
-    }
-
-    function testSwapExactInAfterLimit_Fuzz(FuzzParams memory params, SwapFuzzParams memory swapParams) public {
-        params.delay = bound(params.delay, _INTERPOLATION_TIME + 1, type(uint40).max);
-        _testSwapExactIn(params, swapParams);
-    }
-
-    //the other tests go through individual use cases, this makes sure no combo of weight in and out makes a difference
-    function testSwapExactOutInitial_Fuzz(FuzzParams memory params, SwapFuzzParams memory swapParams) public {
-        params.delay = bound(params.delay, 0, 0); // forcing it to zero for this test
-        _testSwapExactOut(params, swapParams);
-    }
-
-    function testSwapExactOutNBlocksAfter_Fuzz(FuzzParams memory params, SwapFuzzParams memory swapParams) public {
-        params.delay = bound(params.delay, 1, _INTERPOLATION_TIME);
-        _testSwapExactOut(params, swapParams);
-    }
-
-    function testSwapExactOutAfterLimit_Fuzz(FuzzParams memory params, SwapFuzzParams memory swapParams) public {
-        params.delay = bound(params.delay, _INTERPOLATION_TIME + 1, type(uint40).max);
-        _testSwapExactOut(params, swapParams);
+    function _min(int256 a, int256 b) private pure returns (int256) {
+        return a < b ? a : b;
     }
 
     function _testGetNormalizedWeights(FuzzParams memory params) internal {
@@ -410,16 +513,16 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         variables.otherWeights = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
 
         // create pool params
-        variables.params = _createPoolParams(_DEFAULT_WEIGHT, params.delay);
+        variables.params = _createPoolParams(params.numTokens, params.poolParams, params.ruleParams);
 
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params); //@note new pool params
 
         uint expectedDelay = params.delay;
-        if (params.delay > _INTERPOLATION_TIME) {
-            expectedDelay = _INTERPOLATION_TIME;
+        if (params.delay > params.interpolationTime) {
+            expectedDelay = params.interpolationTime;
         }
-        for (uint i = 0; i < uint256(_NUM_TOKENS); i++) {
-            for (uint j = 0; j < uint256(_NUM_TOKENS); j++) {
+        for (uint i = 0; i < params.numTokens; i++) {
+            for (uint j = 0; j < params.numTokens; j++) {
                 if (i != j) {
                     vm.warp(timestamp);
                     _setupVariables(variables, i, j, params);
@@ -428,7 +531,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                     QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
                         variables.newWeights,
                         quantAMMWeightedPool,
-                        uint40(timestamp + _INTERPOLATION_TIME)
+                        uint40(timestamp + params.interpolationTime)
                     );
 
                     if (params.delay > 0) {
@@ -436,8 +539,24 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                     }
 
                     variables.testUint256 = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
+                    console.log("index i", i);
+                    console.log("index j", j);
+                    console.logString(string.concat("first weight: ", vm.toString(variables.firstWeight.weight)));
+                    console.logString(string.concat("second weight: ", vm.toString(variables.secondWeight.weight)));
+                    console.logString(string.concat("other weight: ", vm.toString(variables.otherWeights.weight)));
 
-                    for (uint k = 0; k < uint256(_NUM_TOKENS); k++) {
+                    console.logString(
+                        string.concat("first multiplier: ", vm.toString(variables.firstWeight.multiplier))
+                    );
+                    console.logString(
+                        string.concat("second multiplier: ", vm.toString(variables.secondWeight.multiplier))
+                    );
+                    console.logString(
+                        string.concat("other multiplier: ", vm.toString(variables.otherWeights.multiplier))
+                    );
+                    console.log("expected delay", expectedDelay);
+
+                    for (uint k = 0; k < params.numTokens; k++) {
                         if (k == variables.firstWeight.index) {
                             if (variables.firstWeight.multiplier > 0) {
                                 assertEq(
@@ -500,15 +619,17 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
         variables.secondWeight = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
         variables.otherWeights = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
 
-        variables.params = _createPoolParams(_DEFAULT_WEIGHT, params.delay);
+        // create pool params
+        variables.params = _createPoolParams(params.numTokens, params.poolParams, params.ruleParams);
+
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
 
         uint expectedDelay = params.delay;
-        if (params.delay > _INTERPOLATION_TIME) {
-            expectedDelay = _INTERPOLATION_TIME;
+        if (params.delay > params.interpolationTime) {
+            expectedDelay = params.interpolationTime;
         }
-        for (uint i = 0; i < uint256(_NUM_TOKENS); i++) {
-            for (uint j = 0; j < uint256(_NUM_TOKENS); j++) {
+        for (uint i = 0; i < params.numTokens; i++) {
+            for (uint j = 0; j < params.numTokens; j++) {
                 if (i != j) {
                     vm.warp(timestamp);
                     _setupVariables(variables, i, j, params);
@@ -517,7 +638,7 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                     QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
                         variables.newWeights,
                         quantAMMWeightedPool,
-                        uint40(timestamp + _INTERPOLATION_TIME)
+                        uint40(timestamp + params.interpolationTime)
                     );
 
                     if (params.delay > 0) {
@@ -527,7 +648,24 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                     variables.dynamicData = QuantAMMWeightedPool(quantAMMWeightedPool)
                         .getQuantAMMWeightedPoolDynamicData();
 
-                    for (uint k = 0; k < uint256(_NUM_TOKENS); k++) {
+                    console.log("index i", i);
+                    console.log("index j", j);
+                    console.logString(string.concat("first weight: ", vm.toString(variables.firstWeight.weight)));
+                    console.logString(string.concat("second weight: ", vm.toString(variables.secondWeight.weight)));
+                    console.logString(string.concat("other weight: ", vm.toString(variables.otherWeights.weight)));
+
+                    console.logString(
+                        string.concat("first multiplier: ", vm.toString(variables.firstWeight.multiplier))
+                    );
+                    console.logString(
+                        string.concat("second multiplier: ", vm.toString(variables.secondWeight.multiplier))
+                    );
+                    console.logString(
+                        string.concat("other multiplier: ", vm.toString(variables.otherWeights.multiplier))
+                    );
+                    console.log("expected delay", expectedDelay);
+
+                    for (uint k = 0; k < params.numTokens; k++) {
                         if (k == variables.firstWeight.index) {
                             assertEq(
                                 variables.dynamicData.weightsAtLastUpdateInterval[variables.firstWeight.index],
@@ -561,36 +699,37 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                     assertEq(variables.dynamicData.lastUpdateIntervalTime, uint40(timestamp));
                     assertEq(
                         variables.dynamicData.lastInterpolationTimePossible,
-                        uint40(timestamp + _INTERPOLATION_TIME)
+                        uint40(timestamp + params.interpolationTime)
                     );
                 }
             }
         }
     }
 
-    function _min(uint256 a, uint256 b) private pure returns (uint256) {
-        return a < b ? a : b;
-    }
-
-    function _testBalances(FuzzParams memory params, BalanceFuzzParams memory balanceParams) internal {
+    function _testBalances(FuzzParams memory params, LiquidityFuzzParams memory liquidityParams) internal {
         uint40 timestamp = uint40(block.timestamp);
         VariationTestVariables memory variables;
         variables.firstWeight = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
         variables.secondWeight = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
         variables.otherWeights = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
 
-        balanceParams.tokenIndex = bound(balanceParams.tokenIndex, 0, uint256(_NUM_TOKENS) - 1);
-        balanceParams.invariantRatio = bound(balanceParams.invariantRatio, _MIN_INVARIANT_RATIO, _MAX_INVARIANT_RATIO);
+        liquidityParams.tokenIndex = bound(liquidityParams.tokenIndex, 0, params.numTokens - 1);
+        liquidityParams.invariantRatio = bound(
+            liquidityParams.invariantRatio,
+            _MIN_INVARIANT_RATIO,
+            _MAX_INVARIANT_RATIO
+        );
 
-        variables.params = _createPoolParams(_DEFAULT_WEIGHT, params.delay);
+        variables.params = _createPoolParams(params.numTokens, params.poolParams, params.ruleParams);
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
 
-        uint256 expectedDelay = params.delay;
-        if (params.delay > _INTERPOLATION_TIME) {
-            expectedDelay = _INTERPOLATION_TIME;
+        uint expectedDelay = params.delay;
+        if (params.delay > params.interpolationTime) {
+            expectedDelay = params.interpolationTime;
         }
-        for (uint i = 0; i < uint256(_NUM_TOKENS); i++) {
-            for (uint j = 0; j < uint256(_NUM_TOKENS); j++) {
+
+        for (uint i = 0; i < params.numTokens; i++) {
+            for (uint j = 0; j < params.numTokens; j++) {
                 if (i != j) {
                     vm.warp(timestamp);
                     _setupVariables(variables, i, j, params);
@@ -599,45 +738,61 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                     QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
                         variables.newWeights,
                         quantAMMWeightedPool,
-                        uint40(timestamp + _INTERPOLATION_TIME)
+                        uint40(timestamp + params.interpolationTime)
                     );
 
                     if (params.delay > 0) {
                         vm.warp(timestamp + params.delay);
                     }
+                    console.log("num tokens", params.numTokens);
+                    console.log("index i", i);
+                    console.log("index j", j);
+                    console.logString(string.concat("first weight: ", vm.toString(variables.firstWeight.weight)));
+                    console.logString(string.concat("second weight: ", vm.toString(variables.secondWeight.weight)));
+                    console.logString(string.concat("other weight: ", vm.toString(variables.otherWeights.weight)));
+
+                    console.logString(
+                        string.concat("first multiplier: ", vm.toString(variables.firstWeight.multiplier))
+                    );
+                    console.logString(
+                        string.concat("second multiplier: ", vm.toString(variables.secondWeight.multiplier))
+                    );
+                    console.logString(
+                        string.concat("other multiplier: ", vm.toString(variables.otherWeights.multiplier))
+                    );
+                    console.log("expected delay", expectedDelay);
+
+                    console.logString(string.concat("token index: ", vm.toString(liquidityParams.tokenIndex)));
+                    console.logString(
+                        string.concat(
+                            "balance for token index",
+                            vm.toString(variables.balances[liquidityParams.tokenIndex])
+                        )
+                    );
+                    console.logString(string.concat("invariant ratio", vm.toString(liquidityParams.invariantRatio)));
 
                     // @audit Calculate this instead of passing it as input
                     uint256 normalizedWeight = _calculateInterpolatedWeight(
-                        balanceParams.tokenIndex == variables.firstWeight.index
+                        liquidityParams.tokenIndex == variables.firstWeight.index
                             ? variables.firstWeight
-                            : balanceParams.tokenIndex == variables.secondWeight.index
+                            : liquidityParams.tokenIndex == variables.secondWeight.index
                             ? variables.secondWeight
                             : variables.otherWeights,
                         expectedDelay
                     );
-
-                    uint256 retrievedWeight = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights()[
-                        balanceParams.tokenIndex
-                    ];
-
-                    //_calculateInterpolatedWeight is manual, make sure weights are the same so we know we are testing balances not weight calcs
-                    assertEq(retrievedWeight, normalizedWeight, "weights do not match, testing balances not weights");
+                    console.logString(string.concat("normalized weight", vm.toString(normalizedWeight)));
 
                     //Calculate expected balance using WeightedMath formula
                     uint256 expectedBalance = WeightedMath.computeBalanceOutGivenInvariant(
-                        variables.balances[balanceParams.tokenIndex],
+                        variables.balances[liquidityParams.tokenIndex],
                         normalizedWeight,
-                        balanceParams.invariantRatio
+                        liquidityParams.invariantRatio
                     );
-
-                    console.log("Token Index:", balanceParams.tokenIndex);
-                    console.log("Invariant Ratio:", balanceParams.invariantRatio);
-                    console.log("Balance:", variables.balances[balanceParams.tokenIndex]);
 
                     uint256 actualBalance = QuantAMMWeightedPool(quantAMMWeightedPool).computeBalance(
                         variables.balances,
-                        balanceParams.tokenIndex,
-                        balanceParams.invariantRatio
+                        liquidityParams.tokenIndex,
+                        liquidityParams.invariantRatio
                     );
                     assertApproxEqRel(actualBalance, expectedBalance, 1e12); // Allow small relative error
                 }
@@ -648,21 +803,25 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
     function _testSwapExactIn(FuzzParams memory params, SwapFuzzParams memory swapParams) internal {
         uint40 timestamp = uint40(block.timestamp);
         VariationTestVariables memory variables;
+
         variables.firstWeight = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
         variables.secondWeight = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
         variables.otherWeights = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
 
-        variables.params = _createPoolParams(_DEFAULT_WEIGHT, params.delay);
+        // create pool params
+        variables.params = _createPoolParams(params.numTokens, params.poolParams, params.ruleParams);
+
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
 
         swapParams.exactOut = 0; // this is an exact in swap
 
         uint expectedDelay = params.delay;
-        if (params.delay > _INTERPOLATION_TIME) {
-            expectedDelay = _INTERPOLATION_TIME;
+        if (params.delay > params.interpolationTime) {
+            expectedDelay = params.interpolationTime;
         }
-        for (uint i = 0; i < uint256(_NUM_TOKENS); i++) {
-            for (uint j = 0; j < uint256(_NUM_TOKENS); j++) {
+
+        for (uint i = 0; i < params.numTokens; i++) {
+            for (uint j = 0; j < params.numTokens; j++) {
                 if (i != j) {
                     vm.warp(timestamp);
                     _setupVariables(variables, i, j, params);
@@ -671,12 +830,13 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                     QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
                         variables.newWeights,
                         quantAMMWeightedPool,
-                        uint40(timestamp + _INTERPOLATION_TIME)
+                        uint40(timestamp + params.interpolationTime)
                     );
+
                     uint256 maxTradeSize = variables.balances[variables.firstWeight.index].mulDown(
-                        _min(_MAX_IN_RATIO, uint256(_MAX_TRADE_SIZE_RATIO))
+                        _min(_MAX_IN_RATIO, uint256(params.poolParams.maxTradeSizeRatio))
                     );
-                    swapParams.exactIn = bound(swapParams.exactIn, 1, maxTradeSize); //@audit respecting WeightedMath constraint and max trade size constraint
+                    swapParams.exactIn = bound(swapParams.exactIn, 1, maxTradeSize);
 
                     if (params.delay > 0) {
                         vm.warp(timestamp + params.delay);
@@ -716,22 +876,25 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
     function _testSwapExactOut(FuzzParams memory params, SwapFuzzParams memory swapParams) internal {
         uint40 timestamp = uint40(block.timestamp);
         VariationTestVariables memory variables;
+
         variables.firstWeight = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
         variables.secondWeight = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
         variables.otherWeights = TestParam(0, _DEFAULT_WEIGHT, _DEFAULT_MULTIPLIER);
 
-        variables.params = _createPoolParams(_DEFAULT_WEIGHT, params.delay);
+        // create pool params
+        variables.params = _createPoolParams(params.numTokens, params.poolParams, params.ruleParams);
+
         address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(variables.params);
 
         swapParams.exactIn = 0; // this is an exact out swap
 
         uint expectedDelay = params.delay;
-        if (params.delay > _INTERPOLATION_TIME) {
-            expectedDelay = _INTERPOLATION_TIME;
+        if (params.delay > params.interpolationTime) {
+            expectedDelay = params.interpolationTime;
         }
 
-        for (uint i = 0; i < uint256(_NUM_TOKENS); i++) {
-            for (uint j = 0; j < uint256(_NUM_TOKENS); j++) {
+        for (uint i = 0; i < params.numTokens; i++) {
+            for (uint j = 0; j < params.numTokens; j++) {
                 if (i != j) {
                     vm.warp(timestamp);
                     _setupVariables(variables, i, j, params);
@@ -740,16 +903,17 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                     QuantAMMWeightedPool(quantAMMWeightedPool).setWeights(
                         variables.newWeights,
                         quantAMMWeightedPool,
-                        uint40(timestamp + _INTERPOLATION_TIME)
+                        uint40(timestamp + params.interpolationTime)
                     );
+
+                    uint256 maxTradeSize = variables.balances[variables.secondWeight.index].mulDown(
+                        _min(_MAX_IN_RATIO, uint256(params.poolParams.maxTradeSizeRatio))
+                    );
+                    swapParams.exactOut = bound(swapParams.exactOut, 1, maxTradeSize);
 
                     if (params.delay > 0) {
                         vm.warp(timestamp + params.delay);
                     }
-                    uint256 maxTradeSize = variables.balances[variables.secondWeight.index].mulDown(
-                        _min(_MAX_OUT_RATIO, uint256(_MAX_TRADE_SIZE_RATIO))
-                    );
-                    swapParams.exactOut = bound(swapParams.exactOut, 1, maxTradeSize);
 
                     variables.swapParams = PoolSwapParams({
                         kind: SwapKind.EXACT_OUT,
@@ -778,5 +942,771 @@ contract QuantAMMWeightedPoolAllTokenVariationsTest is QuantAMMWeightedPoolContr
                 }
             }
         }
+    }
+
+    /**** -----------------------------------------------------------------------*****/
+
+    /******* ------------------Tests -------------------------------------- *********/
+
+    //@audit except for delay, other fuzzing param bounds are configured in setVariables
+    //@note this is similar to the testGetNormalizedWeightsInitial_Fuzz - starting at a base level and slowly expanding fuzz envelope
+    //@note this test uses variable numTokens and variable balances
+    function testGetNormalizedWeightsInitial_Fuzz_Generic(FuzzParams memory params) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay to 0
+        params.delay = 0;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testGetNormalizedWeights(params);
+    }
+
+    //@audit this test checks the interpolation at times < interpoliation time
+    //@note again numTokens and balances are extra fuzz params here
+    function testGetNormalizedWeightsNBlocksAfter_Fuzz_Generic(FuzzParams memory params) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay upto interpolation time
+        params.delay = bound(params.delay, 1, params.interpolationTime);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testGetNormalizedWeights(params);
+    }
+
+    function testGetNormalizedWeightsAfterLimit_Fuzz_Generic(FuzzParams memory params) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay after interpolation time
+        params.delay = bound(params.delay, _INTERPOLATION_TIME + 1, type(uint40).max);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testGetNormalizedWeights(params);
+    }
+
+    // uses a dynamic interpolation time
+    function testGetNormalizedWeightsNBlocksAfter_DynamicInterpolationTime_Fuzz_Generic(
+        FuzzParams memory params
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        // fuzz the interpolation time
+        params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
+
+        // fix delay upto interpolation time
+        params.delay = bound(params.delay, 1, params.interpolationTime);
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testGetNormalizedWeights(params);
+    }
+
+    function testGetNormalizedWeightsAfterLimit_DynamicInterpolationTime_Fuzz_Generic(FuzzParams memory params) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        // fuzz the interpolation time
+        params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
+
+        // fix delay upto interpolation time
+        params.delay = bound(params.delay, params.interpolationTime + 1, type(uint40).max);
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testGetNormalizedWeights(params);
+    }
+
+    // use a dynamic update interval and dynamic interpolation time
+    function testGetNormalizedWeightsNBlocksAfter_DynamicIntervalAndInterpolationTime_Fuzz_Generic(
+        FuzzParams memory params
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+
+        // fuzz the interpolation time
+        params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
+
+        // fix delay upto interpolation time
+        params.delay = bound(params.delay, 1, params.interpolationTime);
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testGetNormalizedWeights(params);
+    }
+
+    function testGetNormalizedWeightsAfterLimit_DynamicIntervalAndInterpolationTime_Fuzz_Generic(
+        FuzzParams memory params
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+
+        // fuzz the interpolation time
+        params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
+
+        // fix delay upto interpolation time
+        params.delay = bound(params.delay, params.interpolationTime + 1, type(uint40).max);
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testGetNormalizedWeights(params);
+    }
+
+    // change the abs weight guard rail
+    function testGetNormalizedWeightsNBlocksAfter_GuardRail_Fuzz_Generic(FuzzParams memory params) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay upto interpolation time
+        params.delay = bound(params.delay, 1, params.interpolationTime);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+        params.poolParams.absoluteWeightGuardRail = uint64(
+            bound(params.poolParams.absoluteWeightGuardRail, _ABSOLUTE_WEIGHT_GUARD_RAIL, 1e18 / params.numTokens - 1)
+        );
+
+        _testGetNormalizedWeights(params);
+    }
+
+    function testGetNormalizedWeightsAfterLimit_GuardRail_Fuzz_Generic(FuzzParams memory params) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay after interpolation time
+        params.delay = bound(params.delay, params.interpolationTime + 1, type(uint40).max);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+        params.poolParams.absoluteWeightGuardRail = uint64(
+            bound(params.poolParams.absoluteWeightGuardRail, _ABSOLUTE_WEIGHT_GUARD_RAIL, 1e18 / params.numTokens - 1)
+        );
+
+        _testGetNormalizedWeights(params);
+    }
+
+    function testGetDynamicDataWeightsInitial_Fuzz_Generic(FuzzParams memory params) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay to 0
+        params.delay = 0;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testGetDynamicData(params);
+    }
+
+    function testGetDynamicDataWeightsNBlocksAfter_Fuzz_Generic(FuzzParams memory params) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay upto interpolation time
+        params.delay = bound(params.delay, 1, params.interpolationTime);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testGetDynamicData(params);
+    }
+
+    function testGetDynamicDataWeightsAfterLimit_Fuzz(FuzzParams memory params) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay after interpolation time
+        params.delay = bound(params.delay, _INTERPOLATION_TIME + 1, type(uint40).max);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+        _testGetDynamicData(params);
+    }
+
+    function testGetDynamicDataWeightsNBlocksAfter_DynamicInterpolationTime_Fuzz_Generic(
+        FuzzParams memory params
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        // fuzz the interpolation time
+        params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
+
+        // fix delay upto interpolation time
+        params.delay = bound(params.delay, 1, params.interpolationTime);
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testGetDynamicData(params);
+    }
+
+    function testGetDynamicDataWeightsNBlocksAfter_DynamicIntervalAndInterpolationTime_Fuzz_Generic(
+        FuzzParams memory params
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+
+        // fuzz the interpolation time
+        params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
+
+        // fix delay upto interpolation time
+        params.delay = bound(params.delay, 1, params.interpolationTime);
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+        _testGetDynamicData(params);
+    }
+
+    function testGetDynamicDataWeightsAfterLimit_DynamicIntervalAndInterpolationTime_Fuzz(
+        FuzzParams memory params
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+
+        // fuzz the interpolation time
+        params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
+
+        // fix delay upto interpolation time
+        params.delay = bound(params.delay, params.interpolationTime + 1, type(uint40).max);
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+        _testGetDynamicData(params);
+    }
+
+    //the other tests go through individual use cases, this makes sure no combo of weight in and out makes a difference
+    function testBalancesInitial_Fuzz_Generic(
+        FuzzParams memory params,
+        LiquidityFuzzParams memory liquidityParams
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay to 0
+        params.delay = 0;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.numTokens = bound(params.numTokens, 2, 8);
+        params.poolParams.absoluteWeightGuardRail = uint64(
+            bound(params.poolParams.absoluteWeightGuardRail, 3e16, 1e18 / params.numTokens - 1)
+        );
+
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        _testBalances(params, liquidityParams);
+    }
+
+    function testBalancesNBlocksAfter_Fuzz_Generic(
+        FuzzParams memory params,
+        LiquidityFuzzParams memory liquidityParams
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay upto interpolation time
+        params.delay = bound(params.delay, 1, params.interpolationTime);
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = uint64(
+            bound(params.poolParams.absoluteWeightGuardRail, 3e16, 1e18 / params.numTokens - 1)
+        );
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        console.log("num tokens", params.numTokens);
+        console.logString(
+            string.concat("absolute weight guard rail: ", vm.toString(params.poolParams.absoluteWeightGuardRail))
+        );
+
+        _testBalances(params, liquidityParams);
+    }
+
+    function testBalancesAfterLimit_Fuzz_Generic(
+        FuzzParams memory params,
+        LiquidityFuzzParams memory liquidityParams
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = uint64(
+            bound(params.poolParams.absoluteWeightGuardRail, 3e16, 1e18 / params.numTokens - 1)
+        );
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        console.log("num tokens", params.numTokens);
+        console.logString(
+            string.concat("absolute weight guard rail: ", vm.toString(params.poolParams.absoluteWeightGuardRail))
+        );
+
+        params.delay = bound(params.delay, _INTERPOLATION_TIME + 1, type(uint40).max);
+        _testBalances(params, liquidityParams);
+    }
+
+    //the other tests go through individual use cases, this makes sure no combo of weight in and out makes a difference
+    function testSwapExactInInitial_Fuzz_Generic(FuzzParams memory params, SwapFuzzParams memory swapParams) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay to 0
+        params.delay = 0;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testSwapExactIn(params, swapParams);
+    }
+
+    function testSwapExactInNBlocksAfter_Fuzz_Generic(
+        FuzzParams memory params,
+        SwapFuzzParams memory swapParams
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        params.delay = bound(params.delay, 1, _INTERPOLATION_TIME);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testSwapExactIn(params, swapParams);
+    }
+
+    function testSwapExactInAfterLimit_Fuzz_Generic(FuzzParams memory params, SwapFuzzParams memory swapParams) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        params.delay = bound(params.delay, _INTERPOLATION_TIME + 1, type(uint40).max);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testSwapExactIn(params, swapParams);
+    }
+
+    function testSwapExactInNBlocksAfter_Expanded_Fuzz_Generic(
+        FuzzParams memory params,
+        RuleFuzzParams memory ruleParams,
+        SwapFuzzParams memory swapParams
+    ) public {
+        // construct momentum rule with default params
+        ruleParams.ruleType = 0;
+        ruleParams.kappa = int256(bound(ruleParams.kappa, 0.01e18, 1e18));
+        params.ruleParams = ruleParams;
+        // fuzz update interval
+        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+
+        // fuzz the interpolation time
+        params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
+
+        params.delay = bound(params.delay, 1, params.interpolationTime);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = uint64(bound(params.poolParams.maxSwapfee, 1e16, 1e18 - 1));
+        params.poolParams.lambda = uint64(bound(params.poolParams.lambda, 1, 1e18 - 1));
+        params.poolParams.maxSwapfee = uint64(
+            bound(params.poolParams.maxSwapfee, _MIN_SWAP_FEE_PERCENTAGE, _MAX_SWAP_FEE_PERCENTAGE)
+        );
+        params.poolParams.maxTradeSizeRatio = uint64(bound(params.poolParams.maxTradeSizeRatio, 1e16, 30e16));
+        params.numTokens = bound(params.numTokens, 2, 8);
+        params.poolParams.absoluteWeightGuardRail = uint64(
+            bound(params.poolParams.absoluteWeightGuardRail, 3e16, 1e18 / params.numTokens - 1)
+        );
+
+        _testSwapExactIn(params, swapParams);
+    }
+
+    // //the other tests go through individual use cases, this makes sure no combo of weight in and out makes a difference
+    function testSwapExactOutInitial_Fuzz_Generic(FuzzParams memory params, SwapFuzzParams memory swapParams) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        // fix delay to 0
+        params.delay = 0;
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+
+        _testSwapExactOut(params, swapParams);
+    }
+
+    function testSwapExactOutNBlocksAfter_Fuzz_Generic(
+        FuzzParams memory params,
+        SwapFuzzParams memory swapParams
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        params.delay = bound(params.delay, 1, _INTERPOLATION_TIME);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+        _testSwapExactOut(params, swapParams);
+    }
+
+    function testSwapExactOutAfterLimit_Fuzz_Generic(
+        FuzzParams memory params,
+        SwapFuzzParams memory swapParams
+    ) public {
+        // construct momentum rule with default params
+        RuleFuzzParams memory ruleParams = RuleFuzzParams({
+            ruleType: 0, // momentum rule
+            kappa: _KAPPA
+        });
+        params.ruleParams = ruleParams;
+
+        // fix interpolation time to default
+        params.interpolationTime = _INTERPOLATION_TIME;
+
+        params.delay = bound(params.delay, _INTERPOLATION_TIME + 1, type(uint40).max);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = _EPSILON_MAX;
+        params.poolParams.lambda = _LAMBDA;
+        params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
+        params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
+        params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
+        params.poolParams.updateInterval = _UPDATE_INTERVAL;
+
+        params.numTokens = bound(params.numTokens, 2, 8);
+        _testSwapExactOut(params, swapParams);
+    }
+
+    function testSwapExactOutNBlocksAfter_Expanded_Fuzz_Generic(
+        FuzzParams memory params,
+        RuleFuzzParams memory ruleParams,
+        SwapFuzzParams memory swapParams
+    ) public {
+        // construct momentum rule with default params
+        ruleParams.ruleType = 0;
+        ruleParams.kappa = int256(bound(ruleParams.kappa, 0.01e18, 1e18));
+        params.ruleParams = ruleParams;
+        // fuzz update interval
+        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+
+        // fuzz the interpolation time
+        params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
+
+        params.delay = bound(params.delay, 1, params.interpolationTime);
+
+        // fix pool params to default
+        params.poolParams.epsilonMax = uint64(bound(params.poolParams.maxSwapfee, 1e16, 1e18 - 1));
+        params.poolParams.lambda = uint64(bound(params.poolParams.lambda, 1, 1e18 - 1));
+        params.poolParams.maxSwapfee = uint64(
+            bound(params.poolParams.maxSwapfee, _MIN_SWAP_FEE_PERCENTAGE, _MAX_SWAP_FEE_PERCENTAGE)
+        );
+        params.poolParams.maxTradeSizeRatio = uint64(bound(params.poolParams.maxTradeSizeRatio, 1e16, 30e16));
+        params.numTokens = bound(params.numTokens, 2, 8);
+        params.poolParams.absoluteWeightGuardRail = uint64(
+            bound(params.poolParams.absoluteWeightGuardRail, 3e16, 1e18 / params.numTokens - 1)
+        );
+
+        _testSwapExactOut(params, swapParams);
     }
 }

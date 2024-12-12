@@ -11,10 +11,11 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
         name = "PowerChannel";
 
-        parameterDescriptions = new string[](3);
+        parameterDescriptions = new string[](4);
         parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change";
         parameterDescriptions[1] = "Q: Q dictates the harshness of the channel boundry";
         parameterDescriptions[2] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
+        parameterDescriptions[3] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
     }
 
     using PRBMathSD59x18 for int256;
@@ -56,11 +57,11 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     /// @param _prevWeights the previous weights retrieved from the vault
     /// @param _data the latest data from the signal, usually price
     /// @param _parameters the parameters of the rule that are not lambda
-    /// @param _poolParameters pool parameters
+    /// @param _poolParameters pool parameters [0]=k, [1]=q, can be per token (vector) or single for all tokens (scalar), [2]=useRawPrice
     function _getWeights(
         int256[] calldata _prevWeights,
         int256[] calldata _data,
-        int256[][] calldata _parameters, //[0]=k, [1]=q, [2]=useRawPrice
+        int256[][] calldata _parameters, 
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {
         QuantAMMPowerChannelLocals memory locals;

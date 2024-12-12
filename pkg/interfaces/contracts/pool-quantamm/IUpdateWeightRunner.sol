@@ -146,7 +146,7 @@ interface IUpdateWeightRunner {
         uint40 _time
     ) external ;
 
-    /// @notice Breakglass function to allow the DAO or the pool manager to set the quantammAdmins weights manually
+    /// @notice Breakglass function to allow the admin or the pool manager to set the quantammAdmins weights manually
     /// @param _weights the new weights
     /// @param _poolAddress the target pool
     /// @param _lastInterpolationTimePossible the last time that the interpolation will work
@@ -158,7 +158,7 @@ interface IUpdateWeightRunner {
         uint _numberOfAssets
     ) external ;
 
-    /// @notice Breakglass function to allow the DAO or the pool manager to set the intermediate values of the rule manually
+    /// @notice Breakglass function to allow the admin or the pool manager to set the intermediate values of the rule manually
     /// @param _poolAddress the target pool
     /// @param _newMovingAverages manual new moving averages
     /// @param _newParameters manual new parameters

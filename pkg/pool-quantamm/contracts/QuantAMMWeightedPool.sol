@@ -121,6 +121,9 @@ contract QuantAMMWeightedPool is
     ///@dev Emitted when the weights of the pool are updated
     event WeightsUpdated(address indexed poolAddress, int256[] weights);
 
+    ///@dev Emitted when the update weight runner is updated
+    event UpdateWeightRunnerAddressUpdated(address indexed oldAddress, address indexed newAddress);
+
     /// @dev Indicates that one of the pool tokens' weight is below the minimum allowed.
     error MinWeight();
 
@@ -827,6 +830,7 @@ contract QuantAMMWeightedPool is
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
+        emit UpdateWeightRunnerAddressUpdated(address(updateWeightRunner), _updateWeightRunner);
     }
 
     function getRate() public pure override returns (uint256) {

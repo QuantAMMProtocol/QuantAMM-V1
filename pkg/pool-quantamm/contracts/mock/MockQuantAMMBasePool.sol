@@ -89,6 +89,8 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
 
     function getMaximumInvariantRatio() external view override returns (uint256) {}
 
+    function getPoolDetail(string memory category, string memory name) external view returns (string memory, string memory) {}
+    
     function computeInvariant(
         uint256[] memory balancesLiveScaled18,
         Rounding rounding

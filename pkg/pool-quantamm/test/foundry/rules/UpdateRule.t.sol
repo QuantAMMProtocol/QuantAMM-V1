@@ -252,8 +252,6 @@ contract UpdateRuleTest is Test, QuantAMMTestUtils {
         data[0] = PRBMathSD59x18.fromInt(3);
         data[1] = PRBMathSD59x18.fromInt(4);
 
-        int256 epsilonMax = 0.1e18;
-
         int256[] memory expectedResults = new int256[](2);
         expectedResults[0] = 0.49775e18;
         expectedResults[1] = 0.50225e18;
@@ -304,8 +302,6 @@ contract UpdateRuleTest is Test, QuantAMMTestUtils {
         data[0] = PRBMathSD59x18.fromInt(3);
         data[1] = PRBMathSD59x18.fromInt(4);
 
-        int256 epsilonMax = 0.1e18;
-
         int256[] memory expectedResults = new int256[](2);
         expectedResults[0] = 0.49775e18;
         expectedResults[1] = 0.50225e18;
@@ -353,8 +349,6 @@ contract UpdateRuleTest is Test, QuantAMMTestUtils {
         int256[] memory data = new int256[](2);
         data[0] = PRBMathSD59x18.fromInt(3);
         data[1] = PRBMathSD59x18.fromInt(4);
-
-        int256 epsilonMax = 0.1e18;
 
         int256[] memory expectedResults = new int256[](2);
         expectedResults[0] = 0.49775e18;

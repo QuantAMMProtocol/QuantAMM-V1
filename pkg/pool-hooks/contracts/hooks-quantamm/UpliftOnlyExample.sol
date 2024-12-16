@@ -2,6 +2,8 @@
 
 pragma solidity >=0.8.24;
 
+import "forge-std/Test.sol";
+
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -303,10 +305,12 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                     hookAdjustedAmountCalculatedRaw += hookFee;
                 }
 
-                uint256 adminFee = hookFee.mulUp(IUpdateWeightRunner(_updateWeightRunner).getQuantAMMSwapFeeTake());
-                uint256 ownerFee = hookFee - adminFee;
-                if(adminFee > 0){
+                uint256 quantAMMFeeTake = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
+                uint256 ownerFee = hookFee;
 
+                if(quantAMMFeeTake > 0){
+                    uint256 adminFee = hookFee / (1e18 / quantAMMFeeTake);
+                    ownerFee = hookFee - adminFee;
                     address quantAMMAdmin = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin();
                     _vault.sendTo(feeToken, quantAMMAdmin, adminFee);
                     emit SwapHookFeeCharged(quantAMMAdmin, feeToken, adminFee);
@@ -489,15 +493,18 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             emit ExitFeeCharged(userAddress, localData.pool, localData.tokens[i], exitFee);
         }
 
-
-        uint256 adminFee = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
-        
-        if(adminFee > 0){
+        uint256 adminFeePercent = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
+        if(adminFeePercent > 0){
+            uint256 adminFee = 1e18 / IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
             for(uint i = 0; i < localData.accruedFees.length; i++){
-                localData.accruedQuantAMMFees[i] = localData.accruedFees[i] * adminFee;
+                console.log("accruedFees", localData.accruedFees[i]);
+                console.log("adminFee", adminFee);
+                localData.accruedQuantAMMFees[i] = localData.accruedFees[i]  / adminFee;
+                console.log("accruedQuantAMMFees", localData.accruedQuantAMMFees[i]);
                 localData.accruedFees[i] -= localData.accruedQuantAMMFees[i];
+                console.log("accruedFees", localData.accruedFees[i]);
             }
-            // Donates accrued fees back to LPs.
+            console.log(IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin());
             _vault.addLiquidity(
                 AddLiquidityParams({
                     pool: localData.pool,
@@ -510,7 +517,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             );
         }
 
-        if(adminFee != 1e18){
+        if(adminFeePercent != 1e18){
             // Donates accrued fees back to LPs.
             _vault.addLiquidity(
                 AddLiquidityParams({

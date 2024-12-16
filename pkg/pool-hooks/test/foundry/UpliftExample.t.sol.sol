@@ -215,11 +215,19 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         );
         // Router should set correct lp data
         uint256 expectedTokenId = 1;
-        
+
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "deposit length incorrect");
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount incorrect");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit, block.timestamp, "blockTimestampDeposit incorrect");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue, 500000000000000000, "should match sum(amount * price)");
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
+            block.timestamp,
+            "blockTimestampDeposit incorrect"
+        );
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
+            500000000000000000,
+            "should match sum(amount * price)"
+        );
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
 
         assertEq(upliftOnlyRouter.nftPool(expectedTokenId), pool, "pool mapping is wrong");
@@ -232,7 +240,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         );
         assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
     }
-
 
     function testAddLiquidityMultipleDeposits() public {
         BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
@@ -283,16 +290,32 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             amountsIn[usdcIdx],
             "bob's USDC amount is wrong"
         );
-        
+
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 2, "deposit length incorrect");
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount / 2, "bptAmount incorrect");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit, 1682899200, "blockTimestampDeposit incorrect");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue, 500000000000000000, "should match sum(amount * price)");
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
+            1682899200,
+            "blockTimestampDeposit incorrect"
+        );
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
+            500000000000000000,
+            "should match sum(amount * price)"
+        );
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
-        
+
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[1].amount, bptAmount / 2, "bptAmount incorrect");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[1].blockTimestampDeposit, 1683331200, "blockTimestampDeposit incorrect");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[1].lpTokenDepositValue, 250000000000000000, "should match sum(amount * price)");
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[1].blockTimestampDeposit,
+            1683331200,
+            "blockTimestampDeposit incorrect"
+        );
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[1].lpTokenDepositValue,
+            250000000000000000,
+            "should match sum(amount * price)"
+        );
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[1].upliftFeeBps, 200, "fee");
 
         assertEq(upliftOnlyRouter.nftPool(1), pool, "pool mapping is wrong");
@@ -306,55 +329,44 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
     }
 
-
-
-
     function testAddLiquidityThrowOnLimitDeposits() public {
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
-        for(uint256 i = 0; i < 150; i++) {
-            if(i == 100) {
+        for (uint256 i = 0; i < 150; i++) {
+            if (i == 100) {
                 vm.expectRevert(abi.encodeWithSelector(UpliftOnlyExample.TooManyDeposits.selector, pool, bob));
-                
-                upliftOnlyRouter.addLiquidityProportional(
-                    pool,
-                    maxAmountsIn,
-                    bptAmount / 150,
-                    false,
-                    bytes("")
-                );
-            }
-            else{
-                upliftOnlyRouter.addLiquidityProportional(
-                    pool,
-                    maxAmountsIn,
-                    bptAmount / 150,
-                    false,
-                    bytes("")
-                );
+
+                upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount / 150, false, bytes(""));
+            } else {
+                upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount / 150, false, bytes(""));
             }
 
             skip(1 days);
         }
     }
 
-
     function testRemoveLiquidityNoPriceChange() public {
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
-        
+
         vm.prank(bob);
         upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
         vm.stopPrank();
-        
+
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit, block.timestamp, "bptAmount mapping should be 0");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue, 500000000000000000, "should match sum(amount * price)");
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
+            block.timestamp,
+            "bptAmount mapping should be 0"
+        );
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
+            500000000000000000,
+            "should match sum(amount * price)"
+        );
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
 
-        
-        
         uint256 nftTokenId = 0;
         uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
@@ -364,9 +376,10 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
         vm.stopPrank();
         BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
-        
-        uint256 feeAmountAmountPercent = ((bptAmount/2) * ((uint256(upliftOnlyRouter.minWithdrawalFeeBps()) * 1e18) / 10000)) / ((bptAmount/2));
-        uint256 amountOut = (bptAmount/2).mulDown((1e18 - feeAmountAmountPercent));
+
+        uint256 feeAmountAmountPercent = ((bptAmount / 2) *
+            ((uint256(upliftOnlyRouter.minWithdrawalFeeBps()) * 1e18) / 10000)) / ((bptAmount / 2));
+        uint256 amountOut = (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent));
 
         // Bob gets original liquidity with no fee applied because of full decay.
         assertEq(
@@ -427,7 +440,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
     }
 
-
     function testRemoveLiquidityNegativePriceChange() public {
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
@@ -437,8 +449,16 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit, block.timestamp, "bptAmount mapping should be 0");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue, 500000000000000000, "should match sum(amount * price)");
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
+            block.timestamp,
+            "bptAmount mapping should be 0"
+        );
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
+            500000000000000000,
+            "should match sum(amount * price)"
+        );
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
 
         int256[] memory prices = new int256[](tokens.length);
@@ -456,9 +476,10 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
         vm.stopPrank();
         BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
-        
-        uint256 feeAmountAmountPercent = ((bptAmount/2) * ((uint256(upliftOnlyRouter.minWithdrawalFeeBps()) * 1e18) / 10000)) / ((bptAmount/2));
-        uint256 amountOut = (bptAmount/2).mulDown((1e18 - feeAmountAmountPercent));
+
+        uint256 feeAmountAmountPercent = ((bptAmount / 2) *
+            ((uint256(upliftOnlyRouter.minWithdrawalFeeBps()) * 1e18) / 10000)) / ((bptAmount / 2));
+        uint256 amountOut = (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent));
 
         // Bob gets original liquidity with no fee applied because of full decay.
         assertEq(
@@ -519,7 +540,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
     }
 
-
     function testRemoveLiquidityDoublePositivePriceChange() public {
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
@@ -529,8 +549,16 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit, block.timestamp, "bptAmount mapping should be 0");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue, 500000000000000000, "should match sum(amount * price)");
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
+            block.timestamp,
+            "bptAmount mapping should be 0"
+        );
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
+            500000000000000000,
+            "should match sum(amount * price)"
+        );
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
 
         int256[] memory prices = new int256[](tokens.length);
@@ -548,9 +576,10 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
         vm.stopPrank();
         BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
-        
-        uint256 feeAmountAmountPercent = ((bptAmount/2) * ((uint256(upliftOnlyRouter.upliftFeeBps()) * 1e18) / 10000)) / ((bptAmount/2));
-        
+
+        uint256 feeAmountAmountPercent = ((bptAmount / 2) *
+            ((uint256(upliftOnlyRouter.upliftFeeBps()) * 1e18) / 10000)) / ((bptAmount / 2));
+
         /* 
             Bob has doubled his value. 
             Uplift fee is taken on only the uplift. 
@@ -559,8 +588,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             Bob should get 980e18 in DAI and USDC.
         */
 
-
-        uint256 amountOut = (bptAmount/2).mulDown((1e18 - feeAmountAmountPercent));
+        uint256 amountOut = (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent));
 
         // Bob gets original liquidity with no fee applied because of full decay.
         assertEq(
@@ -938,8 +966,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         _checkPoolAndVaultBalancesAfterSwap(balancesBefore, balancesAfter, swapAmount);
     }
-    
-    
 
     function _checkPoolAndVaultBalancesAfterSwap(
         BaseVaultTest.Balances memory balancesBefore,
@@ -967,5 +993,332 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             poolBalanceChange,
             "Vault USDC balance is wrong"
         );
+    }
+
+    function testRemoveLiquidityWithProtocolTakeNoPriceChange() public {
+        vm.prank(address(vaultAdmin));
+        updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
+        vm.stopPrank();
+
+        // Add liquidity so bob has BPT to remove liquidity.
+        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+
+        vm.prank(bob);
+        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        vm.stopPrank();
+
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
+            block.timestamp,
+            "bptAmount mapping should be 0"
+        );
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
+            500000000000000000,
+            "should match sum(amount * price)"
+        );
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
+
+        uint256 nftTokenId = 0;
+        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+
+        console.log(updateWeightRunner.getQuantAMMAdmin());
+        BaseVaultTest.Balances memory balancesBefore = getBalances(updateWeightRunner.getQuantAMMAdmin());
+
+        console.log("remove liquidity");
+        vm.startPrank(bob);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        vm.stopPrank();
+        BaseVaultTest.Balances memory balancesAfter = getBalances(updateWeightRunner.getQuantAMMAdmin());
+
+        console.log("done remove liquidity");
+        uint256 feeAmountAmountPercent = (((bptAmount / 2) *
+            ((uint256(upliftOnlyRouter.minWithdrawalFeeBps()) * 1e18) / 10000)) / ((bptAmount / 2)));
+        uint256 amountOut = (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent));
+
+        // Bob gets original liquidity with no fee applied because of full decay.
+        assertEq(
+            balancesAfter.bobTokens[daiIdx] - balancesBefore.bobTokens[daiIdx],
+            amountOut,
+            "bob's DAI amount is wrong"
+        );
+        assertEq(
+            balancesAfter.bobTokens[usdcIdx] - balancesBefore.bobTokens[usdcIdx],
+            amountOut,
+            "bob's USDC amount is wrong"
+        );
+
+        console.log("done bob");
+        console.log(balancesBefore.userTokens[daiIdx]);
+        console.log(balancesAfter.userTokens[daiIdx]);
+         // Bob gets original liquidity with no fee applied because of full decay.
+        assertEq(
+            
+            balancesAfter.userTokens[daiIdx] - balancesBefore.userTokens[daiIdx],
+            amountOut,
+            "QuantAMM's DAI amount is wrong"
+        );
+        assertEq(
+            balancesAfter.userTokens[usdcIdx] - balancesBefore.userTokens[usdcIdx],
+            amountOut,
+            "QuantAMM's USDC amount is wrong"
+        );
+
+        // Pool balances decrease by amountOut.
+        assertEq(
+            balancesBefore.poolTokens[daiIdx] - balancesAfter.poolTokens[daiIdx],
+            amountOut,
+            "Pool's DAI amount is wrong"
+        );
+        assertEq(
+            balancesBefore.poolTokens[usdcIdx] - balancesAfter.poolTokens[usdcIdx],
+            amountOut,
+            "Pool's USDC amount is wrong"
+        );
+
+        //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
+        assertEq(balancesBefore.poolSupply - balancesAfter.poolSupply, bptAmount, "BPT supply amount is wrong");
+
+        // Same happens with Vault balances: decrease by amountOut.
+        assertEq(
+            balancesBefore.vaultTokens[daiIdx] - balancesAfter.vaultTokens[daiIdx],
+            amountOut,
+            "Vault's DAI amount is wrong"
+        );
+        assertEq(
+            balancesBefore.vaultTokens[usdcIdx] - balancesAfter.vaultTokens[usdcIdx],
+            amountOut,
+            "Vault's USDC amount is wrong"
+        );
+
+        // Hook balances remain unchanged.
+        assertEq(balancesBefore.hookTokens[daiIdx], balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
+        assertEq(balancesBefore.hookTokens[usdcIdx], balancesAfter.hookTokens[usdcIdx], "Hook's USDC amount is wrong");
+
+        // Router should set all lp data to 0.
+        //User has extracted deposit, now deposit was deleted and popped from the mapping
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "bptAmount mapping should be 0");
+        //assertEq(upliftOnlyRouter.bptAmount(nftTokenId), 0, "bptAmount mapping should be 0");
+        //assertEq(upliftOnlyRouter.startTime(nftTokenId), 0, "startTime mapping should be 0");
+
+        assertEq(upliftOnlyRouter.nftPool(nftTokenId), address(0), "pool mapping should be 0");
+
+        assertEq(
+            BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)),
+            0,
+            "upliftOnlyRouter should hold no BPT"
+        );
+        assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
+    }
+
+    function testRemoveLiquidityWithProtocolTakeNegativePriceChange() public {
+        // Add liquidity so bob has BPT to remove liquidity.
+        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+        vm.prank(bob);
+        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        vm.stopPrank();
+
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
+            block.timestamp,
+            "bptAmount mapping should be 0"
+        );
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
+            500000000000000000,
+            "should match sum(amount * price)"
+        );
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
+
+        int256[] memory prices = new int256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; ++i) {
+            prices[i] = int256(i) / 2;
+        }
+        updateWeightRunner.setMockPrices(pool, prices);
+
+        uint256 nftTokenId = 0;
+        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+
+        BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
+
+        vm.startPrank(bob);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        vm.stopPrank();
+        BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
+
+        uint256 feeAmountAmountPercent = ((bptAmount / 2) *
+            ((uint256(upliftOnlyRouter.minWithdrawalFeeBps()) * 1e18) / 10000)) / ((bptAmount / 2));
+        uint256 amountOut = (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent));
+
+        // Bob gets original liquidity with no fee applied because of full decay.
+        assertEq(
+            balancesAfter.bobTokens[daiIdx] - balancesBefore.bobTokens[daiIdx],
+            amountOut,
+            "bob's DAI amount is wrong"
+        );
+        assertEq(
+            balancesAfter.bobTokens[usdcIdx] - balancesBefore.bobTokens[usdcIdx],
+            amountOut,
+            "bob's USDC amount is wrong"
+        );
+
+        // Pool balances decrease by amountOut.
+        assertEq(
+            balancesBefore.poolTokens[daiIdx] - balancesAfter.poolTokens[daiIdx],
+            amountOut,
+            "Pool's DAI amount is wrong"
+        );
+        assertEq(
+            balancesBefore.poolTokens[usdcIdx] - balancesAfter.poolTokens[usdcIdx],
+            amountOut,
+            "Pool's USDC amount is wrong"
+        );
+
+        //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
+        assertEq(balancesBefore.poolSupply - balancesAfter.poolSupply, bptAmount, "BPT supply amount is wrong");
+
+        // Same happens with Vault balances: decrease by amountOut.
+        assertEq(
+            balancesBefore.vaultTokens[daiIdx] - balancesAfter.vaultTokens[daiIdx],
+            amountOut,
+            "Vault's DAI amount is wrong"
+        );
+        assertEq(
+            balancesBefore.vaultTokens[usdcIdx] - balancesAfter.vaultTokens[usdcIdx],
+            amountOut,
+            "Vault's USDC amount is wrong"
+        );
+
+        // Hook balances remain unchanged.
+        assertEq(balancesBefore.hookTokens[daiIdx], balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
+        assertEq(balancesBefore.hookTokens[usdcIdx], balancesAfter.hookTokens[usdcIdx], "Hook's USDC amount is wrong");
+
+        // Router should set all lp data to 0.
+        //User has extracted deposit, now deposit was deleted and popped from the mapping
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "bptAmount mapping should be 0");
+        //assertEq(upliftOnlyRouter.bptAmount(nftTokenId), 0, "bptAmount mapping should be 0");
+        //assertEq(upliftOnlyRouter.startTime(nftTokenId), 0, "startTime mapping should be 0");
+
+        assertEq(upliftOnlyRouter.nftPool(nftTokenId), address(0), "pool mapping should be 0");
+
+        assertEq(
+            BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)),
+            0,
+            "upliftOnlyRouter should hold no BPT"
+        );
+        assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
+    }
+
+    function testRemoveLiquidityWithProtocolTakeDoublePositivePriceChange() public {
+        // Add liquidity so bob has BPT to remove liquidity.
+        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+        vm.prank(bob);
+        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        vm.stopPrank();
+
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
+            block.timestamp,
+            "bptAmount mapping should be 0"
+        );
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
+            500000000000000000,
+            "should match sum(amount * price)"
+        );
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
+
+        int256[] memory prices = new int256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; ++i) {
+            prices[i] = int256(i) * 2e18;
+        }
+        updateWeightRunner.setMockPrices(pool, prices);
+
+        uint256 nftTokenId = 0;
+        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+
+        BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
+
+        vm.startPrank(bob);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        vm.stopPrank();
+        BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
+
+        uint256 feeAmountAmountPercent = ((bptAmount / 2) *
+            ((uint256(upliftOnlyRouter.upliftFeeBps()) * 1e18) / 10000)) / ((bptAmount / 2));
+
+        /* 
+            Bob has doubled his value. 
+            Uplift fee is taken on only the uplift. 
+            Given each BPT is worth double now, the fee is 2% of the original value.
+            Bob has 1000e18 in BPT, so the fee is 20e18.
+            Bob should get 980e18 in DAI and USDC.
+        */
+
+        uint256 amountOut = (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent));
+
+        // Bob gets original liquidity with no fee applied because of full decay.
+        assertEq(
+            balancesAfter.bobTokens[daiIdx] - balancesBefore.bobTokens[daiIdx],
+            amountOut,
+            "bob's DAI amount is wrong"
+        );
+        assertEq(
+            balancesAfter.bobTokens[usdcIdx] - balancesBefore.bobTokens[usdcIdx],
+            amountOut,
+            "bob's USDC amount is wrong"
+        );
+
+        // Pool balances decrease by amountOut.
+        assertEq(
+            balancesBefore.poolTokens[daiIdx] - balancesAfter.poolTokens[daiIdx],
+            amountOut,
+            "Pool's DAI amount is wrong"
+        );
+        assertEq(
+            balancesBefore.poolTokens[usdcIdx] - balancesAfter.poolTokens[usdcIdx],
+            amountOut,
+            "Pool's USDC amount is wrong"
+        );
+
+        //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
+        assertEq(balancesBefore.poolSupply - balancesAfter.poolSupply, bptAmount, "BPT supply amount is wrong");
+
+        // Same happens with Vault balances: decrease by amountOut.
+        assertEq(
+            balancesBefore.vaultTokens[daiIdx] - balancesAfter.vaultTokens[daiIdx],
+            amountOut,
+            "Vault's DAI amount is wrong"
+        );
+        assertEq(
+            balancesBefore.vaultTokens[usdcIdx] - balancesAfter.vaultTokens[usdcIdx],
+            amountOut,
+            "Vault's USDC amount is wrong"
+        );
+
+        // Hook balances remain unchanged.
+        assertEq(balancesBefore.hookTokens[daiIdx], balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
+        assertEq(balancesBefore.hookTokens[usdcIdx], balancesAfter.hookTokens[usdcIdx], "Hook's USDC amount is wrong");
+
+        // Router should set all lp data to 0.
+        //User has extracted deposit, now deposit was deleted and popped from the mapping
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "bptAmount mapping should be 0");
+        //assertEq(upliftOnlyRouter.bptAmount(nftTokenId), 0, "bptAmount mapping should be 0");
+        //assertEq(upliftOnlyRouter.startTime(nftTokenId), 0, "startTime mapping should be 0");
+
+        assertEq(upliftOnlyRouter.nftPool(nftTokenId), address(0), "pool mapping should be 0");
+
+        assertEq(
+            BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)),
+            0,
+            "upliftOnlyRouter should hold no BPT"
+        );
+        assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
     }
 }

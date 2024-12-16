@@ -2,8 +2,6 @@
 
 pragma solidity >=0.8.24;
 
-import "forge-std/Test.sol";
-
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -225,6 +223,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             pool,
             MULDIRECTION.MULDOWN
         );
+
         poolsFeeData[pool][msg.sender].push(
             FeeData({
                 tokenID: tokenID,
@@ -397,6 +396,10 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         int256 lpTokenDepositValueChange;
         uint256 lpTokenDepositValue;
         IERC20[] tokens;
+        uint256 feeDataArrayLength;
+        uint256 amountLeft;
+        uint256 feePercentage;
+        uint256 adminFeePercent;
     }
 
     /// @inheritdoc BaseHooks
@@ -425,7 +428,11 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             lpTokenDepositValueNow: 0,
             lpTokenDepositValueChange: 0,
             lpTokenDepositValue: 0,
-            tokens: new IERC20[](amountsOutRaw.length)
+            tokens: new IERC20[](amountsOutRaw.length),
+            feeDataArrayLength: 0,
+            amountLeft: 0,
+            feePercentage: 0,
+            adminFeePercent: 0
         });
         // We only allow removeLiquidity via the Router/Hook itself so that fee is applied correctly.
         hookAdjustedAmountsOutRaw = amountsOutRaw;
@@ -434,9 +441,9 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         localData.lpTokenDepositValueNow = getPoolLPTokenValue(localData.prices, pool, MULDIRECTION.MULDOWN);
         
         FeeData[] storage feeDataArray = poolsFeeData[pool][userAddress];
-        uint256 feeDataArrayLength = feeDataArray.length;
-        uint256 amountLeft = bptAmountIn;
-        for (uint256 i = feeDataArrayLength - 1; i >= 0; --i) {            
+        localData.feeDataArrayLength = feeDataArray.length;
+        localData.amountLeft = bptAmountIn;
+        for (uint256 i = localData.feeDataArrayLength - 1; i >= 0; --i) {            
             localData.lpTokenDepositValue = feeDataArray[i].lpTokenDepositValue;
 
             localData.lpTokenDepositValueChange =
@@ -456,68 +463,65 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             }
 
             // if the deposit is less than the amount left to burn, burn the whole deposit and move on to the next
-            if (feeDataArray[i].amount <= amountLeft) {
+            if (feeDataArray[i].amount <= localData.amountLeft) {
                 uint256 depositAmount = feeDataArray[i].amount;
                 localData.feeAmount += (depositAmount * feePerLP);
 
-                amountLeft -= feeDataArray[i].amount;
+                localData.amountLeft -= feeDataArray[i].amount;
 
                 lpNFT.burn(feeDataArray[i].tokenID);
 
                 delete feeDataArray[i];
                 feeDataArray.pop();
 
-                if (amountLeft == 0) {
+                if (localData.amountLeft == 0) {
                     break;
                 }
             } else {
-                feeDataArray[i].amount -= amountLeft;
-                localData.feeAmount += (feePerLP * amountLeft);
+                feeDataArray[i].amount -= localData.amountLeft;
+                localData.feeAmount += (feePerLP * localData.amountLeft);
                 break;
             }
         }
 
-        uint256 feePercentage = (localData.feeAmount) / bptAmountIn;
+    
+        localData.feePercentage = (localData.feeAmount) / bptAmountIn;
 
         hookAdjustedAmountsOutRaw = localData.amountsOutRaw;
         localData.tokens = _vault.getPoolTokens(localData.pool);
+
+        localData.adminFeePercent = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
+        
         // Charge fees proportional to the `amountOut` of each token.
         for (uint256 i = 0; i < localData.amountsOutRaw.length; i++) {
-            uint256 exitFee = localData.amountsOutRaw[i].mulDown(feePercentage);
-            localData.accruedFees[i] = exitFee;
+            uint256 exitFee = localData.amountsOutRaw[i].mulDown(localData.feePercentage);
+            
+            if(localData.adminFeePercent > 0){
+                localData.accruedQuantAMMFees[i] = exitFee / (1e18 / localData.adminFeePercent);
+            }
+
+            localData.accruedFees[i] = exitFee - localData.accruedQuantAMMFees[i];
             hookAdjustedAmountsOutRaw[i] -= exitFee;
             // Fees don't need to be transferred to the hook, because donation will redeposit them in the Vault.
             // In effect, we will transfer a reduced amount of tokensOut to the caller, and leave the remainder
             // in the pool balance.
-
-            emit ExitFeeCharged(userAddress, localData.pool, localData.tokens[i], exitFee);
-        }
-
-        uint256 adminFeePercent = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
-        if(adminFeePercent > 0){
-            uint256 adminFee = 1e18 / IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
-            for(uint i = 0; i < localData.accruedFees.length; i++){
-                console.log("accruedFees", localData.accruedFees[i]);
-                console.log("adminFee", adminFee);
-                localData.accruedQuantAMMFees[i] = localData.accruedFees[i]  / adminFee;
-                console.log("accruedQuantAMMFees", localData.accruedQuantAMMFees[i]);
-                localData.accruedFees[i] -= localData.accruedQuantAMMFees[i];
-                console.log("accruedFees", localData.accruedFees[i]);
-            }
-            console.log(IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin());
+        }           
+    
+        if(localData.adminFeePercent > 0){
             _vault.addLiquidity(
                 AddLiquidityParams({
                     pool: localData.pool,
                     to: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin(), // It would mint BPTs to router, but it's a donation so no BPT is minted
                     maxAmountsIn: localData.accruedQuantAMMFees, // Donate all accrued fees back to the pool (i.e. to the LPs)
-                    minBptAmountOut: 0, // Donation does not return BPTs, any number above 0 will revert
-                    kind: AddLiquidityKind.DONATION,
+                    minBptAmountOut: localData.feeAmount / (1e18 / localData.adminFeePercent) / 1e18, // Donation does not return BPTs, any number above 0 will revert
+                    kind: AddLiquidityKind.PROPORTIONAL,
                     userData: bytes("") // User data is not used by donation, so we can set it to an empty string
                 })
             );
+            emit ExitFeeCharged(userAddress, localData.pool, IERC20(localData.pool), localData.feeAmount / (1e18 / localData.adminFeePercent) / 1e18);
         }
 
-        if(adminFeePercent != 1e18){
+        if(localData.adminFeePercent != 1e18){
             // Donates accrued fees back to LPs.
             _vault.addLiquidity(
                 AddLiquidityParams({

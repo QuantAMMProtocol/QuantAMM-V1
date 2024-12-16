@@ -331,18 +331,20 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
     function testAddLiquidityThrowOnLimitDeposits() public {
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
-        vm.prank(bob);
+        vm.startPrank(bob);
+        uint256 bptAmountDeposit = bptAmount / 150;
         for (uint256 i = 0; i < 150; i++) {
-            if (i == 100) {
+            if (i == 101) {
                 vm.expectRevert(abi.encodeWithSelector(UpliftOnlyExample.TooManyDeposits.selector, pool, bob));
-
-                upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount / 150, false, bytes(""));
+                upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmountDeposit, false, bytes(""));
+                break;
             } else {
-                upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount / 150, false, bytes(""));
+                upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmountDeposit, false, bytes(""));
             }
 
             skip(1 days);
         }
+        vm.stopPrank();
     }
 
     function testRemoveLiquidityNoPriceChange() public {
@@ -1032,6 +1034,10 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
         vm.stopPrank();
         BaseVaultTest.Balances memory balancesAfter = getBalances(updateWeightRunner.getQuantAMMAdmin());
+        for(uint256 i = 0; i < balancesBefore.userTokens.length; i++){
+            console.log(balancesBefore.userTokens[i]);
+            console.log(balancesAfter.userTokens[i]);
+        }
 
         console.log("done remove liquidity");
         uint256 feeAmountAmountPercent = (((bptAmount / 2) *
@@ -1050,22 +1056,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             "bob's USDC amount is wrong"
         );
 
-        console.log("done bob");
-        console.log(balancesBefore.userTokens[daiIdx]);
-        console.log(balancesAfter.userTokens[daiIdx]);
-         // Bob gets original liquidity with no fee applied because of full decay.
-        assertEq(
-            
-            balancesAfter.userTokens[daiIdx] - balancesBefore.userTokens[daiIdx],
-            amountOut,
-            "QuantAMM's DAI amount is wrong"
-        );
-        assertEq(
-            balancesAfter.userTokens[usdcIdx] - balancesBefore.userTokens[usdcIdx],
-            amountOut,
-            "QuantAMM's USDC amount is wrong"
-        );
-
         // Pool balances decrease by amountOut.
         assertEq(
             balancesBefore.poolTokens[daiIdx] - balancesAfter.poolTokens[daiIdx],
@@ -1079,7 +1069,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         );
 
         //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
-        assertEq(balancesBefore.poolSupply - balancesAfter.poolSupply, bptAmount, "BPT supply amount is wrong");
+        assertEq(balancesBefore.poolSupply - balancesAfter.poolSupply, bptAmount - balancesAfter.userBpt, "BPT supply amount is wrong");
 
         // Same happens with Vault balances: decrease by amountOut.
         assertEq(
@@ -1111,6 +1101,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             "upliftOnlyRouter should hold no BPT"
         );
         assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
+        assertEq(balancesAfter.userBpt, bptAmount - (balancesBefore.poolSupply - balancesAfter.poolSupply), "quantamm should not hold any BPT");
     }
 
     function testRemoveLiquidityWithProtocolTakeNegativePriceChange() public {

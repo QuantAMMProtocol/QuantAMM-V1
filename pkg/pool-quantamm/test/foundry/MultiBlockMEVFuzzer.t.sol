@@ -138,7 +138,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
 
         // Deploy UpdateWeightRunner contract
         vm.startPrank(owner);
-        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2); //@note owner = vault admin, addr2 = eth oracle
+        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2, false); //@note owner = vault admin, addr2 = eth oracle
 
         int216 fixedValue = 1000;
         uint delay = 3600;
@@ -520,7 +520,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
         uint256[] memory initialBalances
     ) private returns (address, uint256) {
         QuantAMMWeightedPoolFactory.NewPoolParams memory newParams = _createPoolParams(params.poolParams);
-        address ammPool = quantAMMWeightedPoolFactory.create(newParams);
+        (address ammPool, ) = quantAMMWeightedPoolFactory.create(newParams);
 
         // Ensure LP has enough tokens and that router has approval to transfer those tokens
         _dealAndApprove(lp, ammPool, initialBalances);

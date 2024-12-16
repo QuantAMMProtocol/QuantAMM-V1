@@ -19,6 +19,20 @@ contract MockUpdateWeightRunner is UpdateWeightRunner {
         performUpdate(_pool);
     }
 
+    function calculateMultiplierAndSetWeights(int256[] memory oldWeights,
+                                              int256[] memory newWeights,
+                                              uint40 updateInterval,
+                                              uint64 absWeightGuardRail,
+                                              address pool) public {
+        _calculateMultiplerAndSetWeights(CalculateMuliplierAndSetWeightsLocal({
+                    currentWeights: oldWeights, 
+                    updatedWeights: newWeights, 
+                    updateInterval: int256(int40(updateInterval)), 
+                    absoluteWeightGuardRail18: int256(int64(absWeightGuardRail)),
+                    poolAddress: pool
+                    }));
+    }
+
     function setMockPrices(address _pool, int256[] memory prices) external {
         mockPrices[_pool] = prices;
     }

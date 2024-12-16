@@ -275,6 +275,7 @@ __metadata:
     "@balancer-labs/solidity-toolbox": "workspace:*"
     "@balancer-labs/v3-interfaces": "workspace:*"
     "@balancer-labs/v3-solidity-utils": "workspace:*"
+    "@prb/math": "npm:^2.5.0"
     "@typescript-eslint/eslint-plugin": "npm:^5.41.0"
     "@typescript-eslint/parser": "npm:^5.41.0"
     eslint: "npm:^8.26.0"

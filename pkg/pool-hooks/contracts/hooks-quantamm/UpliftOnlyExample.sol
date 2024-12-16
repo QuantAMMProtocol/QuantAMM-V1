@@ -4,6 +4,7 @@ pragma solidity >=0.8.24;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { IRouterCommon } from "@balancer-labs/v3-interfaces/contracts/vault/IRouterCommon.sol";
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
@@ -15,6 +16,8 @@ import {
     AddLiquidityKind,
     RemoveLiquidityKind,
     AddLiquidityParams,
+    AfterSwapParams,
+    SwapKind,
     PoolData
 } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 
@@ -24,11 +27,11 @@ import { BaseHooks } from "@balancer-labs/v3-vault/contracts/BaseHooks.sol";
 import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol";
 
 import { MinimalRouter } from "../MinimalRouter.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IVaultExplorer } from "@balancer-labs/v3-interfaces/contracts/vault/IVaultExplorer.sol";
 //import { VaultExplorer } from "@balancer-labs/v3-vault/contracts/VaultExplorer.sol";
 
-
-import {LPNFT} from "./lp_nft.sol";
+import { LPNFT } from "./lp_nft.sol";
 
 struct PoolCreationSettings {
     string name;
@@ -40,30 +43,26 @@ struct PoolCreationSettings {
 }
 
 /// @notice Mint an NFT to pool depositors, and charge a decaying exit fee upon withdrawal.
-contract UpliftOnlyExample is MinimalRouter, BaseHooks {
+contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
     using FixedPoint for uint256;
-    
-    /// @notice The withdrawal fee in basis points (1/10000) for the pool
-    uint16 public immutable withdrawalFeeBps;
+    using SafeERC20 for IERC20;
 
-    /// @notice The maximum withdrawal fee in basis points (1/10000) for the pool 
-    uint16 public immutable withdrawalMaxFeeBps;
+    /// @notice The withdrawal fee in basis points (1/10000) that will be charged if no uplift was provided.
+    uint16 public immutable minWithdrawalFeeBps;
 
-    /// @notice The address to send withdrawal fees to
-    address public immutable withdrawalFeeRecipient;
+    /// @notice The uplift fee in basis points (1/10000) for the pool
+    uint16 public immutable upliftFeeBps;
 
-    /// @notice The numerator for the withdrawal fee calculation based on the wp definition
-    uint32 public immutable withdrawalFeeNumerator;
+    /// @notice The hook swap fee percentage, charged on every swap operation.
+    uint64 public hookSwapFeePercentage;
 
     /// @notice The fee data for a given owner and deposit
     struct FeeData {
         uint256 tokenID;
         uint256 amount;
         uint256 lpTokenDepositValue;
-        uint32 blockIndexDeposit;
-        uint16 withdrawalMaxFeeBps;
-        uint16 withdrawalFeeBps;
-        uint32 withdrawalFeeNumerator;
+        uint40 blockTimestampDeposit;
+        uint16 upliftFeeBps;
     }
 
     /// @notice The LP NFT contract for the pool
@@ -73,9 +72,11 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
     /// @notice pool => owner => FeeData[]
     mapping(address => mapping(address => FeeData[])) public poolsFeeData;
 
+    mapping(uint256 => address) public nftPool;
+
     // NFT unique identifier.
     uint256 private _nextTokenId;
-    
+
     address private immutable _updateWeightRunner;
 
     /**
@@ -84,7 +85,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
      * @param hooksContract This contract
      * @param pool The pool on which the hook was registered
      */
-    event NftLiquidityPositionExampleRegistered(address indexed hooksContract, address indexed pool);
+    event UpliftOnlyExampleRegistered(address indexed hooksContract, address indexed pool);
 
     /**
      * @notice An NFT holder withdrew liquidity during the decay period, incurring an exit fee.
@@ -94,6 +95,24 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
      * @param feeAmount The amount of the fee, in native token decimals
      */
     event ExitFeeCharged(address indexed nftHolder, address indexed pool, IERC20 indexed feeToken, uint256 feeAmount);
+
+    /**
+     * @notice The hooks contract has charged a swap fee.
+     * @param hooksContract The contract that collected the fee
+     * @param token The token in which the fee was charged
+     * @param feeAmount The amount of the fee
+     */
+    event SwapHookFeeCharged(address indexed hooksContract, IERC20 indexed token, uint256 feeAmount);
+
+
+    /**
+     * @notice The swap hook fee percentage has been changed.
+     * @dev Note that the initial fee will be zero, and no event is emitted on deployment.
+     * @param hooksContract The hooks contract charging the fee
+     * @param hookFeePercentage The new hook swap fee percentage
+     */
+    event HookSwapFeePercentageChanged(address indexed hooksContract, uint256 hookFeePercentage);
+
 
     /**
      * @notice Hooks functions called from an external router.
@@ -118,18 +137,35 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
 
     /**
      * @notice To avoid Ddos issues, a single depositor can only deposit 100 times
-     * 
+     * @param pool The pool the depositor is attempting to deposit to
+     * @param depositor The address of the depositor
      */
-    error TooManyDeposits();
+    error TooManyDeposits(address pool, address depositor);
 
     /**
      * @notice Attempted withdrawal of an NFT-associated position by an address that is not the owner.
      * @param withdrawer The address attempting to withdraw
      * @param pool The attempted target pool
-     * @param nftId The id of the Pool NFT
+     * @param bptAmountIn The amount of BPT requested
      */
-    error WithdrawalByNonOwner(address withdrawer, address pool, uint256 nftId);
+    error WithdrawalByNonOwner(address withdrawer, address pool, uint256 bptAmountIn);
 
+    /**
+     * @notice Attempted transfer of an NFT-associated position by an address that is not the nft.
+     * @param from The address the NFT is being transferred from
+     * @param to The address the NFT is being transferred to
+     * @param caller The address that called the transfer function
+     * @param tokenId The token ID being transferred
+     */
+    error TransferUpdateNonNft(address from, address to, address caller, uint256 tokenId);
+
+    /**
+     * @notice Attempted transfer of an NFT-associated position with an incorrect nft id.
+     * @param from The address the NFT is being transferred from
+     * @param to The address the NFT is being transferred to
+     * @param tokenId The token ID being transferred
+     */
+    error TransferUpdateTokenIDInvaid(address from, address to, uint256 tokenId);
 
     modifier onlySelfRouter(address router) {
         _ensureSelfRouter(router);
@@ -140,32 +176,20 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
         IVault vault,
         IWETH weth,
         IPermit2 permit2,
-        uint16 _withdrawalFeeBps,
-        uint16 _withdrawalMaxFeeBps,
-        uint32 _withdrawalFeeNumerator,
+        uint16 _upliftFeeBps,
+        uint16 _minWithdrawalFeeBps,
         address _updateWeightRunnerParam,
         string memory version,
         string memory name,
         string memory symbol
-    ) MinimalRouter(vault, weth, permit2, version) {
-         require(
-            bytes(name).length > 0 &&
-                bytes(symbol).length > 0,
-            "NAMEREQ"
-        ); //Must provide a name / symbol
-        
-        lpNFT = new LPNFT(
-            name,
-            symbol,
-            address(vault)
-        );
+    ) MinimalRouter(vault, weth, permit2, version) Ownable(msg.sender) {
+        require(bytes(name).length > 0 && bytes(symbol).length > 0, "NAMEREQ"); //Must provide a name / symbol
 
-        // solhint-disable-previous-line no-empty-blocks
-        withdrawalFeeBps = _withdrawalFeeBps;
-        withdrawalMaxFeeBps = _withdrawalMaxFeeBps;
-        withdrawalFeeNumerator = _withdrawalFeeNumerator;
+        lpNFT = new LPNFT(name, symbol, address(this));
+
+        upliftFeeBps = _upliftFeeBps;
+        minWithdrawalFeeBps = _minWithdrawalFeeBps;
         _updateWeightRunner = _updateWeightRunnerParam;
-
     }
 
     /***************************************************************************
@@ -174,14 +198,13 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
 
     function addLiquidityProportional(
         address pool,
-        uint256[] memory maxAmountsIn,  
+        uint256[] memory maxAmountsIn,
         uint256 exactBptAmountOut,
         bool wethIsEth,
         bytes memory userData
     ) external payable saveSender(msg.sender) returns (uint256[] memory amountsIn) {
-
-        if(poolsFeeData[pool][msg.sender].length > 100){
-            revert TooManyDeposits();
+        if (poolsFeeData[pool][msg.sender].length > 100) {
+            revert TooManyDeposits(pool, msg.sender);
         }
         // Do addLiquidity operation - BPT is minted to this contract.
         amountsIn = _addLiquidityProportional(
@@ -193,44 +216,38 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
             wethIsEth,
             userData
         );
-        
+
         uint256 tokenID = lpNFT.mint(msg.sender);
-        
-        int256[] memory prices = IUpdateWeightRunner(_updateWeightRunner).getData(address(this));
+        uint256 depositValue = getPoolLPTokenValue(
+            IUpdateWeightRunner(_updateWeightRunner).getData(pool),
+            pool,
+            MULDIRECTION.MULDOWN
+        );
+        poolsFeeData[pool][msg.sender].push(
+            FeeData({
+                tokenID: tokenID,
+                amount: exactBptAmountOut,
+                //this rounding favours the LP
+                lpTokenDepositValue: depositValue,
+                blockTimestampDeposit: uint40(block.timestamp),
+                upliftFeeBps: upliftFeeBps
+            })
+        );
 
-        FeeData memory feeDataDeposit = FeeData({
-            tokenID: tokenID,
-            amount: exactBptAmountOut,
-            //this rounding favours the LP 
-            lpTokenDepositValue: getPoolLPTokenValue(prices, pool, MULDIRECTION.MULUP),
-            blockIndexDeposit: uint32(block.number),
-            withdrawalFeeBps: withdrawalFeeBps,
-            withdrawalMaxFeeBps: withdrawalMaxFeeBps,
-            withdrawalFeeNumerator: withdrawalFeeNumerator
-        });
-
-        poolsFeeData[pool][msg.sender].push(feeDataDeposit); 
+        nftPool[tokenID] = pool;
     }
 
     function removeLiquidityProportional(
-        uint256 tokenId,
+        uint256 bptAmountIn,
         uint256[] memory minAmountsOut,
         bool wethIsEth,
         address pool
     ) external payable saveSender(msg.sender) returns (uint256[] memory amountsOut) {
-       
         uint depositLength = poolsFeeData[pool][msg.sender].length;
-        if(depositLength > 0){
-            revert WithdrawalByNonOwner(msg.sender, pool, tokenId);
-        }
 
-        uint256 bptAmountIn;
-        for(uint i = 0; i < depositLength; i++){
-            if(poolsFeeData[pool][msg.sender][i].tokenID == tokenId){
-                bptAmountIn += poolsFeeData[pool][msg.sender][i].amount;
-            }
+        if (depositLength == 0) {
+            revert WithdrawalByNonOwner(msg.sender, pool, bptAmountIn);
         }
-
         // Do removeLiquidity operation - tokens sent to msg.sender.
         amountsOut = _removeLiquidityProportional(
             pool,
@@ -239,13 +256,71 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
             bptAmountIn,
             minAmountsOut,
             wethIsEth,
-            abi.encode(tokenId) // tokenId is passed to index fee data in hook
+            abi.encodePacked(msg.sender)
         );
     }
 
     /***************************************************************************
                                   Hook Functions
     ***************************************************************************/
+    
+    /// @inheritdoc BaseHooks
+    function onAfterSwap(
+        AfterSwapParams calldata params
+    ) public override onlyVault returns (bool success, uint256 hookAdjustedAmountCalculatedRaw) {
+        hookAdjustedAmountCalculatedRaw = params.amountCalculatedRaw;
+        if (hookSwapFeePercentage > 0) {
+            uint256 hookFee = params.amountCalculatedRaw.mulUp(hookSwapFeePercentage);
+
+            if (hookFee > 0) {
+                IERC20 feeToken;
+
+                // Note that we can only alter the calculated amount in this function. This means that the fee will be
+                // charged in different tokens depending on whether the swap is exact in / out, potentially breaking
+                // the equivalence (i.e., one direction might "cost" less than the other).
+
+                if (params.kind == SwapKind.EXACT_IN) {
+                    // For EXACT_IN swaps, the `amountCalculated` is the amount of `tokenOut`. The fee must be taken
+                    // from `amountCalculated`, so we decrease the amount of tokens the Vault will send to the caller.
+                    //
+                    // The preceding swap operation has already credited the original `amountCalculated`. Since we're
+                    // returning `amountCalculated - hookFee` here, it will only register debt for that reduced amount
+                    // on settlement. This call to `sendTo` pulls `hookFee` tokens of `tokenOut` from the Vault to this
+                    // contract, and registers the additional debt, so that the total debits match the credits and
+                    // settlement succeeds.
+                    feeToken = params.tokenOut;
+                    hookAdjustedAmountCalculatedRaw -= hookFee;
+                } else {
+                    // For EXACT_OUT swaps, the `amountCalculated` is the amount of `tokenIn`. The fee must be taken
+                    // from `amountCalculated`, so we increase the amount of tokens the Vault will ask from the user.
+                    //
+                    // The preceding swap operation has already registered debt for the original `amountCalculated`.
+                    // Since we're returning `amountCalculated + hookFee` here, it will supply credit for that increased
+                    // amount on settlement. This call to `sendTo` pulls `hookFee` tokens of `tokenIn` from the Vault to
+                    // this contract, and registers the additional debt, so that the total debits match the credits and
+                    // settlement succeeds.
+                    feeToken = params.tokenIn;
+                    hookAdjustedAmountCalculatedRaw += hookFee;
+                }
+
+                uint256 adminFee = hookFee.mulUp(IUpdateWeightRunner(_updateWeightRunner).getQuantAMMSwapFeeTake());
+                uint256 ownerFee = hookFee - adminFee;
+                if(adminFee > 0){
+
+                    address quantAMMAdmin = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin();
+                    _vault.sendTo(feeToken, quantAMMAdmin, adminFee);
+                    emit SwapHookFeeCharged(quantAMMAdmin, feeToken, adminFee);
+                }
+
+                if(ownerFee > 0){
+                    _vault.sendTo(feeToken, address(this), ownerFee);
+
+                    emit SwapHookFeeCharged(address(this), feeToken, ownerFee);
+                }
+            }
+        }
+        return (true, hookAdjustedAmountCalculatedRaw);
+    }
 
     /// @inheritdoc BaseHooks
     function onRegister(
@@ -261,8 +336,8 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
         if (liquidityManagement.disableUnbalancedLiquidity == false) {
             revert PoolSupportsUnbalancedLiquidity();
         }
-
-        emit NftLiquidityPositionExampleRegistered(address(this), pool);
+    
+        emit UpliftOnlyExampleRegistered(address(this), pool);
 
         return true;
     }
@@ -276,6 +351,8 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
         hookFlags.enableHookAdjustedAmounts = true;
         hookFlags.shouldCallBeforeAddLiquidity = true;
         hookFlags.shouldCallAfterRemoveLiquidity = true;
+        hookFlags.shouldCallAfterSwap = true;
+
         return hookFlags;
     }
 
@@ -293,38 +370,29 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
         return true;
     }
 
-    function _takeFee(
-        address nftHolder,
-        address pool,
-        uint256[] memory amountsOutRaw,
-        uint256 currentFee
-    ) private returns (uint256[] memory hookAdjustedAmountsOutRaw) {
-        hookAdjustedAmountsOutRaw = amountsOutRaw;
-        IERC20[] memory tokens = _vault.getPoolTokens(pool);
-        uint256[] memory accruedFees = new uint256[](tokens.length);
-        // Charge fees proportional to the `amountOut` of each token.
-        for (uint256 i = 0; i < amountsOutRaw.length; i++) {
-            uint256 exitFee = amountsOutRaw[i].mulDown(currentFee);
-            accruedFees[i] = exitFee;
-            hookAdjustedAmountsOutRaw[i] -= exitFee;
-            // Fees don't need to be transferred to the hook, because donation will redeposit them in the Vault.
-            // In effect, we will transfer a reduced amount of tokensOut to the caller, and leave the remainder
-            // in the pool balance.
+    struct TakeFeeLocalData {
+        address nftHolder;
+        address pool;
+        uint256[] amountsOutRaw;
+        uint256 currentFee;
+        IERC20[] tokens;
+        uint256[] accruedFees;
+    }
 
-            emit ExitFeeCharged(nftHolder, pool, tokens[i], exitFee);
-        }
-
-        // Donates accrued fees back to LPs.
-        _vault.addLiquidity(
-            AddLiquidityParams({
-                pool: pool,
-                to: msg.sender, // It would mint BPTs to router, but it's a donation so no BPT is minted
-                maxAmountsIn: accruedFees, // Donate all accrued fees back to the pool (i.e. to the LPs)
-                minBptAmountOut: 0, // Donation does not return BPTs, any number above 0 will revert
-                kind: AddLiquidityKind.DONATION,
-                userData: bytes("") // User data is not used by donation, so we can set it to an empty string
-            })
-        );
+    struct AfterRemoveLiquidityData {
+        address pool;
+        uint256 bptAmountIn;
+        uint256[] amountsOutRaw;
+        uint256[] minAmountsOut;
+        uint256[] accruedFees;
+        uint256[] accruedQuantAMMFees;
+        uint256 currentFee;
+        uint256 feeAmount;
+        int256[] prices;
+        uint256 lpTokenDepositValueNow;
+        int256 lpTokenDepositValueChange;
+        uint256 lpTokenDepositValue;
+        IERC20[] tokens;
     }
 
     /// @inheritdoc BaseHooks
@@ -336,147 +404,203 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
         uint256[] memory,
         uint256[] memory amountsOutRaw,
         uint256[] memory,
-        bytes memory 
+        bytes memory userData
     ) public override onlySelfRouter(router) returns (bool, uint256[] memory hookAdjustedAmountsOutRaw) {
+        address userAddress = address(bytes20(userData));
+
+        AfterRemoveLiquidityData memory localData = AfterRemoveLiquidityData({
+            pool: pool,
+            bptAmountIn: bptAmountIn,
+            amountsOutRaw: amountsOutRaw,
+            minAmountsOut: new uint256[](amountsOutRaw.length),
+            accruedFees: new uint256[](amountsOutRaw.length),
+            accruedQuantAMMFees: new uint256[](amountsOutRaw.length),
+            currentFee: minWithdrawalFeeBps,
+            feeAmount: 0,
+            prices: IUpdateWeightRunner(_updateWeightRunner).getData(pool),
+            lpTokenDepositValueNow: 0,
+            lpTokenDepositValueChange: 0,
+            lpTokenDepositValue: 0,
+            tokens: new IERC20[](amountsOutRaw.length)
+        });
         // We only allow removeLiquidity via the Router/Hook itself so that fee is applied correctly.
-        uint256 feeAmount;
         hookAdjustedAmountsOutRaw = amountsOutRaw;
 
-        int256[] memory prices = IUpdateWeightRunner(_updateWeightRunner).getData(address(this));
-        // in base currency (e.g. USD)
-
-        //this rounding favours the LP 
-        uint256 lpTokenDepositValueNow = getPoolLPTokenValue(prices, pool, MULDIRECTION.MULDOWN);
-        FeeData[] storage feeDataArray = poolsFeeData[pool][msg.sender];
+        //this rounding faxvours the LP
+        localData.lpTokenDepositValueNow = getPoolLPTokenValue(localData.prices, pool, MULDIRECTION.MULDOWN);
+        
+        FeeData[] storage feeDataArray = poolsFeeData[pool][userAddress];
         uint256 feeDataArrayLength = feeDataArray.length;
         uint256 amountLeft = bptAmountIn;
+        for (uint256 i = feeDataArrayLength - 1; i >= 0; --i) {            
+            localData.lpTokenDepositValue = feeDataArray[i].lpTokenDepositValue;
 
-        for (uint256 i; i < feeDataArrayLength; ++i) {
-            int256 lpTokenDepositValueChange = int256(lpTokenDepositValueNow) -
-                int256(feeDataArray[i].lpTokenDepositValue);
+            localData.lpTokenDepositValueChange =
+                (int256(localData.lpTokenDepositValueNow) -
+                int256(localData.lpTokenDepositValue)) / int256(localData.lpTokenDepositValue);
+
             uint256 feePerLP;
-
             // if the pool has increased in value since the deposit, the fee is calculated based on the deposit value
-            if (lpTokenDepositValueChange > 0) {
-                feePerLP =
-                    (calculateFeeBps(
-                        feeDataArray[i].withdrawalMaxFeeBps,
-                        feeDataArray[i].withdrawalFeeBps,
-                        block.number - feeDataArray[i].blockIndexDeposit,
-                        feeDataArray[i].withdrawalFeeNumerator
-                    ) * uint256(lpTokenDepositValueChange)) /
-                    10000;
+            if (localData.lpTokenDepositValueChange > 0) {
+                feePerLP = uint256(localData.lpTokenDepositValueChange) * (uint256(feeDataArray[i].upliftFeeBps) * 1e18) / 10000;
             }
-
             // if the pool has decreased in value since the deposit, the fee is calculated based on the base value - see wp
             else {
-                feePerLP =
-                    (calculateFeeBps(
-                        feeDataArray[i].withdrawalMaxFeeBps,
-                        feeDataArray[i].withdrawalFeeBps,
-                        block.number - feeDataArray[i].blockIndexDeposit,
-                        feeDataArray[i].withdrawalFeeNumerator
-                    ) * lpTokenDepositValueNow) /
-                    10000;
+                //in most cases this should be a normal swap fee amount.
+                //there always myst be at least the swap fee amount to avoid deposit/withdraw attack surgace.
+                feePerLP = (uint256(minWithdrawalFeeBps) * 1e18) / 10000;
             }
 
             // if the deposit is less than the amount left to burn, burn the whole deposit and move on to the next
             if (feeDataArray[i].amount <= amountLeft) {
                 uint256 depositAmount = feeDataArray[i].amount;
-                feeAmount +=
-                    (feePerLP * depositAmount) /
-                    feeDataArray[i].lpTokenDepositValue;
+                localData.feeAmount += (depositAmount * feePerLP);
+
                 amountLeft -= feeDataArray[i].amount;
+
                 lpNFT.burn(feeDataArray[i].tokenID);
+
+                delete feeDataArray[i];
+                feeDataArray.pop();
+
                 if (amountLeft == 0) {
                     break;
                 }
             } else {
                 feeDataArray[i].amount -= amountLeft;
-                feeAmount +=
-                    (feePerLP * amountLeft) /
-                    feeDataArray[i].lpTokenDepositValue;
+                localData.feeAmount += (feePerLP * amountLeft);
                 break;
             }
         }
 
-        feeAmount = FixedPoint.divDown(feeAmount, bptAmountIn);
+        uint256 feePercentage = (localData.feeAmount) / bptAmountIn;
 
-        hookAdjustedAmountsOutRaw = _takeFee(msg.sender, pool, amountsOutRaw, feeAmount);
+        hookAdjustedAmountsOutRaw = localData.amountsOutRaw;
+        localData.tokens = _vault.getPoolTokens(localData.pool);
+        // Charge fees proportional to the `amountOut` of each token.
+        for (uint256 i = 0; i < localData.amountsOutRaw.length; i++) {
+            uint256 exitFee = localData.amountsOutRaw[i].mulDown(feePercentage);
+            localData.accruedFees[i] = exitFee;
+            hookAdjustedAmountsOutRaw[i] -= exitFee;
+            // Fees don't need to be transferred to the hook, because donation will redeposit them in the Vault.
+            // In effect, we will transfer a reduced amount of tokensOut to the caller, and leave the remainder
+            // in the pool balance.
+
+            emit ExitFeeCharged(userAddress, localData.pool, localData.tokens[i], exitFee);
+        }
+
+
+        uint256 adminFee = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
+        
+        if(adminFee > 0){
+            for(uint i = 0; i < localData.accruedFees.length; i++){
+                localData.accruedQuantAMMFees[i] = localData.accruedFees[i] * adminFee;
+                localData.accruedFees[i] -= localData.accruedQuantAMMFees[i];
+            }
+            // Donates accrued fees back to LPs.
+            _vault.addLiquidity(
+                AddLiquidityParams({
+                    pool: localData.pool,
+                    to: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin(), // It would mint BPTs to router, but it's a donation so no BPT is minted
+                    maxAmountsIn: localData.accruedQuantAMMFees, // Donate all accrued fees back to the pool (i.e. to the LPs)
+                    minBptAmountOut: 0, // Donation does not return BPTs, any number above 0 will revert
+                    kind: AddLiquidityKind.DONATION,
+                    userData: bytes("") // User data is not used by donation, so we can set it to an empty string
+                })
+            );
+        }
+
+        if(adminFee != 100e16){
+            // Donates accrued fees back to LPs.
+            _vault.addLiquidity(
+                AddLiquidityParams({
+                    pool: localData.pool,
+                    to: msg.sender, // It would mint BPTs to router, but it's a donation so no BPT is minted
+                    maxAmountsIn: localData.accruedFees, // Donate all accrued fees back to the pool (i.e. to the LPs)
+                    minBptAmountOut: 0, // Donation does not return BPTs, any number above 0 will revert
+                    kind: AddLiquidityKind.DONATION,
+                    userData: bytes("") // User data is not used by donation, so we can set it to an empty string
+                })
+            );
+        }
 
         return (true, hookAdjustedAmountsOutRaw);
     }
 
-
     /// @param _from the owner to transfer from
     /// @param _to the owner to transfer to
     /// @param _tokenID the token ID to transfer
-    /// @notice aftertokentransfer is called by mint/burn and transfer however override checks that this is only called on transfer
-    function afterTokenTransfer(
-        address _from,
-        address _to,
-        uint256 _tokenID
-    ) public {
-        require(msg.sender == address(lpNFT), "ONLYNFT");
-        int256[] memory prices = updateWeightRunner.getData(address(this));
-        uint256 lpTokenDepositValueNow = getPoolLPTokenValue(prices);
-        FeeData[] storage feeDataArray = feeData[_from];
+    /// @notice aftertokenafterUpdate called after overridden _update function in LPNFT for transfers only
+    function afterUpdate(address _from, address _to, uint256 _tokenID) public {
+        if (msg.sender != address(lpNFT)) {
+            revert TransferUpdateNonNft(_from, _to, msg.sender, _tokenID);
+        }
+
+        address poolAddress = nftPool[_tokenID];
+
+        if (poolAddress == address(0)) {
+            revert TransferUpdateTokenIDInvaid(_from, _to, _tokenID);
+        }
+
+        int256[] memory prices = IUpdateWeightRunner(_updateWeightRunner).getData(poolAddress);
+        uint256 lpTokenDepositValueNow = getPoolLPTokenValue(prices, poolAddress, MULDIRECTION.MULDOWN);
+        FeeData[] storage feeDataArray = poolsFeeData[poolAddress][_from];
         uint256 feeDataArrayLength = feeDataArray.length;
+        uint256 tokenIdIndex;
+        bool tokenIdIndexFound = false;
+
         for (uint256 i; i < feeDataArrayLength; ++i) {
             if (feeDataArray[i].tokenID == _tokenID) {
-                // Update the deposit value to the current value of the pool in base currency (e.g. USD) and the block index to the current block number    
-                vault.transferLPTokens(_from, _to, feeDataArray[i].amount);
-                feeDataArray[i].lpTokenDepositValue = lpTokenDepositValueNow;
-                feeDataArray[i].blockIndexDeposit = uint32(block.number);
-                feeDataArray[i].withdrawalFeeBps = withdrawalFeeBps;
-                feeDataArray[i].withdrawalMaxFeeBps = withdrawalMaxFeeBps;
-                feeDataArray[i].withdrawalFeeNumerator = withdrawalFeeNumerator;
-                if (_to != address(0)) {
-                    // Don't push when burning
-                    feeData[_to].push(feeDataArray[i]);
-                }
-                //replaced the burned with the last therefore can pop
-                feeDataArray[i] = feeDataArray[feeDataArrayLength - 1];
-                feeDataArray.pop();
+                tokenIdIndex = i;
+                tokenIdIndexFound = true;
                 break;
             }
         }
 
-    /***************************************************************************
-                                Off-chain Getters
-    ***************************************************************************/
+        if (tokenIdIndexFound) {
+            if (_to != address(0)) {
+                // Update the deposit value to the current value of the pool in base currency (e.g. USD) and the block index to the current block number
+                //vault.transferLPTokens(_from, _to, feeDataArray[i].amount);
+                feeDataArray[tokenIdIndex].lpTokenDepositValue = lpTokenDepositValueNow;
+                feeDataArray[tokenIdIndex].blockTimestampDeposit = uint32(block.number);
+                feeDataArray[tokenIdIndex].upliftFeeBps = upliftFeeBps;
 
-    /// @param _maxFeeBps the maximum fees that can be charged in basis points (1/10000)
-    /// @param _baseFeeBps the base fees that can be charged in basis points (1/10000)
-    /// @param _denominator the denominator for the fee calculation - see wp
-    /// @param _numerator the numerator for the fee calculation - see wp
-    function calculateFeeBps(
-        uint256 _maxFeeBps,
-        uint256 _baseFeeBps,
-        uint256 _denominator,
-        uint256 _numerator
-    ) private pure returns (uint256) {
-        require(_denominator != 0);
-        
-        uint256 calculatedFee = _baseFeeBps + (_numerator * 10_000) / _denominator;
+                //actual transfer not a afterTokenTransfer caused by a burn
+                poolsFeeData[poolAddress][_to].push(feeDataArray[tokenIdIndex]);
 
-        if (calculatedFee >= _maxFeeBps) {
-            return _maxFeeBps;
+                if (tokenIdIndex != feeDataArrayLength - 1) {
+                    //Reordering the entire array could be expensive but it is the only way to keep the array ordered
+                    for (uint i = tokenIdIndex + 1; i < feeDataArrayLength; i++) {
+                        delete feeDataArray[i - 1];
+                        feeDataArray[i - 1] = feeDataArray[i];
+                    }
+                }
+
+                feeDataArray.pop();
+            }
         }
+    }
 
-        uint256 closenessToBaseBps = calculatedFee - _baseFeeBps;
+    /**
+     * @notice Sets the hook swap fee percentage, charged on every swap operation.
+     * @dev This function must be permissioned.
+     * @param hookFeePercentage The new hook fee percentage
+     */
+    function setHookSwapFeePercentage(uint64 hookFeePercentage) external onlyOwner {
+        hookSwapFeePercentage = hookFeePercentage;
 
-        if (closenessToBaseBps <= 10) {
-            return _baseFeeBps;
-        }
+        emit HookSwapFeePercentageChanged(address(this), hookFeePercentage);
+    }
 
-        return calculatedFee;
+    function getUserPoolFeeData(address _pool, address _user) public view returns (FeeData[] memory) {
+        return poolsFeeData[_pool][_user];
     }
 
     enum MULDIRECTION {
         MULUP,
         MULDOWN
     }
+
     /// @notice gets the notional value of the lp token in USD
     /// @param _prices the prices of the assets in the pool
     function getPoolLPTokenValue(
@@ -488,14 +612,14 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks {
 
         //PoolData memory poolData = VaultExplorer(address(_vault)).getPoolData(pool);
         PoolData memory poolData = IVaultExplorer(address(_vault)).getPoolData(pool);
-        
-        uint256 poolTotalSupply = _vault.totalSupply(address(this));
+        uint256 poolTotalSupply = _vault.totalSupply(pool);
 
         for (uint i; i < poolData.tokens.length; ) {
-            if(_direction == MULDIRECTION.MULUP) {
-                poolValueInUSD += FixedPoint.mulUp(uint256(_prices[i]), poolData.balancesLiveScaled18[i]);
+            int256 priceScaled18 = _prices[i] * 1e18;
+            if (_direction == MULDIRECTION.MULUP) {
+                poolValueInUSD += FixedPoint.mulUp(uint256(priceScaled18), poolData.balancesLiveScaled18[i]);
             } else {
-                poolValueInUSD += FixedPoint.mulDown(uint256(_prices[i]), poolData.balancesLiveScaled18[i]);
+                poolValueInUSD += FixedPoint.mulDown(uint256(priceScaled18), poolData.balancesLiveScaled18[i]);
             }
 
             unchecked {

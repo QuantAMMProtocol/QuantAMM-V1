@@ -74,6 +74,54 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.expectRevert("ONLYADMIN");
         updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
     }
+    
+    function testOwnerCanAddSwapFee(uint256 fee) public {
+        uint256 boundFee = bound(fee, 0, 1e18);
+        vm.startPrank(owner);
+        updateWeightRunner.setQuantAMMSwapFeeTake(boundFee);
+        vm.stopPrank();
+        assertEq(updateWeightRunner.getQuantAMMSwapFeeTake(), boundFee);
+    }
+
+    function testOwnerCannotAddSwapFeeGreaterThan100(uint256 fee) public {
+        uint256 oldFee = updateWeightRunner.getQuantAMMSwapFeeTake();
+        uint256 boundFee = bound(fee, 1e18 + 1, type(uint256).max);
+        vm.startPrank(owner);
+        vm.expectRevert("Swap fee must be less than 100%");
+        updateWeightRunner.setQuantAMMSwapFeeTake(boundFee);
+        vm.stopPrank();
+        assertEq(updateWeightRunner.getQuantAMMSwapFeeTake(), oldFee);
+    }
+
+    function testNonOwnerCannotAddSwapFee() public {
+        vm.startPrank(addr1);
+        vm.expectRevert("ONLYADMIN");
+        updateWeightRunner.setQuantAMMSwapFeeTake(50e16);
+    }
+
+    function testOwnerCanAddUpliftFee(uint256 fee) public {
+        uint256 boundFee = bound(fee, 0, 1e18);
+        vm.startPrank(owner);
+        updateWeightRunner.setQuantAMMUpliftFeeTake(boundFee);
+        vm.stopPrank();
+        assertEq(updateWeightRunner.getQuantAMMUpliftFeeTake(), boundFee);
+    }
+
+    function testOwnerCannotAddUpliftFeeGreaterThan100(uint256 fee) public {
+        uint256 oldFee = updateWeightRunner.getQuantAMMSwapFeeTake();
+        uint256 boundFee = bound(fee, 1e18 + 1, type(uint256).max);
+        vm.startPrank(owner);
+        vm.expectRevert("Uplift fee must be less than 100%");
+        updateWeightRunner.setQuantAMMUpliftFeeTake(boundFee);
+        vm.stopPrank();
+        assertEq(updateWeightRunner.getQuantAMMSwapFeeTake(), oldFee);
+    }
+
+    function testNonOwnerCannotAddUpliftFee() public {
+        vm.startPrank(addr1);
+        vm.expectRevert("ONLYADMIN");
+        updateWeightRunner.setQuantAMMUpliftFeeTake(50e16);
+    }
 
     function testOracleCannotBeAddedTwice() public {
         int216 fixedValue = 1000;

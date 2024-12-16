@@ -148,7 +148,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         addr2 = addr2Local;
         // Deploy UpdateWeightRunner contract
         vm.startPrank(owner);
-        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2); //@note owner = vault admin, addr2 = eth oracle
+        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2, false); //@note owner = vault admin, addr2 = eth oracle
 
         chainlinkOracle = _deployOracle(fixedValue, delay);
 

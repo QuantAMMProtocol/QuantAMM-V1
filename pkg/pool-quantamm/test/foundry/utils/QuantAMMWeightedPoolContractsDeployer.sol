@@ -62,7 +62,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         addr2 = addr2Local;
 
         vm.startPrank(owner);
-        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2);
+        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2, false);
 
         chainlinkOracle = _deployOracle(1e18, 0);
 

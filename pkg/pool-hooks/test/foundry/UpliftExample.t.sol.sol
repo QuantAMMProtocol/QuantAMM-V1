@@ -84,7 +84,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.label(address(feeController), "fee controller");
 
         vm.startPrank(address(vaultAdmin));
-        updateWeightRunner = new MockUpdateWeightRunner(address(vaultAdmin), address(addr2));
+        updateWeightRunner = new MockUpdateWeightRunner(address(vaultAdmin), address(addr2), true);
         vm.label(address(updateWeightRunner), "updateWeightRunner");
         updateWeightRunner.setQuantAMMSwapFeeTake(0);
 

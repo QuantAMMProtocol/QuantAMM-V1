@@ -510,7 +510,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             );
         }
 
-        if(adminFee != 100e16){
+        if(adminFee != 1e18){
             // Donates accrued fees back to LPs.
             _vault.addLiquidity(
                 AddLiquidityParams({

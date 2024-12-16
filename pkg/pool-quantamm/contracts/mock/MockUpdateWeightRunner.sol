@@ -7,8 +7,11 @@ import "../rules/UpdateRule.sol";
 /// @dev Additionally exposes private fields for testing, otherwise normal update weight runner
 
 contract MockUpdateWeightRunner is UpdateWeightRunner {
-    constructor(address _vaultAdmin, address ethOracle) UpdateWeightRunner(_vaultAdmin, ethOracle) {}
+    constructor(address _vaultAdmin, address ethOracle, bool overrideGetData) UpdateWeightRunner(_vaultAdmin, ethOracle) {
+        _overrideGetData = overrideGetData;
+    }
 
+    bool private _overrideGetData;
     mapping(address => int256[]) public mockPrices;
 
     // To allow differentiation in the gas reporter plugin
@@ -21,6 +24,11 @@ contract MockUpdateWeightRunner is UpdateWeightRunner {
     }
 
     function getData(address _pool) public view override returns (int256[] memory outputData) {
-        return mockPrices[_pool];
+        if(_overrideGetData){
+            return mockPrices[_pool];
+        }
+        else{
+            return super.getData(_pool);
+        }
     }
 }

@@ -36,7 +36,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         addr2 = addr2Local;
         // Deploy UpdateWeightRunner contract
         vm.startPrank(owner);
-        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2);
+        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2, false);
         
         vm.stopPrank();
         // Deploy Mock Rule and Pool

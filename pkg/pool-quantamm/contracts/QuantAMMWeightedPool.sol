@@ -79,7 +79,7 @@ contract QuantAMMWeightedPool is
     // This means they have 0.00001% resolution (i.e., any non-zero bits < 1e11 will cause precision loss).
     // Minimum values help make the math well-behaved (i.e., the swap fee should overwhelm any rounding error).
     // Maximum values protect users by preventing permissioned actors from setting excessively high swap fees.
-    uint256 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16; // 0.0001%
+    uint256 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16; // 0.001%
     uint256 private constant _MAX_SWAP_FEE_PERCENTAGE = 10e16; // 10%
 
     uint256 private immutable _totalTokens;
@@ -781,7 +781,7 @@ contract QuantAMMWeightedPool is
         require(
             int256(uint256(_poolSettings.absoluteWeightGuardRail)) <
                 PRBMathSD59x18.fromInt(1) / int256(uint256((_initialWeights.length))) &&
-                int256(uint256(_poolSettings.absoluteWeightGuardRail)) > 0.001e18,
+                int256(uint256(_poolSettings.absoluteWeightGuardRail)) >= 0.01e18,
             "INV_ABSWGT"
         ); //Invalid absoluteWeightGuardRail value
 

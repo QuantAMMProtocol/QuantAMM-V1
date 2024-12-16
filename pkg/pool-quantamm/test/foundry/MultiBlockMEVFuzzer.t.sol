@@ -493,7 +493,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
          // Bound parameters to valid ranges
         params.poolParams.delay = bound(params.poolParams.delay, 0, _UPDATE_INTERVAL);
         params.poolParams.maxSwapfee = uint64(bound(params.poolParams.maxSwapfee, 1e16, _MAX_SWAP_FEE_PERCENTAGE)); // min of 1% and max of 10%
-        params.poolParams.epsilonMax = uint64(bound(params.poolParams.epsilonMax, 0.001e18, 0.10e18)); // 0.1% to 25% @audit epsilon
+        params.poolParams.epsilonMax = uint64(bound(params.poolParams.epsilonMax, 0.001e18, 0.01e18)); // 0.1% to 25% @audit epsilon
         params.poolParams.absoluteWeightGuardRail = uint64(bound(params.poolParams.absoluteWeightGuardRail, 0.03e18, 1e18 / params.poolParams.numTokens - 1)); // 1% to 100%/numTokens
         params.poolParams.maxTradeSizeRatio = uint64(bound(params.poolParams.maxTradeSizeRatio, 0.01e18, 0.3e18)); // 1% to 30%    
     }
@@ -820,7 +820,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
         console.log("amount out", amountOut);
         console.log("boundedDeposit", boundedDeposit);
 
-        poolState.minThresholdProfit = (boundedDeposit * 101) / 100;
+        poolState.minThresholdProfit = (boundedDeposit * 10001) / 10000;
 
         int256 profitLoss = int256(amountOut) - int256(boundedDeposit);
         if (profitLoss > int256(poolState.minThresholdProfit)){

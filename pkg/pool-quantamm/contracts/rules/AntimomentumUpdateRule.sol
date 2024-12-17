@@ -14,8 +14,9 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         name = "AntiMomentum";
         
         parameterDescriptions = new string[](3);
-        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change TODO";
+        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of the rule's response to a signal change (here, -(price gradient))";
         parameterDescriptions[1] = "Use raw price: 0 = use moving average, 1 = use raw price to be used as the denominator";
+        parameterDescriptions[2] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
     }
 
     using PRBMathSD59x18 for int256;
@@ -47,7 +48,7 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     /// @param _prevWeights the previous weights retrieved from the vault
     /// @param _data the latest data from the signal, usually price
     /// @param _parameters the parameters of the rule that are not lambda
-    /// @param _poolParameters pool parameters
+    /// @param _poolParameters pool parameters [0]=kappa can be per token (vector) or single for all tokens (scalar), [1][0]=useRawPrice
     /// @notice w(t) = w(t − 1) + κ ·(ℓp(t) − 1/p(t) · ∂p(t)/∂t) where ℓp(t) = 1/N * ∑(1/p(t)i * (∂p(t)/∂t)i)
     function _getWeights(
         int256[] calldata _prevWeights,

@@ -139,7 +139,7 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
-    function testCorrectUpdateWithHigherPrices() public {
+    function testCorrectUpdateWithHigherPrice_scalarParams() public {
         /*
             ℓp(t)	0.10125	
             moving average	[0.9, 1.2]
@@ -152,8 +152,9 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
-        parameters[1] = new int256[](1);
-        parameters[1][0] = PRBMathSD59x18.fromInt(1);
+        parameters[1] = new int256[](2);
+        parameters[1][0] = 0.5e18;
+        parameters[1][1] = 0.5e18;
 
         int256[] memory previousAlphas = new int256[](4);
         previousAlphas[0] = PRBMathSD59x18.fromInt(1);
@@ -262,9 +263,9 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
-        parameters[1] = new int256[](1);
-        parameters[1][0] = PRBMathSD59x18.fromInt(1);
-
+        parameters[1] = new int256[](2);
+        parameters[1][0] = 0.7e18;
+        parameters[1][1] = 0.7e18;
         int256[] memory previousAlphas = new int256[](4);
         previousAlphas[0] = PRBMathSD59x18.fromInt(1);
         previousAlphas[1] = PRBMathSD59x18.fromInt(2);

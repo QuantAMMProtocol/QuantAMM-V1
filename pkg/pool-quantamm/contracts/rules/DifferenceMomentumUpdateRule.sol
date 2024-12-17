@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24;
 
+import "forge-std/Test.sol";
+
 import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "./UpdateRule.sol";
 import "./base/QuantammGradientBasedRule.sol";
@@ -62,38 +64,53 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {
         QuantAMMMomentumLocals memory locals;
-
+        console.log("1");
         locals.kappaStore = _parameters[0];
         locals.useRawPrice = false;
+        _poolParameters.numberOfAssets = _prevWeights.length;
         // the second parameter determines if momentum should use the price or the average price as the denominator
         // using the average price has shown greater performance and resilience due to greater smoothing
         if (_parameters.length > 1) {
             locals.useRawPrice = _parameters[1][0] == ONE;
         }
+        console.log("2");
+        console.log(shortMovingAverages[_poolParameters.pool].length);
+        console.log(_poolParameters.numberOfAssets);
 
+        int256[] memory currentShortMovingAverages = _quantAMMUnpack128Array(shortMovingAverages[_poolParameters.pool], _poolParameters.numberOfAssets);
+        console.log("22");
         int256[] memory newShortMovingAverages = _calculateQuantAMMMovingAverage(
-            shortMovingAverages[_poolParameters.pool],
+            currentShortMovingAverages,
             _data,
             _poolParameters.lambda,
             _poolParameters.numberOfAssets
         );
-
+        console.log("3");
+        console.log(newShortMovingAverages.length);
+        shortMovingAverages[_poolParameters.pool] = _quantAMMPack128Array(newShortMovingAverages);
         for(uint i; i < newShortMovingAverages.length; i++) {
-            //done inside the loop to save an SSTORE
-            shortMovingAverages[_poolParameters.pool][i] = newShortMovingAverages[i];
-
             //reuse array for efficiency, this is now the moving average dif.
+            console.log("i", i);
+            console.log("newShort");
+            console.log(newShortMovingAverages[i] > 0 ? uint256(newShortMovingAverages[i]) : uint256(-newShortMovingAverages[i]));
+            console.log(newShortMovingAverages[i] > 0 ? "+" : "-");
+            console.log("movingAverages");
+            console.log(movingAverages[_poolParameters.pool][i] > 0 ? uint256(movingAverages[_poolParameters.pool][i]) : uint256(-movingAverages[_poolParameters.pool][i]));
+            console.log(movingAverages[_poolParameters.pool][i] > 0 ? "+" : "-");
             newShortMovingAverages[i] -= movingAverages[_poolParameters.pool][i];
+            console.log("dif avg");
+            console.log(newShortMovingAverages[i] > 0 ? "+" : "-");
+            console.log(newShortMovingAverages[i] > 0 ? uint256(newShortMovingAverages[i]) : uint256(-newShortMovingAverages[i]));
+            
             unchecked{++i;}
         }
-
-        _poolParameters.numberOfAssets = _prevWeights.length;
+        console.log("4");
 
         locals.prevWeightLength = _prevWeights.length;
 
         // newWeights is reused multiple times to save gas of multiple array initialisation
         locals.newWeights = _calculateQuantAMMGradient(newShortMovingAverages, _poolParameters);
-
+        console.log("5");
         for (locals.i = 0; locals.i < locals.prevWeightLength; ) {
             locals.denominator = _poolParameters.movingAverage[locals.i];
             if (locals.useRawPrice) {
@@ -113,7 +130,7 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 ++locals.i;
             }
         }
-
+        console.log("7");
         newWeightsConverted = new int256[](locals.prevWeightLength);
 
         if (locals.kappaStore.length == 1) {
@@ -154,6 +171,7 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 }
             }
         }
+        console.log("8");
         return newWeightsConverted;
     }
 

@@ -74,22 +74,24 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         console.log(_poolParameters.numberOfAssets);
 
         int256[] memory currentShortMovingAverages = _quantAMMUnpack128Array(shortMovingAverages[_poolParameters.pool], _poolParameters.numberOfAssets);
-        int256[] memory currentLongMovingAverages = _quantAMMUnpack128Array(movingAverages[_poolParameters.pool], _poolParameters.numberOfAssets);
         int256[] memory newShortMovingAverages = _calculateQuantAMMMovingAverage(
             currentShortMovingAverages,
             _data,
-            _poolParameters.lambda,
+            _poolParameters.lambda, // TODO: This should be lambda_short, i.e. _parameters[1]
             _poolParameters.numberOfAssets
         );
-        int256[] memory newLongMovingAverages = _calculateQuantAMMMovingAverage(
-            currentLongMovingAverages,
-            _data,
-            _poolParameters.lambda,
-            _poolParameters.numberOfAssets
-        );
+        shortMovingAverages[_poolParameters.pool] = _quantAMMPack128Array(newShortMovingAverages);    
+
+        // int256[] memory currentLongMovingAverages = _quantAMMUnpack128Array(movingAverages[_poolParameters.pool], _poolParameters.numberOfAssets);
+        // int256[] memory newLongMovingAverages = _calculateQuantAMMMovingAverage(
+        //     currentLongMovingAverages,
+        //     _data,
+        //     _poolParameters.lambda,
+        //     _poolParameters.numberOfAssets
+        // );
+        // movingAverages[_poolParameters.pool] = _quantAMMPack128Array(newLongMovingAverages);
+        int256[] memory newLongMovingAverages = _quantAMMUnpack128Array(movingAverages[_poolParameters.pool], _poolParameters.numberOfAssets);
         console.log("3");
-        shortMovingAverages[_poolParameters.pool] = _quantAMMPack128Array(newShortMovingAverages);
-        movingAverages[_poolParameters.pool] = _quantAMMPack128Array(newLongMovingAverages);
 
         for(uint i; i < newShortMovingAverages.length; ) {
             console.log("top of for loop");
@@ -114,7 +116,7 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             console.log("newShortMovingAverages[locals.i]");
             console.logInt(newShortMovingAverages[locals.i]);
             console.log("movingAverages[_poolParameters.pool][locals.i]");
-            console.logInt(movingAverages[_poolParameters.pool][locals.i]);
+            console.logInt(newLongMovingAverages[locals.i]);
         
             locals.newWeights[locals.i] = newShortMovingAverages[locals.i] - newLongMovingAverages[locals.i];
 

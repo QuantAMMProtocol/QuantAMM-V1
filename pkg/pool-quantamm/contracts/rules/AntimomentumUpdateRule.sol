@@ -52,7 +52,7 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     /// @notice w(t) = w(t − 1) + κ ·(ℓp(t) − 1/p(t) · ∂p(t)/∂t) where ℓp(t) = 1/N * ∑(1/p(t)i * (∂p(t)/∂t)i)
     function _getWeights(
         int256[] calldata _prevWeights,
-        int256[] calldata _data,
+        int256[]  memory _data,
         int256[][] calldata _parameters,
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {

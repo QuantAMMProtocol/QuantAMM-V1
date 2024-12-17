@@ -28,7 +28,7 @@ contract MinimumVarianceUpdateRule is QuantAMMVarianceBasedRule, UpdateRule {
     /// @notice w(t) = (Λ * w(t − 1)) + ((1 − Λ)*Σ^−1(t)) / N,j=1∑ Σ^−1 j(t) - see whitepaper
     function _getWeights(
         int256[] calldata _prevWeights,
-        int256[] calldata _data,
+        int256[]  memory _data,
         int256[][] calldata _parameters, //
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {

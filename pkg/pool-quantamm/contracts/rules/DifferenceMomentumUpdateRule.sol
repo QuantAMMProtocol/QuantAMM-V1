@@ -7,20 +7,26 @@ import "./base/QuantammGradientBasedRule.sol";
 
 /// @title MomentumUpdateRule contract for QuantAMM momentum update rule
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the momentum update rule
-contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
+contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
-        name = "Momentum";
-        
+        name = "DifferenceMomentum";
+
         parameterDescriptions = new string[](3);
-        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of the rule's response to a signal change (here, price gradient)";
+        parameterDescriptions[
+            0
+        ] = "Kappa: Kappa dictates the aggressiveness of the rule's response to a signal change (here, price gradient)";
         parameterDescriptions[1] = "Use raw price: 0 = use moving average, 1 = use raw price";
-        parameterDescriptions[2] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
+        parameterDescriptions[
+            2
+        ] = "Lambda: Lambda dictates the estimator weighting and price smoothing for a given period of time";
     }
 
     using PRBMathSD59x18 for int256;
 
     int256 private constant ONE = 1 * 1e18; // Result of PRBMathSD59x18.fromInt(1), store as constant to avoid recalculation every time
     uint16 private constant REQUIRES_PREV_MAVG = 0;
+
+    mapping(address => int256[]) public shortMovingAverages;
 
     /// @dev struct to avoid stack too deep issues
     /// @notice Struct to store local variables for the momentum calculation
@@ -51,8 +57,8 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     /// @param _parameters the parameters of the rule that are not lambda [0]=kappa can be per token (vector) or single for all tokens (scalar), [1]=useRawPrice
     function _getWeights(
         int256[] calldata _prevWeights,
-        int256[] memory _data,
-        int256[][] calldata _parameters, 
+        int256[]  memory _data,
+        int256[][] calldata _parameters,
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {
         QuantAMMMomentumLocals memory locals;
@@ -65,12 +71,28 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             locals.useRawPrice = _parameters[1][0] == ONE;
         }
 
+        int256[] memory newShortMovingAverages = _calculateQuantAMMMovingAverage(
+            shortMovingAverages[_poolParameters.pool],
+            _data,
+            _poolParameters.lambda,
+            _poolParameters.numberOfAssets
+        );
+
+        for(uint i; i < newShortMovingAverages.length; i++) {
+            //done inside the loop to save an SSTORE
+            shortMovingAverages[_poolParameters.pool][i] = newShortMovingAverages[i];
+
+            //reuse array for efficiency, this is now the moving average dif.
+            newShortMovingAverages[i] -= movingAverages[_poolParameters.pool][i];
+            unchecked{++i;}
+        }
+
         _poolParameters.numberOfAssets = _prevWeights.length;
 
         locals.prevWeightLength = _prevWeights.length;
 
         // newWeights is reused multiple times to save gas of multiple array initialisation
-        locals.newWeights = _calculateQuantAMMGradient(_data, _poolParameters);
+        locals.newWeights = _calculateQuantAMMGradient(newShortMovingAverages, _poolParameters);
 
         for (locals.i = 0; locals.i < locals.prevWeightLength; ) {
             locals.denominator = _poolParameters.movingAverage[locals.i];
@@ -144,7 +166,28 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         int256[] memory _initialValues,
         uint _numberOfAssets
     ) internal override {
-        _setGradient(_poolAddress, _initialValues, _numberOfAssets);
+        require(_initialValues.length == _numberOfAssets * 2, "Invalid initial values");
+        int256[] memory initialValues = new int256[](_numberOfAssets);
+        int256[] memory initialAverageValues = new int256[](_numberOfAssets);
+        for (uint i; i < _numberOfAssets; ) {
+            initialValues[i] = _initialValues[i];
+            initialAverageValues[i] = _initialValues[i + _numberOfAssets];
+            unchecked {
+                ++i;
+            }
+        }
+
+        _setGradient(_poolAddress, initialValues, _numberOfAssets);
+
+        //unfortunately to avoid incorrect access to base MathMovingAverage, we need to set the moving average here
+        uint movingAverageLength = shortMovingAverages[_poolAddress].length;
+
+        if (movingAverageLength == 0 || initialAverageValues.length == _numberOfAssets) {
+            //should be during create pool
+            shortMovingAverages[_poolAddress] = _quantAMMPack128Array(initialAverageValues);
+        } else {
+            revert("Invalid set moving avg");
+        }
     }
 
     /// @notice Check if the rule requires the previous moving average

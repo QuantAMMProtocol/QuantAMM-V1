@@ -29,7 +29,6 @@ import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/Fixe
 import { MinimalRouter } from "../MinimalRouter.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IVaultExplorer } from "@balancer-labs/v3-interfaces/contracts/vault/IVaultExplorer.sol";
-//import { VaultExplorer } from "@balancer-labs/v3-vault/contracts/VaultExplorer.sol";
 
 import { LPNFT } from "./lp_nft.sol";
 
@@ -41,8 +40,19 @@ struct PoolCreationSettings {
     int256[] initialIntermediateValues;
     uint oracleStalenessThreshold;
 }
-
-/// @notice Mint an NFT to pool depositors, and charge a decaying exit fee upon withdrawal.
+/**
+ * @title UpliftOnlyExample
+ * @notice Deposits are recorded in USD notional and at withdrawal, the user is charged a fee based on the uplift since deposit.
+ * This is done in a FILO manner given the user can have multiple deposits.
+ * Transfers are possible however are expensive given a reordering of the storage array is required. 
+ * Alternatives include depositing under different addresses or withdrawing and transferring. 
+ * 
+ * Fixed swap fees are also divided between the owner and the quantAMM admin.
+ * 
+ * The user is restricted to 100 deposits to avoid Ddos issues.
+ * 
+ */
+/// @notice Change Withdrawal fees on USD uplift since deposit, and charge swap fees on every swap operation.
 contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
     using FixedPoint for uint256;
     using SafeERC20 for IERC20;
@@ -68,10 +78,10 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
     /// @notice The LP NFT contract for the pool
     LPNFT public lpNFT;
 
-    /// @notice The fee data for a given owner and deposit
     /// @notice pool => owner => FeeData[]
     mapping(address => mapping(address => FeeData[])) public poolsFeeData;
 
+    /// @notice The pool associated with the NFT Token ID
     mapping(uint256 => address) public nftPool;
 
     // NFT unique identifier.
@@ -80,7 +90,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
     address private immutable _updateWeightRunner;
 
     /**
-     * @notice A new `NftLiquidityPositionExample` contract has been registered successfully for a given pool.
+     * @notice A new `UpliftOnlyExampleRegistered` contract has been registered successfully for a given pool.
      * @dev If the registration fails the call will revert, so there will be no event.
      * @param hooksContract This contract
      * @param pool The pool on which the hook was registered
@@ -88,8 +98,8 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
     event UpliftOnlyExampleRegistered(address indexed hooksContract, address indexed pool);
 
     /**
-     * @notice An NFT holder withdrew liquidity during the decay period, incurring an exit fee.
-     * @param nftHolder The NFT holder who withdrew liquidity in exchange for the NFT
+     * @notice The hooks contract has charged a fee on a withdrawal.
+     * @param nftHolder The NFT holder who withdrew liquidity 
      * @param pool The pool from which the NFT holder withdrew liquidity
      * @param feeToken The address of the token in which the fee was charged
      * @param feeAmount The amount of the fee, in native token decimals
@@ -196,6 +206,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                                   Router Functions
     ***************************************************************************/
 
+    ///@inheritdoc MinimalRouter
     function addLiquidityProportional(
         address pool,
         uint256[] memory maxAmountsIn,
@@ -218,6 +229,9 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         );
 
         uint256 tokenID = lpNFT.mint(msg.sender);
+
+        //this requires the pool to be registered with the QuantAMM update weight runner
+        //as well as approved with oracles that provide the prices
         uint256 depositValue = getPoolLPTokenValue(
             IUpdateWeightRunner(_updateWeightRunner).getData(pool),
             pool,
@@ -230,6 +244,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                 amount: exactBptAmountOut,
                 //this rounding favours the LP
                 lpTokenDepositValue: depositValue,
+                //known use of timestamp, caveats are known.
                 blockTimestampDeposit: uint40(block.timestamp),
                 upliftFeeBps: upliftFeeBps
             })
@@ -238,6 +253,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         nftPool[tokenID] = pool;
     }
 
+    ///@inheritdoc MinimalRouter
     function removeLiquidityProportional(
         uint256 bptAmountIn,
         uint256[] memory minAmountsOut,
@@ -382,6 +398,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         uint256[] accruedFees;
     }
 
+    //needed to avoid stack too deep error
     struct AfterRemoveLiquidityData {
         address pool;
         uint256 bptAmountIn;
@@ -511,11 +528,11 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             _vault.addLiquidity(
                 AddLiquidityParams({
                     pool: localData.pool,
-                    to: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin(), // It would mint BPTs to router, but it's a donation so no BPT is minted
-                    maxAmountsIn: localData.accruedQuantAMMFees, // Donate all accrued fees back to the pool (i.e. to the LPs)
-                    minBptAmountOut: localData.feeAmount / (1e18 / localData.adminFeePercent) / 1e18, // Donation does not return BPTs, any number above 0 will revert
+                    to: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin(), 
+                    maxAmountsIn: localData.accruedQuantAMMFees, 
+                    minBptAmountOut: localData.feeAmount / (1e18 / localData.adminFeePercent) / 1e18, 
                     kind: AddLiquidityKind.PROPORTIONAL,
-                    userData: bytes("") // User data is not used by donation, so we can set it to an empty string
+                    userData: bytes("") 
                 })
             );
             emit ExitFeeCharged(userAddress, localData.pool, IERC20(localData.pool), localData.feeAmount / (1e18 / localData.adminFeePercent) / 1e18);
@@ -555,11 +572,14 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
 
         int256[] memory prices = IUpdateWeightRunner(_updateWeightRunner).getData(poolAddress);
         uint256 lpTokenDepositValueNow = getPoolLPTokenValue(prices, poolAddress, MULDIRECTION.MULDOWN);
+
         FeeData[] storage feeDataArray = poolsFeeData[poolAddress][_from];
+        
         uint256 feeDataArrayLength = feeDataArray.length;
         uint256 tokenIdIndex;
         bool tokenIdIndexFound = false;
 
+        //find the tokenID index in the array 
         for (uint256 i; i < feeDataArrayLength; ++i) {
             if (feeDataArray[i].tokenID == _tokenID) {
                 tokenIdIndex = i;
@@ -580,13 +600,14 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                 poolsFeeData[poolAddress][_to].push(feeDataArray[tokenIdIndex]);
 
                 if (tokenIdIndex != feeDataArrayLength - 1) {
-                    //Reordering the entire array could be expensive but it is the only way to keep the array ordered
+                    //Reordering the entire array could be expensive but it is the only way to keep true FILO
                     for (uint i = tokenIdIndex + 1; i < feeDataArrayLength; i++) {
                         delete feeDataArray[i - 1];
                         feeDataArray[i - 1] = feeDataArray[i];
                     }
                 }
-
+                
+                delete feeDataArray[feeDataArrayLength - 1];
                 feeDataArray.pop();
             }
         }

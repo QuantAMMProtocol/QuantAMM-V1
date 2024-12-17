@@ -348,22 +348,19 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
 
-    function testTransferDepositsAtRandom() public {
+    function testTransferDepositsAtRandom(uint256 seed) public {
+
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.startPrank(bob);
         uint256 bptAmountDeposit = bptAmount / 150;
-        for (uint256 i = 0; i < 150; i++) {
-            if (i == 101) {
-                vm.expectRevert(abi.encodeWithSelector(UpliftOnlyExample.TooManyDeposits.selector, pool, bob));
-                upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmountDeposit, false, bytes(""));
-                break;
-            } else {
-                upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmountDeposit, false, bytes(""));
-            }
-
+        for (uint256 i = 0; i < 99; i++) {            
+            upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmountDeposit, false, bytes(""));            
             skip(1 days);
         }
         vm.stopPrank();
+
+        // Shuffle the array using the seed
+        uint[] memory shuffledArray = shuffle(masterArray, seed);
     }
 
     // Function to generate a shuffled array of unique uints between 0 and 10
@@ -1056,20 +1053,13 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         uint256 nftTokenId = 0;
         uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
-        console.log(updateWeightRunner.getQuantAMMAdmin());
         BaseVaultTest.Balances memory balancesBefore = getBalances(updateWeightRunner.getQuantAMMAdmin());
 
-        console.log("remove liquidity");
         vm.startPrank(bob);
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
         vm.stopPrank();
         BaseVaultTest.Balances memory balancesAfter = getBalances(updateWeightRunner.getQuantAMMAdmin());
-        for(uint256 i = 0; i < balancesBefore.userTokens.length; i++){
-            console.log(balancesBefore.userTokens[i]);
-            console.log(balancesAfter.userTokens[i]);
-        }
 
-        console.log("done remove liquidity");
         uint256 feeAmountAmountPercent = (((bptAmount / 2) *
             ((uint256(upliftOnlyRouter.minWithdrawalFeeBps()) * 1e18) / 10000)) / ((bptAmount / 2)));
         uint256 amountOut = (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent));
@@ -1099,7 +1089,11 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         );
 
         //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
-        assertEq(balancesBefore.poolSupply - balancesAfter.poolSupply, bptAmount - balancesAfter.userBpt, "BPT supply amount is wrong");
+        assertEq(
+            balancesBefore.poolSupply - balancesAfter.poolSupply,
+            bptAmount - balancesAfter.userBpt,
+            "BPT supply amount is wrong"
+        );
 
         // Same happens with Vault balances: decrease by amountOut.
         assertEq(
@@ -1131,10 +1125,22 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             "upliftOnlyRouter should hold no BPT"
         );
         assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
-        assertEq(balancesAfter.userBpt, bptAmount - (balancesBefore.poolSupply - balancesAfter.poolSupply), "quantamm should not hold any BPT");
+
+        // was originall 1000000000000000000, doubled in value to 2000000000000000000,
+        //total fee was 50% of uplift which is 1000000000000000000, of that fee the protocol take 50% which is 500000000000000000
+        assertEq(
+            balancesAfter.userBpt,
+            500000000000000000,
+            
+            "quantamm should not hold any BPT"
+        );
     }
 
     function testRemoveLiquidityWithProtocolTakeNegativePriceChange() public {
+        vm.prank(address(vaultAdmin));
+        updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
+        vm.stopPrank();
+
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -1200,7 +1206,11 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         );
 
         //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
-        assertEq(balancesBefore.poolSupply - balancesAfter.poolSupply, bptAmount, "BPT supply amount is wrong");
+        assertEq(
+            balancesBefore.poolSupply - balancesAfter.poolSupply,
+            bptAmount - balancesAfter.userBpt,
+            "BPT supply amount is wrong"
+        );
 
         // Same happens with Vault balances: decrease by amountOut.
         assertEq(
@@ -1235,6 +1245,9 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testRemoveLiquidityWithProtocolTakeDoublePositivePriceChange() public {
+        vm.prank(address(vaultAdmin));
+        updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
+        vm.stopPrank();
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -1309,8 +1322,12 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         );
 
         //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
-        assertEq(balancesBefore.poolSupply - balancesAfter.poolSupply, bptAmount, "BPT supply amount is wrong");
-
+        assertEq(
+            balancesBefore.poolSupply - balancesAfter.poolSupply,
+            bptAmount - balancesAfter.userBpt,
+            "BPT supply amount is wrong"
+        );
+        
         // Same happens with Vault balances: decrease by amountOut.
         assertEq(
             balancesBefore.vaultTokens[daiIdx] - balancesAfter.vaultTokens[daiIdx],

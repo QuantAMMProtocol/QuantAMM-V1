@@ -193,7 +193,7 @@ contract ChannelFollowingUpdateRuleTest is Test, QuantAMMTestUtils {
         }
     }
 
-    function testFuzz_OnlySevenParamsAccepted(uint8 numParams) public {
+    function testFuzz_OnlySevenParamsAccepted(uint8 numParams) public view {
         // Bound number of parameters between 1 and 20 to keep test reasonable
         // Exclude 7 since that's the valid case
         numParams = uint8(bound(numParams, 1, 20));

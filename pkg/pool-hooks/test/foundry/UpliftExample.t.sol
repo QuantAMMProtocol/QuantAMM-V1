@@ -96,7 +96,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             weth,
             permit2,
             200,
-            5,
+            20,
             address(updateWeightRunner),
             "Uplift LiquidityPosition v1",
             "Uplift LiquidityPosition v1",
@@ -1188,12 +1188,12 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         uint256 nftTokenId = 0;
         uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
-        BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
+        BaseVaultTest.Balances memory balancesBefore = getBalances(updateWeightRunner.getQuantAMMAdmin());
 
         vm.startPrank(bob);
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
         vm.stopPrank();
-        BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
+        BaseVaultTest.Balances memory balancesAfter = getBalances(updateWeightRunner.getQuantAMMAdmin());
 
         uint256 feeAmountAmountPercent = ((bptAmount / 2) *
             ((uint256(upliftOnlyRouter.minWithdrawalFeeBps()) * 1e18) / 10000)) / ((bptAmount / 2));

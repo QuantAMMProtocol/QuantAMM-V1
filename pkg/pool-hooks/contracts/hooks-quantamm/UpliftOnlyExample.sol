@@ -514,7 +514,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             uint256 exitFee = localData.amountsOutRaw[i].mulDown(localData.feePercentage);
             
             if(localData.adminFeePercent > 0){
-                localData.accruedQuantAMMFees[i] = exitFee / (1e18 / localData.adminFeePercent);
+                localData.accruedQuantAMMFees[i] = exitFee.mulDown(localData.adminFeePercent);
             }
 
             localData.accruedFees[i] = exitFee - localData.accruedQuantAMMFees[i];
@@ -524,6 +524,20 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             // in the pool balance.
         }           
     
+        if(localData.adminFeePercent > 0){
+            _vault.addLiquidity(
+                AddLiquidityParams({
+                    pool: localData.pool,
+                    to: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin(), 
+                    maxAmountsIn: localData.accruedQuantAMMFees, 
+                    minBptAmountOut: localData.feeAmount.mulDown(localData.adminFeePercent) / 1e18, 
+                    kind: AddLiquidityKind.PROPORTIONAL,
+                    userData: bytes("") 
+                })
+            );
+            emit ExitFeeCharged(userAddress, localData.pool, IERC20(localData.pool), localData.feeAmount / (1e18 / localData.adminFeePercent) / 1e18);
+        }
+
         if(localData.adminFeePercent != 1e18){
             // Donates accrued fees back to LPs.
             _vault.addLiquidity(
@@ -536,20 +550,6 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                     userData: bytes("") // User data is not used by donation, so we can set it to an empty string
                 })
             );
-        }
-        
-        if(localData.adminFeePercent > 0){
-            _vault.addLiquidity(
-                AddLiquidityParams({
-                    pool: localData.pool,
-                    to: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin(), 
-                    maxAmountsIn: localData.accruedQuantAMMFees, 
-                    minBptAmountOut: (localData.feeAmount) / (1e18 / localData.adminFeePercent) / 1e18, 
-                    kind: AddLiquidityKind.PROPORTIONAL,
-                    userData: bytes("") 
-                })
-            );
-            emit ExitFeeCharged(userAddress, localData.pool, IERC20(localData.pool), localData.feeAmount / (1e18 / localData.adminFeePercent) / 1e18);
         }
 
         return (true, hookAdjustedAmountsOutRaw);

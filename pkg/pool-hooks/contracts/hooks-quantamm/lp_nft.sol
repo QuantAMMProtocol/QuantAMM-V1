@@ -4,21 +4,24 @@ pragma solidity >=0.8.24;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "./UpliftOnlyExample.sol";
 
+/** 
+ * @notice This contract is a simple ERC721 contract for LP NFTs. It overrides update which means
+ * that the deposits can be transferred feely between users.
+ * this does require the router to change the vault balances and deposit records as well
+ */
+
 /// @title LPNFT contract for QuantAMM LP NFTs 
 /// @notice implements ERC721 for LP NFTs 
 contract LPNFT is ERC721 {
 
     uint256 numMinted;
 
-    /// @notice the address of the QuantAMM pool this token is for
+    /// @notice the address of the QuantAMM router this token is for
     UpliftOnlyExample public router;
 
-    /// @notice Exception to be thrown when a transfer is attempted
-    error NonTransferable();
-
-    /// @notice Modifier for only allowing the pool to call certain functions
+    /// @notice Modifier for only allowing the router to call certain functions
     modifier onlyUpliftOnlyRouter() {
-        require(msg.sender == address(router), "ROUTERONLY"); //Action only allowed by pool
+        require(msg.sender == address(router), "ROUTERONLY"); 
         _;
     }
 

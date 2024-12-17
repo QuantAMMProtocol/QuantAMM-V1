@@ -347,6 +347,36 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.stopPrank();
     }
 
+
+    function testTransferDepositsAtRandom() public {
+        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+        vm.startPrank(bob);
+        uint256 bptAmountDeposit = bptAmount / 150;
+        for (uint256 i = 0; i < 150; i++) {
+            if (i == 101) {
+                vm.expectRevert(abi.encodeWithSelector(UpliftOnlyExample.TooManyDeposits.selector, pool, bob));
+                upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmountDeposit, false, bytes(""));
+                break;
+            } else {
+                upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmountDeposit, false, bytes(""));
+            }
+
+            skip(1 days);
+        }
+        vm.stopPrank();
+    }
+
+    // Function to generate a shuffled array of unique uints between 0 and 10
+    function shuffle(uint[] memory array, uint seed) internal pure returns (uint[] memory) {
+        uint length = array.length;
+        for (uint i = length - 1; i > 0; i--) {
+            uint j = seed % (i + 1); // Pseudo-random index based on the seed
+            (array[i], array[j]) = (array[j], array[i]); // Swap elements
+            seed /= (i + 1); // Adjust seed to vary indices in next iteration
+        }
+        return array;
+    }
+
     function testRemoveLiquidityNoPriceChange() public {
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();

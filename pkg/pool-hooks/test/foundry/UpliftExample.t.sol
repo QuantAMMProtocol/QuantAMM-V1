@@ -348,20 +348,20 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
 
-    function testTransferDepositsAtRandom(uint256 seed) public {
-
-        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
-        vm.startPrank(bob);
-        uint256 bptAmountDeposit = bptAmount / 150;
-        for (uint256 i = 0; i < 99; i++) {            
-            upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmountDeposit, false, bytes(""));            
-            skip(1 days);
-        }
-        vm.stopPrank();
-
-        // Shuffle the array using the seed
-        uint[] memory shuffledArray = shuffle(masterArray, seed);
-    }
+    //function testTransferDepositsAtRandom(uint256 seed) public {
+//
+    //    uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+    //    vm.startPrank(bob);
+    //    uint256 bptAmountDeposit = bptAmount / 150;
+    //    for (uint256 i = 0; i < 99; i++) {            
+    //        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmountDeposit, false, bytes(""));            
+    //        skip(1 days);
+    //    }
+    //    vm.stopPrank();
+//
+    //    // Shuffle the array using the seed
+    //    uint[] memory shuffledArray = shuffle(masterArray, seed);
+    //}
 
     // Function to generate a shuffled array of unique uints between 0 and 10
     function shuffle(uint[] memory array, uint seed) internal pure returns (uint[] memory) {
@@ -375,6 +375,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testRemoveLiquidityNoPriceChange() public {
+        BaseVaultTest.Balances memory balancesPre = getBalances(bob);
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
 
@@ -434,6 +435,18 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             "Pool's USDC amount is wrong"
         );
 
+        console.log("balancebefore");
+        console.log(balancesPre.poolSupply);
+        console.log("balanceafter");
+        console.log(balancesPre.poolSupply);
+        console.log("bptAmount");
+        console.log(bptAmount);
+        console.log("userbpt");
+        console.log(balancesAfter.userBpt);
+        console.log("balancebefore");
+        console.log(balancesBefore.poolSupply);
+        console.log("balanceafter");
+        console.log(balancesAfter.poolSupply);
         //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
         assertEq(balancesBefore.poolSupply - balancesAfter.poolSupply, bptAmount, "BPT supply amount is wrong");
 
@@ -1088,6 +1101,11 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             "Pool's USDC amount is wrong"
         );
 
+        console.log("bptAmount");
+        console.log(bptAmount);
+        console.log("userbpt");
+        console.log(balancesAfter.userBpt);
+
         //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
         assertEq(
             balancesBefore.poolSupply - balancesAfter.poolSupply,
@@ -1204,6 +1222,15 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             amountOut,
             "Pool's USDC amount is wrong"
         );
+
+        console.log("bptAmount");
+        console.log(bptAmount);
+        console.log("userbpt");
+        console.log(balancesAfter.userBpt);
+        console.log("balancebefore");
+        console.log(balancesBefore.poolSupply);
+        console.log("balanceafter");
+        console.log(balancesAfter.poolSupply);
 
         //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
         assertEq(

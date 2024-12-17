@@ -2,6 +2,8 @@
 
 pragma solidity >=0.8.24;
 
+import "forge-std/Test.sol";
+
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -206,7 +208,6 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                                   Router Functions
     ***************************************************************************/
 
-    ///@inheritdoc MinimalRouter
     function addLiquidityProportional(
         address pool,
         uint256[] memory maxAmountsIn,
@@ -253,7 +254,6 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         nftPool[tokenID] = pool;
     }
 
-    ///@inheritdoc MinimalRouter
     function removeLiquidityProportional(
         uint256 bptAmountIn,
         uint256[] memory minAmountsOut,
@@ -524,20 +524,6 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             // in the pool balance.
         }           
     
-        if(localData.adminFeePercent > 0){
-            _vault.addLiquidity(
-                AddLiquidityParams({
-                    pool: localData.pool,
-                    to: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin(), 
-                    maxAmountsIn: localData.accruedQuantAMMFees, 
-                    minBptAmountOut: localData.feeAmount / (1e18 / localData.adminFeePercent) / 1e18, 
-                    kind: AddLiquidityKind.PROPORTIONAL,
-                    userData: bytes("") 
-                })
-            );
-            emit ExitFeeCharged(userAddress, localData.pool, IERC20(localData.pool), localData.feeAmount / (1e18 / localData.adminFeePercent) / 1e18);
-        }
-
         if(localData.adminFeePercent != 1e18){
             // Donates accrued fees back to LPs.
             _vault.addLiquidity(
@@ -550,6 +536,20 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                     userData: bytes("") // User data is not used by donation, so we can set it to an empty string
                 })
             );
+        }
+        
+        if(localData.adminFeePercent > 0){
+            _vault.addLiquidity(
+                AddLiquidityParams({
+                    pool: localData.pool,
+                    to: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin(), 
+                    maxAmountsIn: localData.accruedQuantAMMFees, 
+                    minBptAmountOut: (localData.feeAmount) / (1e18 / localData.adminFeePercent) / 1e18, 
+                    kind: AddLiquidityKind.PROPORTIONAL,
+                    userData: bytes("") 
+                })
+            );
+            emit ExitFeeCharged(userAddress, localData.pool, IERC20(localData.pool), localData.feeAmount / (1e18 / localData.adminFeePercent) / 1e18);
         }
 
         return (true, hookAdjustedAmountsOutRaw);

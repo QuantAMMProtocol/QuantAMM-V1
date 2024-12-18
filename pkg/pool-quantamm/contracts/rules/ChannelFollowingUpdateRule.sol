@@ -7,20 +7,22 @@ import "./base/QuantammMathGuard.sol";
 import "./base/QuantammMathMovingAverage.sol";
 import "./UpdateRule.sol";
 
-/// @title MeanReversionChannelUpdateRule contract for QuantAMM mean reversion channel weight updates
-/// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the mean reversion channel strategy
+/// @title ChannelFollowingUpdateRule contract for QuantAMM channel following weight updates
+/// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the channel following strategy
 contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
-        name = "MeanReversionChannel";
+        name = "ChannelFollowing";
 
         parameterDescriptions = new string[](7);
-        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change";
-        parameterDescriptions[1] = "Width: Width parameter for the mean reversion channel";
-        parameterDescriptions[2] = "Amplitude: Amplitude of the mean reversion effect";
-        parameterDescriptions[3] = "Exponents: Exponents for the trend following portion";
-        parameterDescriptions[4] = "Inverse Scaling: Scaling factor for channel portion (default 0.5415)";
-        parameterDescriptions[5] = "Pre-exp Scaling: Scaling factor before exponentiation (default 0.5)";
-        parameterDescriptions[6] = "Use raw price: 0 = use moving average, 1 = use raw price";
+        parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change.";
+        parameterDescriptions[1] = "Width: Width parameter for the mean reversion channel.";
+        parameterDescriptions[2] = "Amplitude: Amplitude of the mean reversion effect.";
+        parameterDescriptions[3] = "Exponents: Exponents for the trend following portion.";
+        parameterDescriptions[4] = "Inverse Scaling: Scaling factor for channel portion. "
+            "If set to max(exp(-x^2/2)sin(pi*x/3)) [=0.541519...] "
+            "then the amplitude parameter directly controls the channel height.";
+        parameterDescriptions[5] = "Pre-exp Scaling: Scaling factor before exponentiation in the trend following portion.";
+        parameterDescriptions[6] = "Use raw price: 0 = use moving average, 1 = use raw price for denominator of price gradient.";
     }
 
     using PRBMathSD59x18 for int256;
@@ -30,11 +32,25 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     int256 private constant THREE = 3e18;
     int256 private constant SIX = 6e18;
     int256 private constant PI = 3.141592653589793238e18; // π scaled to 18 decimals
-    int256 private constant DEFAULT_INVERSE_SCALING = 0.5415e18; // 0.5415 in 18 decimals
-    int256 private constant DEFAULT_PRE_EXP_SCALING = 0.5e18; // 0.5 in 18 decimals
     uint16 private constant REQUIRES_PREV_MAVG = 0;
 
-    struct MeanReversionChannelLocals {
+    /// @dev struct to avoid stack too deep issues
+    /// @notice Struct to store local variables for the channel following calculation
+    /// @param kappa array of kappa value parameters
+    /// @param width array of width value parameters
+    /// @param amplitude array of amplitude value parameters
+    /// @param exponents array of exponent value parameters
+    /// @param inverseScaling array of inverse scaling value parameters
+    /// @param preExpScaling array of pre-exp scaling value parameters
+    /// @param newWeights array of new weights
+    /// @param signal array of signal values
+    /// @param normalizationFactor normalization factor for the weights
+    /// @param prevWeightLength length of the previous weights
+    /// @param useRawPrice boolean to determine if raw price should be used or average
+    /// @param i index for looping
+    /// @param denominator denominator for the weights
+    /// @param sumKappa sum of all kappa values
+    struct ChannelFollowingLocals {
         int256[] kappa;
         int256[] width;
         int256[] amplitude;
@@ -51,13 +67,45 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         int256 sumKappa;
     }
 
+    /// @notice Calculates the new weights for a QuantAMM pool using the channel following strategy.
+    /// @notice The channel following strategy combines trend following with a channel component:
+    /// w(t) = w(t-1) + κ[channel + trend - normalizationFactor]
+    /// where:
+    /// - g = normalized price gradient = (1/p)·(dp/dt)
+    /// - envelope = exp(-g²/(2W²))
+    /// - s = pi * g / (3W)
+    /// - channel = -(A/h)·envelope · (s - 1/6 s^3)
+    /// - trend = (1-envelope) * sign(g) * |g/(2S)|^(exponent)
+    /// - normalizationFactor = 1/N * ∑(κ[channel + trend])_i
+    /// Parameters:
+    /// - κ: Kappa controls overall update magnitude
+    /// - W: Width controls the channel and envelope width
+    /// - A: Amplitude controls channel height
+    /// - exponents: Exponent for the trend following portion
+    /// - h: Inverse scaling within the channel
+    /// - S: Pre-exp scaling for trend component
+    /// The strategy aims to:
+    /// 1. Mean-revert within the channel (channel component, for small changes in g)
+    /// 2. Follow trends (nonlinearly, if exponents are not 1) outside the channel (trend component, for large changes in g)
+    /// 3. Smoothly transition between the two regimes (via the envelope function)
+    /// @param _prevWeights the previous weights retrieved from the vault
+    /// @param _data the latest data, usually price
+    /// @param _parameters the parameters of the rule that are not lambda.
+    ///     Parameters [0] through [5] are arrays/vectors, [6] is a scalar.
+    ///     [0]=kappa
+    ///     [1]=width
+    ///     [2]=amplitude
+    ///     [3]=exponents
+    ///     [4]=inverseScaling
+    ///     [5]=preExpScaling
+    ///     [6]=useRawPrice
     function _getWeights(
         int256[] calldata _prevWeights,
         int256[] memory _data,
         int256[][] calldata _parameters,
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {
-        MeanReversionChannelLocals memory locals;
+        ChannelFollowingLocals memory locals;
 
         locals.kappa = _parameters[0];
         locals.width = _parameters[1];
@@ -66,10 +114,9 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         locals.inverseScaling = _parameters[4];
         locals.preExpScaling = _parameters[5];
 
+        _poolParameters.numberOfAssets = _prevWeights.length;
         locals.prevWeightLength = _prevWeights.length;
-        _poolParameters.numberOfAssets = locals.prevWeightLength;
 
-        locals.useRawPrice = false;
         // the 7th parameter to determine if momentum should use the price or the average price as the denominator
         // using the average price has shown greater performance and resilience due to greater smoothing
         locals.useRawPrice = _parameters[6][0] == ONE;
@@ -144,11 +191,19 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 int256 scaledAbsGradient = absGradient.div(locals.preExpScaling[locals.i].mul(TWO));
                 trendPortion = _pow(scaledAbsGradient, locals.exponents[locals.i]);
             }
-            channelPortion = -channelPortion; // Negative amplitude effect
+            // We want, in effect, a mean-reverting channel, so we want the channel portion to act as if it were
+            // its own anti-momentum strategy (ie if there were no envelope, no trendPortion, we would want this
+            // strategy to look like an anti-momentum strategy). Amplitude is required to be positive, so to achieve
+            // this we can just negate the channel portion.
+            channelPortion = -channelPortion;
 
+            // The trendPortion variable so far has been calculated using the absolute value of the price gradient.
+            // This is because x^y is not defined for negative x if y is not an integer. So we need to reintroduce
+            // the sign of the price gradient to the trendPortion. We can use the sign of the price gradient to achieve this.
             if (locals.newWeights[locals.i] < 0) {
                 trendPortion = -trendPortion;
             }
+
 
             trendPortion = trendPortion.mul(ONE - envelope);
 
@@ -208,6 +263,10 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         return REQUIRES_PREV_MAVG;
     }
 
+    /// @notice Set the initial intermediate values for the pool, in this case the gradient
+    /// @param _poolAddress the target pool address
+    /// @param _initialValues the initial values of the pool
+    /// @param _numberOfAssets the number of assets in the pool
     function _setInitialIntermediateValues(
         address _poolAddress,
         int256[] memory _initialValues,

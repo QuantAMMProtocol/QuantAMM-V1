@@ -14,6 +14,8 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
     int256 private constant ONE = 1 * 1e18; // Result of PRBMathSD59x18.fromInt(1), store as constant to avoid recalculation every time
     int256 private constant TENPOWEIGHTEEN = (10 ** 18);
 
+    bool private immutable _protectedAccess;
+    
     // Key is the pool address and stores the intermediate variance state in a packed array of 128 bit integers
     mapping(address => int256[]) internal intermediateVarianceStates;
 
@@ -47,7 +49,7 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
     /// @param _newData p(t)
     /// @param _poolParameters _movingAverage p̅(t), _lambda λ, _numberOfAssets number of assets in the pool, _pool the target pool address
     function _calculateQuantAMMVariance(
-        int256[] calldata _newData,
+        int256[] memory _newData,
         QuantAMMPoolParameters memory _poolParameters
     ) internal returns (int256[] memory) {
         QuantAMMVarianceLocals memory locals;

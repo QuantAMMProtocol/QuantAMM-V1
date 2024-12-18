@@ -65,7 +65,7 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
         uint lastAssetIndex;
     }
 
-    constructor(address _updateWeightRunner) {
+    constructor(address _updateWeightRunner){
         updateWeightRunner = _updateWeightRunner;
     }
 
@@ -211,7 +211,7 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
     /// @return newWeights w(t), the updated weights
     function _getWeights(
         int256[] calldata _prevWeights,
-        int256[] calldata _data,
+        int256[]  memory _data,
         int256[][] calldata _parameters,
         QuantAMMPoolParameters memory _poolParameters
     ) internal virtual returns (int256[] memory newWeights);

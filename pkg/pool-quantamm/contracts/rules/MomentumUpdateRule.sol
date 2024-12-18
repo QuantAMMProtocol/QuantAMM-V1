@@ -51,7 +51,7 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     /// @param _parameters the parameters of the rule that are not lambda [0]=kappa can be per token (vector) or single for all tokens (scalar), [1]=useRawPrice
     function _getWeights(
         int256[] calldata _prevWeights,
-        int256[] calldata _data,
+        int256[] memory _data,
         int256[][] calldata _parameters, 
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {

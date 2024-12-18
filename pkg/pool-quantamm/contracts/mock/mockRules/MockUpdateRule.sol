@@ -30,7 +30,7 @@ contract MockUpdateRule is UpdateRule {
 
     function _getWeights(
         int256[] calldata /*_prevWeights*/,
-        int256[] calldata /*_data*/,
+        int256[] memory /*_data*/,
         int256[][] calldata /*_parameters*/,
         QuantAMMPoolParameters memory /*_poolParameters*/
     ) internal virtual override returns (int256[] memory newWeights) {

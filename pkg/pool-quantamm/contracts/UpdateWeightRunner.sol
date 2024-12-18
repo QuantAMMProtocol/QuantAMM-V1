@@ -6,6 +6,7 @@ import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
+import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateWeightRunner.sol";
 import "./rules/UpdateRule.sol";
 
 import "./QuantAMMWeightedPool.sol";
@@ -47,12 +48,24 @@ updates and guard rails.
 
 /// @title UpdateWeightRunner singleton contract that is responsible for running all weight updates
 
-contract UpdateWeightRunner is Ownable2Step {
+contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
     event OracleAdded(address indexed oracleAddress);
     event OracleRemved(address indexed oracleAddress);
-    event GetData(address indexed caller, address indexed pool);
-    event SetWeightManual(address indexed caller, address indexed pool, int256[] weights, uint40 lastInterpolationTimePossible);
-    event SetIntermediateValuesManually(address indexed caller, address indexed pool, int256[] newMovingAverages, int256[] newParameters, uint numberOfAssets);
+    event SetWeightManual(
+        address indexed caller,
+        address indexed pool,
+        int256[] weights,
+        uint40 lastInterpolationTimePossible
+    );
+    event SetIntermediateValuesManually(
+        address indexed caller,
+        address indexed pool,
+        int256[] newMovingAverages,
+        int256[] newParameters,
+        uint numberOfAssets
+    );
+    event SwapFeeTakeSet(uint256 oldSwapFee, uint256 newSwapFee);
+    event UpliftFeeTakeSet(uint256 oldSwapFee, uint256 newSwapFee);
     event UpdatePerformed(address indexed caller, address indexed pool);
     event UpdatePerformedQuantAMM(address indexed caller, address indexed pool);
     event SetApprovedActionsForPool(address indexed caller, address indexed pool, uint256 actions);
@@ -69,34 +82,8 @@ contract UpdateWeightRunner is Ownable2Step {
     );
     event PoolLastRunSet(address poolAddress, uint40 time);
 
-    // Store the current execution context for callbacks
-    struct ExecutionData {
-        address pool;
-        uint96 subpoolIndex;
-    }
-    struct PoolTimingSettings {
-        uint40 lastPoolUpdateRun;
-        uint40 updateInterval;
-    }
-
-    struct PoolRuleSettings {
-        uint64[] lambda;
-        PoolTimingSettings timingSettings;
-        uint64 epsilonMax;
-        uint64 absoluteWeightGuardRail;
-        int256[][] ruleParameters;
-        address poolManager;
-    }
-
-    /// @notice Struct for caching oracle replies
-    /// @dev Data types chosen such that only one slot is used
-    struct OracleData {
-        int216 data;
-        uint40 timestamp;
-    }
-
     /// @notice main eth oracle that could be used to determine value of pools and assets.
-    /// @dev this could be used for things like uplift only withdrawal fee hooks 
+    /// @dev this could be used for things like uplift only withdrawal fee hooks
     OracleWrapper private ethOracle;
 
     /// @notice Mask to check if a pool is allowed to perform an update, some might only want to get data
@@ -117,7 +104,7 @@ contract UpdateWeightRunner is Ownable2Step {
     constructor(address _quantammAdmin, address _ethOracle) Ownable(msg.sender) {
         require(_quantammAdmin != address(0), "Admin cannot be default address");
         require(_ethOracle != address(0), "eth oracle cannot be default address");
-        
+
         quantammAdmin = _quantammAdmin;
         ethOracle = OracleWrapper(_ethOracle);
     }
@@ -132,6 +119,43 @@ contract UpdateWeightRunner is Ownable2Step {
 
     /// @notice Mapping of pool backup oracles keyed by pool address for each asset in the pool (in order of priority)
     mapping(address => address[][]) public poolBackupOracles;
+
+    /// @notice The % of the total swap fee that is allocated to the protocol for running costs. 
+    uint256 public quantAMMSwapFeeTake = 0.5e18;
+
+    function setQuantAMMSwapFeeTake(uint256 _quantAMMSwapFeeTake) external override {
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
+        require(_quantAMMSwapFeeTake <= 1e18, "Swap fee must be less than 100%");
+        uint256 oldSwapFee = quantAMMSwapFeeTake;
+        quantAMMSwapFeeTake = _quantAMMSwapFeeTake;
+
+        emit SwapFeeTakeSet(oldSwapFee, _quantAMMSwapFeeTake);
+    }
+
+    function getQuantAMMSwapFeeTake() external view override returns (uint256) {
+        return quantAMMSwapFeeTake;
+    }
+    
+    /// @notice Set the quantAMM uplift fee % amount allocated to the protocol for running costs
+    /// @param _quantAMMUpliftFeeTake The new uplift fee % amount allocated to the protocol for running costs
+    function setQuantAMMUpliftFeeTake(uint256 _quantAMMUpliftFeeTake) external{
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
+        require(_quantAMMUpliftFeeTake <= 1e18, "Uplift fee must be less than 100%");
+        uint256 oldSwapFee = quantAMMSwapFeeTake;
+        quantAMMSwapFeeTake = _quantAMMUpliftFeeTake;
+
+        emit UpliftFeeTakeSet(oldSwapFee, _quantAMMUpliftFeeTake);
+    }
+
+    /// @notice Get the quantAMM uplift fee % amount allocated to the protocol for running costs
+    function getQuantAMMUpliftFeeTake() external view returns (uint256){
+        return quantAMMSwapFeeTake;
+    }
+
+
+    function getQuantAMMAdmin() external view override returns (address) {
+        return quantammAdmin;
+    }
 
     /// @notice Get the happy path primary oracles for the constituents of a pool
     /// @param _poolAddress Address of the pool
@@ -256,7 +280,7 @@ contract UpdateWeightRunner is Ownable2Step {
         //Main external access point to trigger an update
         address rule = address(rules[_pool]);
         require(rule != address(0), "Pool not registered");
-        
+
         PoolRuleSettings memory settings = poolRuleSettings[_pool];
 
         require(
@@ -265,13 +289,12 @@ contract UpdateWeightRunner is Ownable2Step {
         );
 
         uint256 poolRegistryEntry = approvedPoolActions[_pool];
-        if(poolRegistryEntry & MASK_POOL_PERFORM_UPDATE > 0){            
+        if (poolRegistryEntry & MASK_POOL_PERFORM_UPDATE > 0) {
             _performUpdateAndGetData(_pool, settings);
 
             // emit event for easier tracking of updates and to allow for easier querying of updates
             emit UpdatePerformed(msg.sender, _pool);
-        }
-        else{
+        } else {
             revert("Pool not approved to perform update");
         }
     }
@@ -293,13 +316,12 @@ contract UpdateWeightRunner is Ownable2Step {
         //current breakglass settings allow pool creator trigger. This is subject to review
         if (poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0) {
             require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
-        } else if(poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0){
+        } else if (poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0) {
             require(msg.sender == quantammAdmin, "ONLYADMIN");
-        }        
-        else{
+        } else {
             revert("No permission to set last run time");
         }
-        
+
         poolRuleSettings[_poolAddress].timingSettings.lastPoolUpdateRun = _time;
         emit PoolLastRunSet(_poolAddress, _time);
     }
@@ -315,14 +337,14 @@ contract UpdateWeightRunner is Ownable2Step {
 
     /// @notice Wrapper for if someone wants to get the oracle data the rule is using from an external source
     /// @param _pool Pool to get data for
-    function getData(address _pool) public returns (int256[] memory outputData) {
+    function getData(address _pool) public view virtual returns (int256[] memory outputData) {
         return _getData(_pool, false);
     }
 
     /// @notice Get the data for a pool from the oracles and return it in the same order as the assets in the pool
     /// @param _pool Pool to get data for
     /// @param internalCall Internal call flag to detect if the function was called internally for emission and permissions
-    function _getData(address _pool, bool internalCall) private returns (int256[] memory outputData) {
+    function _getData(address _pool, bool internalCall) private view returns (int256[] memory outputData) {
         require(internalCall || (approvedPoolActions[_pool] & MASK_POOL_GET_DATA > 0), "Not allowed to get data");
         //optimised == happy path, optimised into a different array to save gas
         address[] memory optimisedOracles = poolOracles[_pool];
@@ -365,10 +387,6 @@ contract UpdateWeightRunner is Ownable2Step {
             unchecked {
                 ++i;
             }
-        }
-
-        if(!internalCall){
-            emit GetData(msg.sender, _pool);
         }
     }
 
@@ -429,7 +447,7 @@ contract UpdateWeightRunner is Ownable2Step {
         return data;
     }
 
-    struct CalculateMuliplierAndSetWeightsLocal{
+    struct CalculateMuliplierAndSetWeightsLocal {
         int256[] currentWeights;
         int256[] updatedWeights;
         int256 updateInterval;
@@ -437,7 +455,7 @@ contract UpdateWeightRunner is Ownable2Step {
         address poolAddress;
     }
 
-    /// @dev The multipler is the amount per block to add/remove from the last successful weight update. 
+    /// @dev The multipler is the amount per block to add/remove from the last successful weight update.
     /// @notice Calculate the multiplier and set the weights for a pool.
     /// @param local Local data for the function
     function _calculateMultiplerAndSetWeights(CalculateMuliplierAndSetWeightsLocal memory local) internal {
@@ -454,23 +472,29 @@ contract UpdateWeightRunner is Ownable2Step {
             int256 blockMultiplier = (local.updatedWeights[i] - local.currentWeights[i]) / local.updateInterval;
 
             targetWeightsAndBlockMultiplier[i + local.currentWeights.length] = blockMultiplier;
-            
-            int256 upperGuardRail = (PRBMathSD59x18.fromInt(1) - (PRBMathSD59x18.mul(PRBMathSD59x18.fromInt(int256(local.currentWeights.length - 1)), local.absoluteWeightGuardRail18)));
-            
+
+            int256 upperGuardRail = (PRBMathSD59x18.fromInt(1) -
+                (
+                    PRBMathSD59x18.mul(
+                        PRBMathSD59x18.fromInt(int256(local.currentWeights.length - 1)),
+                        local.absoluteWeightGuardRail18
+                    )
+                ));
+
             unchecked {
                 //This is your worst case scenario, usually you expect (and have DR) that at your next interval you
                 //get another update. However what if you don't, you can carry on interpolating until you hit a rail
                 //This calculates the first blocktime which one of your constituents hits the rail and that is your max
                 //interpolation weight
                 //There are also economic reasons for this detailed in the whitepaper design notes.
-                //In an event of a chain halt, the pool will still be able to interpolate weights, 
+                //In an event of a chain halt, the pool will still be able to interpolate weights,
                 //there are reasons for or against this being better than stopping at the update interval blocktime.
                 int256 weightBetweenTargetAndMax;
                 int256 blockTimeUntilGuardRailHit;
                 if (blockMultiplier > int256(0)) {
                     weightBetweenTargetAndMax = upperGuardRail - local.currentWeights[i];
-                    //the updated weight should never be above guard rail. final check as block multiplier 
-                    //will be even worse if 
+                    //the updated weight should never be above guard rail. final check as block multiplier
+                    //will be even worse if
                     //not using .div so that the 18dp is removed
                     blockTimeUntilGuardRailHit = weightBetweenTargetAndMax / blockMultiplier;
                 } else if (blockMultiplier == int256(0)) {
@@ -480,7 +504,7 @@ contract UpdateWeightRunner is Ownable2Step {
 
                     //not using .div so that the 18dp is removed
                     //abs block multiplier
-                    blockTimeUntilGuardRailHit = weightBetweenTargetAndMax / int256(uint256(-1 * blockMultiplier));                    
+                    blockTimeUntilGuardRailHit = weightBetweenTargetAndMax / int256(uint256(-1 * blockMultiplier));
                 }
 
                 if (blockTimeUntilGuardRailHit < currentLastInterpolationPossible) {
@@ -495,9 +519,11 @@ contract UpdateWeightRunner is Ownable2Step {
         uint40 lastTimestampThatInterpolationWorks = uint40(type(uint40).max);
 
         //L01 possible if multiplier is 0
-        if (currentLastInterpolationPossible < int256(type(int40).max) - int256(int40(uint40(block.timestamp)))){
+        if (currentLastInterpolationPossible < int256(type(int40).max) - int256(int40(uint40(block.timestamp)))) {
             //next expected update + time beyond that
-            lastTimestampThatInterpolationWorks = uint40(int40(currentLastInterpolationPossible + int40(uint40(block.timestamp))));
+            lastTimestampThatInterpolationWorks = uint40(
+                int40(currentLastInterpolationPossible + int40(uint40(block.timestamp)))
+            );
         }
 
         //the main point of interaction between the update weight runner and the quantammAdmin is here
@@ -517,7 +543,7 @@ contract UpdateWeightRunner is Ownable2Step {
 
         uint256 poolRegistryEntry = QuantAMMWeightedPool(params.poolAddress).poolRegistry();
         require(poolRegistryEntry & MASK_POOL_RULE_DIRECT_SET_WEIGHT > 0, "FUNCTIONNOTAPPROVEDFORPOOL");
-        
+
         //why do we still need to calculate the multiplier and why not just set the weights like in the manual override?
         //the reason is we enforce clamp weights for all base rules however that still requires the catch all
         //pre update interval guardrail reach check. This is the only place where this is enforced
@@ -537,12 +563,11 @@ contract UpdateWeightRunner is Ownable2Step {
         uint _numberOfAssets
     ) external {
         uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
-        if(poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0){
+        if (poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0) {
             require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
-        }else if(poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0){
+        } else if (poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0) {
             require(msg.sender == quantammAdmin, "ONLYADMIN");
-        }
-        else {
+        } else {
             revert("No permission to set weight values");
         }
 
@@ -550,8 +575,8 @@ contract UpdateWeightRunner is Ownable2Step {
         //given how the math library works weights it is easiest to define weights as 18dp
         //even though technically G3M works of the ratio between them so it is not strictly necessary
         //CYFRIN L-02
-        for(uint i; i < _weights.length; i++){
-            if(i < _numberOfAssets){
+        for (uint i; i < _weights.length; i++) {
+            if (i < _numberOfAssets) {
                 require(_weights[i] > 0, "Negative weight not allowed");
                 require(_weights[i] < 1e18, "greater than 1 weight not allowed");
             }
@@ -576,12 +601,11 @@ contract UpdateWeightRunner is Ownable2Step {
         uint256 poolRegistryEntry = approvedPoolActions[_poolAddress];
 
         //Who can trigger these very powerful breakglass features is under review
-        if(poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0){
+        if (poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0) {
             require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
-        } else if(poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0){
+        } else if (poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0) {
             require(msg.sender == quantammAdmin, "ONLYADMIN");
-        }
-        else {
+        } else {
             revert("No permission to set intermediate values");
         }
 
@@ -590,6 +614,12 @@ contract UpdateWeightRunner is Ownable2Step {
         // utilises the base function so that manual updates go through the standard process
         rule.initialisePoolRuleIntermediateValues(_poolAddress, _newMovingAverages, _newParameters, _numberOfAssets);
 
-        emit SetIntermediateValuesManually(msg.sender, _poolAddress, _newMovingAverages, _newParameters, _numberOfAssets);
+        emit SetIntermediateValuesManually(
+            msg.sender,
+            _poolAddress,
+            _newMovingAverages,
+            _newParameters,
+            _numberOfAssets
+        );
     }
 }

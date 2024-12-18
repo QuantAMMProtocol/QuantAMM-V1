@@ -53,15 +53,15 @@ contract E2eBatchSwapWeightedTest is QuantAMMWeightedPoolContractsDeployer, E2eB
     }
 
     /// @notice Overrides BaseVaultTest _createPool(). This pool is used by FungibilityTest.
-    function _createPool(address[] memory tokens, string memory label) internal virtual override returns (address) {
+    function _createPool(address[] memory tokens, string memory label) internal virtual override returns (address newPool, bytes memory poolArgs)  {
         IRateProvider[] memory rateProviders;
-        address newPool = address(createQuantAMMPool(tokens, label, rateProviders, vault, lp));
+        (newPool, poolArgs) = createQuantAMMPool(tokens, label, rateProviders, vault, lp);
+
         vm.label(newPool, label);
         // Cannot set the pool creator directly on a standard Balancer weighted pool factory.
         vault.manualSetPoolCreator(newPool, lp);
 
         ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
         feeController.manualSetPoolCreator(newPool, lp);
-        return newPool; 
     }
 }

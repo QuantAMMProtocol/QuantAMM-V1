@@ -22,7 +22,7 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
     /// @return p̅(t) avertage price of the pool
     function _calculateQuantAMMMovingAverage(
         int256[] memory _prevMovingAverage,
-        int256[] calldata _newData,
+        int256[]  memory _newData,
         int128[] memory _lambda,
         uint _numberOfAssets
     ) internal pure returns (int256[] memory) {

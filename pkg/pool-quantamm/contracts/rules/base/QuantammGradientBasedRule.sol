@@ -39,7 +39,7 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
     /// @param _newData p(t)
     /// @param _poolParameters pool parameters
     function _calculateQuantAMMGradient(
-        int256[] calldata _newData,
+        int256[]  memory _newData,
         QuantAMMPoolParameters memory _poolParameters
     ) internal returns (int256[] memory) {
         QuantAMMGradientLocals memory locals;

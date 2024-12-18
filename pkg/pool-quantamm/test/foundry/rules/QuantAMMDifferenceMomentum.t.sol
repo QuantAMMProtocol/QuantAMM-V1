@@ -31,7 +31,7 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
     function runInitialUpdate(
         uint256 numAssets,
         int256[][] memory parameters,
-        int256[] memory previousAlphas,
+        int256[] memory prevShortMovingAverage,
         int256[] memory prevMovingAverages,
         int256[] memory movingAverages,
         int128[] memory lambdas,
@@ -42,7 +42,7 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         // Simulate setting number of assets and calculating intermediate values
         mockPool.setNumberOfAssets(numAssets);
         vm.startPrank(owner);
-        rule.initialisePoolRuleIntermediateValues(address(mockPool), prevMovingAverages, previousAlphas, numAssets);
+        rule.initialisePoolRuleIntermediateValues(address(mockPool), prevMovingAverages, prevShortMovingAverage, numAssets);
 
         // Run calculation for unguarded weights
         rule.CalculateUnguardedWeights(prevWeights, data, address(mockPool), parameters, lambdas, movingAverages);
@@ -73,70 +73,133 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
     }
 
     function testZeroShouldBeAccepted() public view {
-        int256[][] memory parameters = new int256[][](1);
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(0);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
         bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
 
     function testPositiveNumberShouldBeAccepted() public view {
-        int256[][] memory parameters = new int256[][](1);
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(42);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
         bool result = rule.validParameters(parameters);
         assertTrue(result);
     }
 
+    function testNegativeNumberShouldBeAccepted() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(-42);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
+
+    function testZeroShouldBeAccepted_VectorParams() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(0);
+        parameters[0][1] = PRBMathSD59x18.fromInt(1);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
+        bool result = rule.validParameters(parameters);
+        assertFalse(result);
+    }
+
+    function testPositiveNumberShouldBeAccepted_VectorParams() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(42);
+        parameters[0][1] = PRBMathSD59x18.fromInt(42);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
+    function testNegativeNumberShouldBeAccepted_VectorParams() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(-42);
+        parameters[0][1] = PRBMathSD59x18.fromInt(-42);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
+
+    function testMixedNumberShouldBeAccepted_VectorParams() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(42);
+        parameters[0][1] = PRBMathSD59x18.fromInt(-42);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
     function testFuzz_TestPositiveNumberShouldBeAccepted(int256 param) public view {
-        int256[][] memory parameters = new int256[][](1);
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18()));
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
         bool result = rule.validParameters(parameters);
         assertTrue(result);
     }
 
-    function testNegativeNumberShouldNotBeAccepted() public view {
-        int256[][] memory parameters = new int256[][](1);
-        parameters[0] = new int256[](1);
-        parameters[0][0] = -PRBMathSD59x18.fromInt(1);
-        bool result = rule.validParameters(parameters);
-        assertFalse(result);
-    }
 
-    function testFuzz_TestNegativeNumberShouldNotBeAccepted(int256 param) public view {
-        int256[][] memory parameters = new int256[][](1);
+    function testFuzz_TestNegativeNumberShouldBeAccepted(int256 param) public view {
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = -PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18()));
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
         bool result = rule.validParameters(parameters);
-        assertFalse(result);
+        assertTrue(result);
     }
 
-    function testVectorParamTestZeroShouldBeAccepted() public view {
-        int256[][] memory parameters = new int256[][](1);
+    function testVectorParamTestZeroShouldNotBeAccepted() public view {
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(0);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
         bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
 
     function testVectorParamTestPositiveNumberShouldBeAccepted() public view {
-        int256[][] memory parameters = new int256[][](1);
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(42);
         parameters[0][1] = PRBMathSD59x18.fromInt(42);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
         bool result = rule.validParameters(parameters);
         assertTrue(result);
     }
 
-    function testVectorParamTestNegativeNumberShouldNotBeAccepted() public view {
-        int256[][] memory parameters = new int256[][](1);
+    function testVectorParamTestNegativeNumberShouldBeAccepted() public view {
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = -PRBMathSD59x18.fromInt(1);
+        parameters[1] = new int256[](2);
+        parameters[1][0] = 0.5e18;
+        parameters[1][1] = 0.5e18;
         bool result = rule.validParameters(parameters);
-        assertFalse(result);
+        assertTrue(result);
     }
 
     function testCorrectUpdateWithHigherPrice_scalarParams() public {
@@ -152,13 +215,12 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
-        parameters[1] = new int256[](2);
+        parameters[1] = new int256[](1);
         parameters[1][0] = 0.5e18;
-        parameters[1][1] = 0.5e18;
 
-        int256[] memory previousAlphas = new int256[](4);
-        previousAlphas[0] = PRBMathSD59x18.fromInt(1);
-        previousAlphas[1] = PRBMathSD59x18.fromInt(2);
+        int256[] memory prevShortMovingAverage = new int256[](2);
+        prevShortMovingAverage[0] = PRBMathSD59x18.fromInt(1);
+        prevShortMovingAverage[1] = PRBMathSD59x18.fromInt(2);
 
         int256[] memory prevMovingAverages = new int256[](2);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(0);
@@ -167,8 +229,6 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory movingAverages = new int256[](2);
         movingAverages[0] = 0.9e18;
         movingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.2e18;
-        previousAlphas[2] = 0.9e18;
-        previousAlphas[3] = PRBMathSD59x18.fromInt(1) + 0.2e18;
 
         int128[] memory lambdas = new int128[](1);
         lambdas[0] = int128(0.7e18);
@@ -182,14 +242,14 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         data[1] = PRBMathSD59x18.fromInt(4);
 
         int256[] memory expectedResults = new int256[](2);
-        expectedResults[0] = 0.49775e18;
-        expectedResults[1] = 0.50225e18;
+        expectedResults[0] = 0.361111111111111112e18;
+        expectedResults[1] = 0.638888888888888889e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
             2, // numAssets
             parameters,
-            previousAlphas,
+            prevShortMovingAverage,
             prevMovingAverages,
             movingAverages,
             lambdas,
@@ -199,7 +259,7 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testCorrectUpdateWithLowerPrices() public {
+    function testCorrectUpdateWithLowerPrices_scalarParams() public {
         /*
             moving average	2.7	4
             alpha	-1.633333333	1.4
@@ -212,11 +272,11 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         parameters[0] = new int256[](1);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[1] = new int256[](1);
-        parameters[1][0] = PRBMathSD59x18.fromInt(1);
+        parameters[1][0] = 0.5e18;
 
-        int256[] memory previousAlphas = new int256[](4);
-        previousAlphas[0] = PRBMathSD59x18.fromInt(1);
-        previousAlphas[1] = PRBMathSD59x18.fromInt(2);
+        int256[] memory prevShortMovingAverage = new int256[](2);
+        prevShortMovingAverage[0] = PRBMathSD59x18.fromInt(1);
+        prevShortMovingAverage[1] = PRBMathSD59x18.fromInt(2);
 
         int256[] memory prevMovingAverages = new int256[](2);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(3);
@@ -225,8 +285,6 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory movingAverages = new int256[](2);
         movingAverages[0] = PRBMathSD59x18.fromInt(2) + 0.7e18;
         movingAverages[1] = PRBMathSD59x18.fromInt(4);
-        previousAlphas[2] = PRBMathSD59x18.fromInt(2) + 0.7e18;
-        previousAlphas[3] = PRBMathSD59x18.fromInt(4);
 
         int128[] memory lambdas = new int128[](1);
         lambdas[0] = int128(0.7e18);
@@ -240,14 +298,14 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         data[1] = PRBMathSD59x18.fromInt(4);
 
         int256[] memory expectedResults = new int256[](2);
-        expectedResults[0] = 0.4775e18;
-        expectedResults[1] = 0.5225e18;
+        expectedResults[0] = 0.402777777777777778e18;
+        expectedResults[1] = 0.597222222222222222e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
             2, // numAssets
             parameters,
-            previousAlphas,
+            prevShortMovingAverage,
             prevMovingAverages,
             movingAverages,
             lambdas,
@@ -264,11 +322,11 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
         parameters[1] = new int256[](2);
-        parameters[1][0] = 0.7e18;
-        parameters[1][1] = 0.7e18;
-        int256[] memory previousAlphas = new int256[](4);
-        previousAlphas[0] = PRBMathSD59x18.fromInt(1);
-        previousAlphas[1] = PRBMathSD59x18.fromInt(2);
+        parameters[1][0] = 0.5e18;
+        parameters[1][1] = 0.5e18;
+        int256[] memory prevShortMovingAverage = new int256[](2);
+        prevShortMovingAverage[0] = PRBMathSD59x18.fromInt(1);
+        prevShortMovingAverage[1] = PRBMathSD59x18.fromInt(2);
 
         int256[] memory prevMovingAverages = new int256[](2);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(3);
@@ -277,8 +335,6 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory movingAverages = new int256[](2);
         movingAverages[0] = PRBMathSD59x18.fromInt(3);
         movingAverages[1] = PRBMathSD59x18.fromInt(4);
-        previousAlphas[2] = PRBMathSD59x18.fromInt(3);
-        previousAlphas[3] = PRBMathSD59x18.fromInt(4);
 
         int128[] memory lambdas = new int128[](2);
         lambdas[0] = int128(0.7e18);
@@ -293,14 +349,14 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         data[1] = PRBMathSD59x18.fromInt(4);
 
         int256[] memory expectedResults = new int256[](2);
-        expectedResults[0] = 0.4973e18;
-        expectedResults[1] = 0.5027e18;
+        expectedResults[0] = 0.45e18;
+        expectedResults[1] = 0.55e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
             2, // numAssets
             parameters,
-            previousAlphas,
+            prevShortMovingAverage,
             prevMovingAverages,
             movingAverages,
             lambdas,
@@ -317,12 +373,14 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
         parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
-        parameters[1] = new int256[](1);
-        parameters[1][0] = PRBMathSD59x18.fromInt(1);
+        parameters[1] = new int256[](2);
+        parameters[1][0] = 0.5e18;
+        parameters[1][1] = 0.5e18;
 
-        int256[] memory previousAlphas = new int256[](4);
-        previousAlphas[0] = PRBMathSD59x18.fromInt(1);
-        previousAlphas[1] = PRBMathSD59x18.fromInt(2);
+
+        int256[] memory prevShortMovingAverage = new int256[](2);
+        prevShortMovingAverage[0] = PRBMathSD59x18.fromInt(1);
+        prevShortMovingAverage[1] = PRBMathSD59x18.fromInt(2);
 
         int256[] memory prevMovingAverages = new int256[](2);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(3);
@@ -331,8 +389,7 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory movingAverages = new int256[](2);
         movingAverages[0] = PRBMathSD59x18.fromInt(2) + 0.7e18;
         movingAverages[1] = PRBMathSD59x18.fromInt(4);
-        previousAlphas[2] = PRBMathSD59x18.fromInt(2) + 0.7e18;
-        previousAlphas[3] = PRBMathSD59x18.fromInt(4);
+
 
         int128[] memory lambdas = new int128[](2);
         lambdas[0] = int128(0.7e18);
@@ -347,14 +404,14 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         data[1] = PRBMathSD59x18.fromInt(4);
 
         int256[] memory expectedResults = new int256[](2);
-        expectedResults[0] = 0.473e18;
-        expectedResults[1] = 0.527e18;
+        expectedResults[0] = 0.383333333333333333e18;
+        expectedResults[1] = 0.616666666666666666e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
             2, // numAssets
             parameters,
-            previousAlphas,
+            prevShortMovingAverage,
             prevMovingAverages,
             movingAverages,
             lambdas,
@@ -364,7 +421,7 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testCorrectUpdateWithHigherPricesAverageDenominator() public {
+    function testCorrectUpdateWithHigherPrices_scalarParams_negativeKappa() public {
         /*
             ℓp(t)	0.10125	
             moving average	[0.9, 1.2]
@@ -374,13 +431,15 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         */
 
         // Define local variables for the parameters
-        int256[][] memory parameters = new int256[][](1);
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
-        parameters[0][0] = PRBMathSD59x18.fromInt(1);
+        parameters[0][0] = -PRBMathSD59x18.fromInt(1);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
 
-        int256[] memory previousAlphas = new int256[](4);
-        previousAlphas[0] = PRBMathSD59x18.fromInt(1);
-        previousAlphas[1] = PRBMathSD59x18.fromInt(2);
+        int256[] memory prevShortMovingAverage = new int256[](2);
+        prevShortMovingAverage[0] = PRBMathSD59x18.fromInt(1);
+        prevShortMovingAverage[1] = PRBMathSD59x18.fromInt(2);
 
         int256[] memory prevMovingAverages = new int256[](2);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(0);
@@ -389,8 +448,6 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory movingAverages = new int256[](2);
         movingAverages[0] = 0.9e18;
         movingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.2e18;
-        previousAlphas[2] = 0.9e18;
-        previousAlphas[3] = PRBMathSD59x18.fromInt(1) + 0.2e18;
 
         int128[] memory lambdas = new int128[](1);
         lambdas[0] = int128(0.7e18);
@@ -405,14 +462,14 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
 
         int256[] memory expectedResults = new int256[](2);
         //rounding is fine. Gets normalised during guard process
-        expectedResults[0] = 0.492500000000000001e18;
-        expectedResults[1] = 0.5075e18;
+        expectedResults[0] = 0.638888888888888888e18;
+        expectedResults[1] = 0.361111111111111111e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
             2, // numAssets
             parameters,
-            previousAlphas,
+            prevShortMovingAverage,
             prevMovingAverages,
             movingAverages,
             lambdas,
@@ -422,7 +479,7 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testCorrectUpdateWithLowerPricesAverageDenominator() public {
+    function testCorrectUpdateWithLowerPrices_scalarParams_negativeKappa() public {
         /*
             moving average	2.7	4
             alpha	-1.633333333	1.4
@@ -431,13 +488,15 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         */
 
         // Define local variables for the parameters
-        int256[][] memory parameters = new int256[][](1);
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);
-        parameters[0][0] = PRBMathSD59x18.fromInt(1);
+        parameters[0][0] = -PRBMathSD59x18.fromInt(1);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0.5e18;
 
-        int256[] memory previousAlphas = new int256[](4);
-        previousAlphas[0] = PRBMathSD59x18.fromInt(1);
-        previousAlphas[1] = PRBMathSD59x18.fromInt(2);
+        int256[] memory prevShortMovingAverage = new int256[](2);
+        prevShortMovingAverage[0] = PRBMathSD59x18.fromInt(1);
+        prevShortMovingAverage[1] = PRBMathSD59x18.fromInt(2);
 
         int256[] memory prevMovingAverages = new int256[](2);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(3);
@@ -446,8 +505,6 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory movingAverages = new int256[](2);
         movingAverages[0] = PRBMathSD59x18.fromInt(2) + 0.7e18;
         movingAverages[1] = PRBMathSD59x18.fromInt(4);
-        previousAlphas[2] = PRBMathSD59x18.fromInt(2) + 0.7e18;
-        previousAlphas[3] = PRBMathSD59x18.fromInt(4);
 
         int128[] memory lambdas = new int128[](1);
         lambdas[0] = int128(0.7e18);
@@ -461,14 +518,14 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         data[1] = PRBMathSD59x18.fromInt(4);
 
         int256[] memory expectedResults = new int256[](2);
-        expectedResults[0] = 0.481583333333333333e18;
-        expectedResults[1] = 0.518416666666666666e18;
+        expectedResults[0] = 0.597222222222222222e18;
+        expectedResults[1] = 0.402777777777777778e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
             2, // numAssets
             parameters,
-            previousAlphas,
+            prevShortMovingAverage,
             prevMovingAverages,
             movingAverages,
             lambdas,
@@ -478,16 +535,19 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testCorrectUpdateWithHigherPricesAverageDenominator_VectorParams() public {
+    function testCorrectUpdateWithHigherPrices_VectorParams_negativeKappa() public {
         // Define local variables for the parameters
-        int256[][] memory parameters = new int256[][](1);
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
-        parameters[0][0] = PRBMathSD59x18.fromInt(1);
-        parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
+        parameters[0][0] = -PRBMathSD59x18.fromInt(1);
+        parameters[0][1] = -PRBMathSD59x18.fromInt(1) - 0.5e18;
+        parameters[1] = new int256[](2);
+        parameters[1][0] = 0.5e18;
+        parameters[1][1] = 0.5e18;
 
-        int256[] memory previousAlphas = new int256[](4);
-        previousAlphas[0] = PRBMathSD59x18.fromInt(1);
-        previousAlphas[1] = PRBMathSD59x18.fromInt(2);
+        int256[] memory prevShortMovingAverage = new int256[](2);
+        prevShortMovingAverage[0] = PRBMathSD59x18.fromInt(1);
+        prevShortMovingAverage[1] = PRBMathSD59x18.fromInt(2);
 
         int256[] memory prevMovingAverages = new int256[](2);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(3);
@@ -496,8 +556,6 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory movingAverages = new int256[](2);
         movingAverages[0] = PRBMathSD59x18.fromInt(3);
         movingAverages[1] = PRBMathSD59x18.fromInt(4);
-        previousAlphas[2] = PRBMathSD59x18.fromInt(3);
-        previousAlphas[3] = PRBMathSD59x18.fromInt(4);
 
         int128[] memory lambdas = new int128[](2);
         lambdas[0] = int128(0.7e18);
@@ -512,14 +570,14 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         data[1] = PRBMathSD59x18.fromInt(4);
 
         int256[] memory expectedResults = new int256[](2);
-        expectedResults[0] = 0.4973e18;
-        expectedResults[1] = 0.5027e18;
+        expectedResults[0] = 0.55e18;
+        expectedResults[1] = 0.45e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
             2, // numAssets
             parameters,
-            previousAlphas,
+            prevShortMovingAverage,
             prevMovingAverages,
             movingAverages,
             lambdas,
@@ -529,17 +587,20 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         );
     }
 
-    function testCorrectUpdateWithLowerPricesAverageDenominator_VectorParams() public {
+    function testCorrectUpdateWithLowerPrices_VectorParams_negativeKappa() public {
         // Define local variables for the parameters
 
-        int256[][] memory parameters = new int256[][](1);
+        int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
-        parameters[0][0] = PRBMathSD59x18.fromInt(1);
-        parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
+        parameters[0][0] = -PRBMathSD59x18.fromInt(1);
+        parameters[0][1] = -PRBMathSD59x18.fromInt(1) - 0.5e18;
+        parameters[1] = new int256[](2);
+        parameters[1][0] = 0.5e18;
+        parameters[1][1] = 0.5e18;
 
-        int256[] memory previousAlphas = new int256[](4);
-        previousAlphas[0] = PRBMathSD59x18.fromInt(1);
-        previousAlphas[1] = PRBMathSD59x18.fromInt(2);
+        int256[] memory prevShortMovingAverage = new int256[](2);
+        prevShortMovingAverage[0] = PRBMathSD59x18.fromInt(1);
+        prevShortMovingAverage[1] = PRBMathSD59x18.fromInt(2);
 
         int256[] memory prevMovingAverages = new int256[](2);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(3);
@@ -548,8 +609,6 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory movingAverages = new int256[](2);
         movingAverages[0] = PRBMathSD59x18.fromInt(2) + 0.7e18;
         movingAverages[1] = PRBMathSD59x18.fromInt(4);
-        previousAlphas[2] = PRBMathSD59x18.fromInt(2) + 0.7e18;
-        previousAlphas[3] = PRBMathSD59x18.fromInt(4);
 
         int128[] memory lambdas = new int128[](2);
         lambdas[0] = int128(0.7e18);
@@ -564,14 +623,121 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         data[1] = PRBMathSD59x18.fromInt(4);
 
         int256[] memory expectedResults = new int256[](2);
-        expectedResults[0] = 0.4779e18;
-        expectedResults[1] = 0.5221e18;
+        expectedResults[0] = 0.616666666666666667e18;
+        expectedResults[1] = 0.383333333333333334e18;
 
         // Now pass the variables into the runInitialUpdate function
         runInitialUpdate(
             2, // numAssets
             parameters,
-            previousAlphas,
+            prevShortMovingAverage,
+            prevMovingAverages,
+            movingAverages,
+            lambdas,
+            prevWeights,
+            data,
+            expectedResults
+        );
+    }
+
+
+    function testCorrectUpdateWithLowerPrices_VectorParams_differentShortLambda() public {
+        // Define local variables for the parameters
+
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(1);
+        parameters[0][1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
+        parameters[1] = new int256[](2);
+        parameters[1][0] = 0.5e18;
+        parameters[1][1] = 0.3e18;
+
+        int256[] memory prevShortMovingAverage = new int256[](2);
+        prevShortMovingAverage[0] = PRBMathSD59x18.fromInt(1);
+        prevShortMovingAverage[1] = PRBMathSD59x18.fromInt(2);
+
+        int256[] memory prevMovingAverages = new int256[](2);
+        prevMovingAverages[0] = PRBMathSD59x18.fromInt(3);
+        prevMovingAverages[1] = PRBMathSD59x18.fromInt(4);
+
+        int256[] memory movingAverages = new int256[](2);
+        movingAverages[0] = PRBMathSD59x18.fromInt(2) + 0.7e18;
+        movingAverages[1] = PRBMathSD59x18.fromInt(4);
+
+        int128[] memory lambdas = new int128[](2);
+        lambdas[0] = int128(0.7e18);
+        lambdas[1] = int128(0.7e18);
+
+        int256[] memory prevWeights = new int256[](2);
+        prevWeights[0] = 0.5e18;
+        prevWeights[1] = 0.5e18;
+
+        int256[] memory data = new int256[](2);
+        data[0] = PRBMathSD59x18.fromInt(2);
+        data[1] = PRBMathSD59x18.fromInt(4);
+
+        int256[] memory expectedResults = new int256[](2);
+        expectedResults[0] = 0.323333333333333333e18;
+        expectedResults[1] = 0.676666666666666666e18;
+
+        // Now pass the variables into the runInitialUpdate function
+        runInitialUpdate(
+            2, // numAssets
+            parameters,
+            prevShortMovingAverage,
+            prevMovingAverages,
+            movingAverages,
+            lambdas,
+            prevWeights,
+            data,
+            expectedResults
+        );
+    }
+
+    function testCorrectUpdateWithLowerPrices_VectorParams_negativeKappa_differentShortLambda() public {
+        // Define local variables for the parameters
+
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = -PRBMathSD59x18.fromInt(1);
+        parameters[0][1] = -PRBMathSD59x18.fromInt(1) - 0.5e18;
+        parameters[1] = new int256[](2);
+        parameters[1][0] = 0.5e18;
+        parameters[1][1] = 0.3e18;
+
+        int256[] memory prevShortMovingAverage = new int256[](2);
+        prevShortMovingAverage[0] = PRBMathSD59x18.fromInt(1);
+        prevShortMovingAverage[1] = PRBMathSD59x18.fromInt(2);
+
+        int256[] memory prevMovingAverages = new int256[](2);
+        prevMovingAverages[0] = PRBMathSD59x18.fromInt(3);
+        prevMovingAverages[1] = PRBMathSD59x18.fromInt(4);
+
+        int256[] memory movingAverages = new int256[](2);
+        movingAverages[0] = PRBMathSD59x18.fromInt(2) + 0.7e18;
+        movingAverages[1] = PRBMathSD59x18.fromInt(4);
+
+        int128[] memory lambdas = new int128[](2);
+        lambdas[0] = int128(0.7e18);
+        lambdas[1] = int128(0.7e18);
+
+        int256[] memory prevWeights = new int256[](2);
+        prevWeights[0] = 0.5e18;
+        prevWeights[1] = 0.5e18;
+
+        int256[] memory data = new int256[](2);
+        data[0] = PRBMathSD59x18.fromInt(2);
+        data[1] = PRBMathSD59x18.fromInt(4);
+
+        int256[] memory expectedResults = new int256[](2);
+        expectedResults[0] = 0.676666666666666667e18;
+        expectedResults[1] = 0.323333333333333334e18;
+
+        // Now pass the variables into the runInitialUpdate function
+        runInitialUpdate(
+            2, // numAssets
+            parameters,
+            prevShortMovingAverage,
             prevMovingAverages,
             movingAverages,
             lambdas,

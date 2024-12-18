@@ -48,7 +48,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         addr2 = addr2Local;
         // Deploy UpdateWeightRunner contract
         vm.startPrank(owner);
-        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2);
+        updateWeightRunner = new MockUpdateWeightRunner(owner, addr2, false);
 
         chainlinkOracle = _deployOracle(fixedValue, delay);
 
@@ -333,7 +333,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         params.name = supportsDonation ? "Pool With Donation" : "Pool Without Donation";
         params.symbol = supportsDonation ? "PwD" : "PwoD";
 
-        address quantAMMWeightedPool = quantAMMWeightedPoolFactory.create(params);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
         // Initialize pool.
         vm.prank(lp);

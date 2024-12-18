@@ -12,7 +12,7 @@ import "./UpdateRule.sol";
 contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {
         name = "MeanReversionChannel";
-        
+
         parameterDescriptions = new string[](7);
         parameterDescriptions[0] = "Kappa: Kappa dictates the aggressiveness of response to a signal change";
         parameterDescriptions[1] = "Width: Width parameter for the mean reversion channel";
@@ -58,7 +58,7 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {
         MeanReversionChannelLocals memory locals;
-        
+
         locals.kappa = _parameters[0];
         locals.width = _parameters[1];
         locals.amplitude = _parameters[2];
@@ -74,10 +74,8 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         // using the average price has shown greater performance and resilience due to greater smoothing
         locals.useRawPrice = _parameters[6][0] == ONE;
 
-
         // Calculate price gradients
         locals.newWeights = _calculateQuantAMMGradient(_data, _poolParameters);
-        
 
         for (locals.i = 0; locals.i < locals.prevWeightLength; ) {
             locals.denominator = _poolParameters.movingAverage[locals.i];
@@ -95,7 +93,7 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         locals.signal = new int256[](locals.prevWeightLength);
 
         // Calculate signal for each asset
-        for (locals.i = 0; locals.i < locals.prevWeightLength;) {
+        for (locals.i = 0; locals.i < locals.prevWeightLength; ) {
             // Calculate envelope: exp(-(price_gradient^2) / (2 * width^2))
             int256 gradientSquared = locals.newWeights[locals.i].mul(locals.newWeights[locals.i]);
             int256 trendPortion;
@@ -105,47 +103,57 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             if (locals.kappa.length == 1) {
                 int256 widthSquared = locals.width[0].mul(locals.width[0]);
                 envelope_exponent = -gradientSquared.div(widthSquared.mul(TWO));
-                envelope = (-gradientSquared.div(widthSquared.mul(TWO))).exp();
+                envelope = envelope_exponent.exp();
+
                 // Calculate scaled price gradient: π * price_gradient / (3 * width)
                 int256 scaledGradient = PI.mul(locals.newWeights[locals.i]).div(locals.width[0].mul(THREE));
+                
                 // Calculate channel portion
-                channelPortion = locals.amplitude[0].mul(envelope).mul(
-                    scaledGradient - scaledGradient.mul(scaledGradient).mul(scaledGradient).div(SIX)
-                ).div(locals.inverseScaling[0]);
+                channelPortion = locals
+                    .amplitude[0]
+                    .mul(envelope)
+                    .mul(scaledGradient - scaledGradient.mul(scaledGradient).mul(scaledGradient).div(SIX))
+                    .div(locals.inverseScaling[0]);
+                
                 // Calculate trend portion
-                int256 absGradient = locals.newWeights[locals.i] >= 0 ? 
-                    locals.newWeights[locals.i] : -locals.newWeights[locals.i];
+                int256 absGradient = locals.newWeights[locals.i] >= 0
+                    ? locals.newWeights[locals.i]
+                    : -locals.newWeights[locals.i];
+                
                 int256 scaledAbsGradient = absGradient.div(locals.preExpScaling[0].mul(TWO));
+                
                 trendPortion = _pow(scaledAbsGradient, locals.exponents[0]);
-
             } else {
                 int256 widthSquared = locals.width[locals.i].mul(locals.width[locals.i]);
                 envelope = (-gradientSquared.div(widthSquared.mul(TWO))).exp();
                 // Calculate scaled price gradient: π * price_gradient / (3 * width)
                 int256 scaledGradient = PI.mul(locals.newWeights[locals.i]).div(locals.width[locals.i].mul(THREE));
-                
+
                 // Calculate channel portion
-                channelPortion = locals.amplitude[locals.i].mul(envelope).mul(
-                    scaledGradient - scaledGradient.mul(scaledGradient).mul(scaledGradient).div(SIX)
-                ).div(locals.inverseScaling[locals.i]);
+                channelPortion = locals
+                    .amplitude[locals.i]
+                    .mul(envelope)
+                    .mul(scaledGradient - scaledGradient.mul(scaledGradient).mul(scaledGradient).div(SIX))
+                    .div(locals.inverseScaling[locals.i]);
 
                 // Calculate trend portion
-                int256 absGradient = locals.newWeights[locals.i] >= 0 ? 
-                    locals.newWeights[locals.i] : -locals.newWeights[locals.i];
-                
+                int256 absGradient = locals.newWeights[locals.i] >= 0
+                    ? locals.newWeights[locals.i]
+                    : -locals.newWeights[locals.i];
+
                 int256 scaledAbsGradient = absGradient.div(locals.preExpScaling[locals.i].mul(TWO));
                 trendPortion = _pow(scaledAbsGradient, locals.exponents[locals.i]);
             }
             channelPortion = -channelPortion; // Negative amplitude effect
-            
+
             if (locals.newWeights[locals.i] < 0) {
                 trendPortion = -trendPortion;
             }
-            
+
             trendPortion = trendPortion.mul(ONE - envelope);
 
             locals.signal[locals.i] = channelPortion + trendPortion;
-            
+
             if (locals.kappa.length == 1) {
                 locals.normalizationFactor += locals.signal[locals.i];
             } else {
@@ -162,16 +170,17 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         // Calculate final weights
         if (locals.kappa.length == 1) {
             locals.normalizationFactor /= int256(locals.prevWeightLength);
-            for (locals.i = 0; locals.i < locals.prevWeightLength;) {
-                newWeightsConverted[locals.i] = _prevWeights[locals.i] + 
+            for (locals.i = 0; locals.i < locals.prevWeightLength; ) {
+                newWeightsConverted[locals.i] =
+                    _prevWeights[locals.i] +
                     locals.kappa[0].mul(locals.signal[locals.i] - locals.normalizationFactor);
-                
+
                 unchecked {
                     ++locals.i;
                 }
             }
         } else {
-            for (locals.i = 0; locals.i < locals.kappa.length;) {
+            for (locals.i = 0; locals.i < locals.kappa.length; ) {
                 locals.sumKappa += locals.kappa[locals.i];
                 unchecked {
                     ++locals.i;
@@ -179,13 +188,11 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             }
 
             locals.normalizationFactor = locals.normalizationFactor.div(locals.sumKappa);
-            for (locals.i = 0; locals.i < locals.prevWeightLength;) {
-                int256 weightUpdate = locals.kappa[locals.i].mul(
-                    locals.signal[locals.i] - locals.normalizationFactor
-                );
+            for (locals.i = 0; locals.i < locals.prevWeightLength; ) {
+                int256 weightUpdate = locals.kappa[locals.i].mul(locals.signal[locals.i] - locals.normalizationFactor);
                 newWeightsConverted[locals.i] = _prevWeights[locals.i] + weightUpdate;
                 require(newWeightsConverted[locals.i] >= 0, "Invalid weight");
-                
+
                 unchecked {
                     ++locals.i;
                 }

@@ -48,6 +48,7 @@ updates and guard rails.
 /// @title UpdateWeightRunner singleton contract that is responsible for running all weight updates
 
 interface IUpdateWeightRunner {
+    
     // Store the current execution context for callbacks
     struct ExecutionData {
         address pool;
@@ -62,6 +63,7 @@ interface IUpdateWeightRunner {
         uint64[] lambda;
         PoolTimingSettings timingSettings;
         uint64 epsilonMax;
+        uint64 absoluteWeightGuardRail;
         int256[][] ruleParameters;
         address poolManager;
     }
@@ -72,6 +74,7 @@ interface IUpdateWeightRunner {
         int216 data;
         uint40 timestamp;
     }
+
     /// @notice Get the happy path primary oracles for the constituents of a pool
     /// @param _poolAddress Address of the pool
     function getOptimisedPoolOracle(
@@ -111,32 +114,32 @@ interface IUpdateWeightRunner {
     function removeOracle(OracleWrapper _oracleToRemove) external;
 
     /// @notice Set a rule for a pool, called by the pool
-    /// @param _rule Address of the rule
-    /// @param _poolOracles Array of oracle indices (in order of priority)
-    function setRuleForPool(
-        IUpdateRule _rule,
-        address[][] calldata _poolOracles,
-        uint64[] calldata _lambda,
-        int256[][] calldata _ruleParameters,
-        uint64 _epsilonMax,
-        uint40 _updateInterval,
-        address _poolManager
-    ) external ;
+    /// @param _poolSettings Settings for the pool
+    function setRuleForPool(IQuantAMMWeightedPool.PoolSettings memory _poolSettings) external;
 
     /// @notice Run the update for the provided rule. Last update must be performed more than updateInterval seconds ago.
     function performUpdate(address _pool) external;
 
-    /// @notice Allow / disallow an address to call performUpdateQuantAMM
-    /// @param _weightRunner the target runner address
-    /// @param _allowed whether or not it is considered a quantamm owned address
-    function setQuantAMMWeightRunner(
-        address _weightRunner,
-        bool _allowed
-    ) external;
-
     /// @notice Change the ETH/USD oracle
     /// @param _ethUsdOracle The new oracle address to use for ETH/USD 
     function setETHUSDOracle(address _ethUsdOracle) external;
+
+    /// @notice Set the quantAMM swap fee % amount allocated to the protocol for running costs
+    /// @param _quantAMMSwapFeeTake The new swap fee % amount allocated to the protocol for running costs
+    function setQuantAMMSwapFeeTake(uint256 _quantAMMSwapFeeTake) external;
+
+    /// @notice Get the quantAMM swap fee % amount allocated to the protocol for running costs
+    function getQuantAMMSwapFeeTake() external view returns (uint256);
+
+    /// @notice Set the quantAMM uplift fee % amount allocated to the protocol for running costs
+    /// @param _quantAMMUpliftFeeTake The new uplift fee % amount allocated to the protocol for running costs
+    function setQuantAMMUpliftFeeTake(uint256 _quantAMMUpliftFeeTake) external;
+
+    /// @notice Get the quantAMM uplift fee % amount allocated to the protocol for running costs
+    function getQuantAMMUpliftFeeTake() external view returns (uint256);
+
+    /// @notice get the confirmedquantAMMAdmin address
+    function getQuantAMMAdmin() external view returns (address); 
 
     /// @notice Sets the timestamp of when an update was last run for a pool. Can by used as a breakgrass measure to retrigger an update.
     /// @param _poolAddress the target pool address

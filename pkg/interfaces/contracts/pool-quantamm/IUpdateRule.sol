@@ -12,7 +12,7 @@ interface IUpdateRule {
     /// @param _absoluteWeightGuardRail the maximum weight change possible for the pool
     function CalculateNewWeights(
         int256[] calldata _prevWeights,
-        int256[] calldata _data,
+        int256[]  memory _data,
         address _pool,
         int256[][] calldata _parameters,
         uint64[] calldata _lambdaStore,

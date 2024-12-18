@@ -45,7 +45,7 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
     /// @param _poolParameters pool parameters
     /// @return newState new state of the covariance matrix
     function _calculateQuantAMMCovariance(
-        int256[] calldata _newData,
+        int256[]  memory _newData,
         QuantAMMPoolParameters memory _poolParameters
     ) internal returns (int256[][] memory) {
         QuantAMMCovariance memory locals;

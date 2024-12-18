@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24;
 
-import "forge-std/Test.sol";
-
 import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "./UpdateRule.sol";
 import "./base/QuantammGradientBasedRule.sol";
@@ -17,7 +15,9 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         parameterDescriptions[
             0
         ] = "Kappa: Kappa dictates the aggressiveness of the rule's response to a signal change (here, price gradient)";
-        parameterDescriptions[1] = "Lambda Short: This Lambda dictates price smoothing for the short-memory moving average";
+        parameterDescriptions[
+            1
+        ] = "Lambda Short: This Lambda dictates price smoothing for the short-memory moving average";
         parameterDescriptions[
             2
         ] = "Lambda Long: This Lambda dictates price smoothing for the long-memory moving average";
@@ -59,7 +59,7 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     ///                   [1] = lambda short: Can be per token (vector) or single for all tokens (scalar)
     function _getWeights(
         int256[] calldata _prevWeights,
-        int256[]  memory _data,
+        int256[] memory _data,
         int256[][] calldata _parameters,
         QuantAMMPoolParameters memory _poolParameters
     ) internal override returns (int256[] memory newWeightsConverted) {
@@ -74,17 +74,23 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             }
         }
 
-        int256[] memory currentShortMovingAverages = _quantAMMUnpack128Array(shortMovingAverages[_poolParameters.pool], _poolParameters.numberOfAssets);
+        int256[] memory currentShortMovingAverages = _quantAMMUnpack128Array(
+            shortMovingAverages[_poolParameters.pool],
+            _poolParameters.numberOfAssets
+        );
+
         int256[] memory newShortMovingAverages = _calculateQuantAMMMovingAverage(
             currentShortMovingAverages,
             _data,
             lambdaShort,
             _poolParameters.numberOfAssets
         );
-        shortMovingAverages[_poolParameters.pool] = _quantAMMPack128Array(newShortMovingAverages);    
+        shortMovingAverages[_poolParameters.pool] = _quantAMMPack128Array(newShortMovingAverages);
 
-        for(uint i; i < newShortMovingAverages.length; ) {
-            unchecked{++i;}
+        for (uint i; i < newShortMovingAverages.length; ) {
+            unchecked {
+                ++i;
+            }
         }
 
         locals.prevWeightLength = _prevWeights.length;
@@ -160,7 +166,6 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
     ) internal override {
         require(_initialValues.length == _numberOfAssets, "Invalid initial values");
 
-
         //to avoid incorrect access to base MathMovingAverage, we need to set the moving average here
         uint movingAverageLength = shortMovingAverages[_poolAddress].length;
 
@@ -215,6 +220,5 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             }
         }
         return valid == 1;
-        
     }
 }

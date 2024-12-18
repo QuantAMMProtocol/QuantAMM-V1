@@ -121,7 +121,7 @@ contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
     mapping(address => address[][]) public poolBackupOracles;
 
     /// @notice The % of the total swap fee that is allocated to the protocol for running costs. 
-    uint256 public quantAMMSwapFeeTake = 0.0005e18;
+    uint256 public quantAMMSwapFeeTake = 0.5e18;
 
     function setQuantAMMSwapFeeTake(uint256 _quantAMMSwapFeeTake) external override {
         require(msg.sender == quantammAdmin, "ONLYADMIN");

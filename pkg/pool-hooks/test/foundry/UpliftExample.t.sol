@@ -35,7 +35,10 @@ import { PoolMock } from "@balancer-labs/v3-vault/contracts/test/PoolMock.sol";
 
 import { MockUpdateWeightRunner } from "pool-quantamm/contracts/mock/MockUpdateWeightRunner.sol";
 
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+
 import { UpliftOnlyExample } from "../../contracts/hooks-quantamm/UpliftOnlyExample.sol";
+import { LPNFT } from "../../contracts/hooks-quantamm/LPNFT.sol";
 
 contract UpliftOnlyExampleTest is BaseVaultTest {
     using CastingHelpers for address[];
@@ -50,7 +53,9 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     address internal addr2;
 
     // Maximum exit fee of 10%
-    uint64 public constant MAX_EXIT_FEE_PERCENTAGE = 10e16;
+    uint64 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16; // 0.001%
+    uint64 private constant _MAX_SWAP_FEE_PERCENTAGE = 10e16; // 10%
+    uint64 private constant _MAX_UPLIFT_WITHDRAWAL_FEE = 20e16; // 20%
 
     uint256 internal constant DEFAULT_AMP_FACTOR = 200;
 
@@ -96,7 +101,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             weth,
             permit2,
             200,
-            20,
+            5,
             address(updateWeightRunner),
             "Uplift LiquidityPosition v1",
             "Uplift LiquidityPosition v1",
@@ -347,23 +352,74 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.stopPrank();
     }
 
+    function testTransferDepositsAtRandom(uint256 seed, uint256 depositLength) public {
+        uint256 depositBound = bound(depositLength, 1, 10);
+        /**
+         * This can be changed to the max 98 however it takes some time!
+         * uint256 depositBound = bound(depositLength, 1, 98);
+         * [PASS] testTransferDepositsAtRandom(uint256,uint256) (runs: 10002, μ: 119097137, ~: 78857000)
+            Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1233.99s (1233.98s CPU time)
 
-    //function testTransferDepositsAtRandom(uint256 seed) public {
-//
-    //    uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
-    //    vm.startPrank(bob);
-    //    uint256 bptAmountDeposit = bptAmount / 150;
-    //    for (uint256 i = 0; i < 99; i++) {            
-    //        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmountDeposit, false, bytes(""));            
-    //        skip(1 days);
-    //    }
-    //    vm.stopPrank();
-//
-    //    // Shuffle the array using the seed
-    //    uint[] memory shuffledArray = shuffle(masterArray, seed);
-    //}
+            Ran 1 test suite in 1234.00s (1233.99s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)
+         * 
+         */
+        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+        vm.startPrank(bob);
+        uint256 bptAmountDeposit = bptAmount / 150;
+        uint256[] memory tokenIndexArray = new uint256[](depositBound);
+        for (uint256 i = 0; i < depositBound; i++) {
+            tokenIndexArray[i] = i + 1;
+            upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmountDeposit, false, bytes(""));
+            skip(1 days);
+        }
+        vm.stopPrank();
 
-    // Function to generate a shuffled array of unique uints between 0 and 10
+        // Shuffle the array using the seed
+        uint[] memory shuffledArray = shuffle(tokenIndexArray, seed);
+
+        LPNFT lpNft = upliftOnlyRouter.lpNFT();
+
+        for (uint256 i = 0; i < depositBound; i++) {
+            vm.startPrank(bob);
+
+            lpNft.transferFrom(bob, alice, shuffledArray[i]);
+            UpliftOnlyExample.FeeData[] memory aliceFees = upliftOnlyRouter.getUserPoolFeeData(pool, alice);
+            UpliftOnlyExample.FeeData[] memory bobFees = upliftOnlyRouter.getUserPoolFeeData(pool, bob);
+
+            assertEq(aliceFees.length, i + 1, "alice should have all transfers");
+            assertEq(
+                aliceFees[aliceFees.length - 1].tokenID,
+                shuffledArray[i],
+                "last transferred tokenId should match"
+            );
+
+            assertEq(bobFees.length, depositBound - (i + 1), "bob should have all transferred last");
+
+            uint[] memory orderedArrayWithoutShuffled = new uint[](depositBound - (i + 1));
+            uint lastPopulatedIndex = 0;
+            for (uint256 j = 1; j <= depositBound; j++) {
+                bool inPreviousShuffled = false;
+                for (uint256 k = 0; k < i + 1; k++) {
+                    if (shuffledArray[k] == j) {
+                        inPreviousShuffled = true;
+                        break;
+                    }
+                }
+                if (!inPreviousShuffled) {
+                    orderedArrayWithoutShuffled[lastPopulatedIndex] = j;
+                    lastPopulatedIndex++;
+                }
+            }
+
+            for (uint256 j = 0; j < bobFees.length; j++) {
+                assertEq(bobFees[j].tokenID, orderedArrayWithoutShuffled[j], "bob should have ordered tokenID");
+            }
+
+            vm.stopPrank();
+        }
+    }
+
+    //Function to generate a shuffled array of unique uints between 0 and 10
     function shuffle(uint[] memory array, uint seed) internal pure returns (uint[] memory) {
         uint length = array.length;
         for (uint i = length - 1; i > 0; i--) {
@@ -375,7 +431,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testRemoveLiquidityNoPriceChange() public {
-        BaseVaultTest.Balances memory balancesPre = getBalances(bob);
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
 
@@ -435,18 +490,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             "Pool's USDC amount is wrong"
         );
 
-        console.log("balancebefore");
-        console.log(balancesPre.poolSupply);
-        console.log("balanceafter");
-        console.log(balancesPre.poolSupply);
-        console.log("bptAmount");
-        console.log(bptAmount);
-        console.log("userbpt");
-        console.log(balancesAfter.userBpt);
-        console.log("balancebefore");
-        console.log(balancesBefore.poolSupply);
-        console.log("balanceafter");
-        console.log(balancesAfter.poolSupply);
         //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
         assertEq(balancesBefore.poolSupply - balancesAfter.poolSupply, bptAmount, "BPT supply amount is wrong");
 
@@ -866,12 +909,46 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.stopPrank();
     }
 
+    function testSetHookFeeNonOwnerFail() public {
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, bob));
+        vm.startPrank(bob);
+        upliftOnlyRouter.setHookSwapFeePercentage(1);
+        vm.stopPrank();
+    }
+
+    function testSetHookFeeOwnerPass(uint64 poolHookAmount) public {
+        uint64 boundFeeAmount = uint64(bound(poolHookAmount, _MIN_SWAP_FEE_PERCENTAGE, _MAX_SWAP_FEE_PERCENTAGE));
+        vm.expectEmit();
+        emit UpliftOnlyExample.HookSwapFeePercentageChanged(poolHooksContract, boundFeeAmount);
+        vm.startPrank(owner);
+        upliftOnlyRouter.setHookSwapFeePercentage(boundFeeAmount);
+        vm.stopPrank();
+    }
+
+    function testSetHookPassSmallerThanMinimumFail(uint64 poolHookAmount) public {
+        uint64 boundFeeAmount = uint64(bound(poolHookAmount, 0, _MIN_SWAP_FEE_PERCENTAGE - 1));
+
+        vm.startPrank(owner);
+        vm.expectRevert("Below _MIN_SWAP_FEE_PERCENTAGE");
+        upliftOnlyRouter.setHookSwapFeePercentage(boundFeeAmount);
+        vm.stopPrank();
+    }
+
+    function testSetHookPassGreaterThanMaxFail(uint64 poolHookAmount) public {
+        uint64 boundFeeAmount = uint64(bound(poolHookAmount, uint64(_MAX_SWAP_FEE_PERCENTAGE) + 1, uint64(type(uint64).max)));
+
+        vm.startPrank(owner);
+        vm.expectRevert("Above _MAX_SWAP_FEE_PERCENTAGE");
+        upliftOnlyRouter.setHookSwapFeePercentage(boundFeeAmount);
+        vm.stopPrank();
+    }
+
     function testFeeSwapExactIn__Fuzz(uint256 swapAmount, uint64 hookFeePercentage) public {
         // Swap between POOL_MINIMUM_TOTAL_SUPPLY and whole pool liquidity (pool math is linear)
         swapAmount = bound(swapAmount, POOL_MINIMUM_TOTAL_SUPPLY, poolInitAmount);
 
         // Fee between 0 and 100%
-        hookFeePercentage = uint64(bound(hookFeePercentage, 0, FixedPoint.ONE));
+        hookFeePercentage = uint64(bound(hookFeePercentage, _MIN_SWAP_FEE_PERCENTAGE, _MAX_SWAP_FEE_PERCENTAGE));
 
         vm.expectEmit();
         emit UpliftOnlyExample.HookSwapFeePercentageChanged(poolHooksContract, hookFeePercentage);
@@ -938,7 +1015,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         swapAmount = bound(swapAmount, POOL_MINIMUM_TOTAL_SUPPLY, poolInitAmount);
 
         // Fee between 0 and 100%
-        hookFeePercentage = uint64(bound(hookFeePercentage, 0, FixedPoint.ONE));
+        hookFeePercentage = uint64(bound(hookFeePercentage, _MIN_SWAP_FEE_PERCENTAGE, _MAX_SWAP_FEE_PERCENTAGE));
 
         vm.expectEmit();
         emit UpliftOnlyExample.HookSwapFeePercentageChanged(poolHooksContract, hookFeePercentage);
@@ -1101,11 +1178,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             "Pool's USDC amount is wrong"
         );
 
-        console.log("bptAmount");
-        console.log(bptAmount);
-        console.log("userbpt");
-        console.log(balancesAfter.userBpt);
-
         //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
         assertEq(
             balancesBefore.poolSupply - balancesAfter.poolSupply,
@@ -1146,12 +1218,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         // was originall 1000000000000000000, doubled in value to 2000000000000000000,
         //total fee was 50% of uplift which is 1000000000000000000, of that fee the protocol take 50% which is 500000000000000000
-        assertEq(
-            balancesAfter.userBpt,
-            500000000000000000,
-            
-            "quantamm should not hold any BPT"
-        );
+        assertEq(balancesAfter.userBpt, 500000000000000000, "quantamm should not hold any BPT");
     }
 
     function testRemoveLiquidityWithProtocolTakeNegativePriceChange() public {
@@ -1222,15 +1289,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             amountOut,
             "Pool's USDC amount is wrong"
         );
-
-        console.log("bptAmount");
-        console.log(bptAmount);
-        console.log("userbpt");
-        console.log(balancesAfter.userBpt);
-        console.log("balancebefore");
-        console.log(balancesBefore.poolSupply);
-        console.log("balanceafter");
-        console.log(balancesAfter.poolSupply);
 
         //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
         assertEq(
@@ -1304,12 +1362,12 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         uint256 nftTokenId = 0;
         uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
-        BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
+        BaseVaultTest.Balances memory balancesBefore = getBalances(updateWeightRunner.getQuantAMMAdmin());
 
         vm.startPrank(bob);
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
         vm.stopPrank();
-        BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
+        BaseVaultTest.Balances memory balancesAfter = getBalances(updateWeightRunner.getQuantAMMAdmin());
 
         uint256 feeAmountAmountPercent = ((bptAmount / 2) *
             ((uint256(upliftOnlyRouter.upliftFeeBps()) * 1e18) / 10000)) / ((bptAmount / 2));
@@ -1354,7 +1412,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             bptAmount - balancesAfter.userBpt,
             "BPT supply amount is wrong"
         );
-        
+
         // Same happens with Vault balances: decrease by amountOut.
         assertEq(
             balancesBefore.vaultTokens[daiIdx] - balancesAfter.vaultTokens[daiIdx],

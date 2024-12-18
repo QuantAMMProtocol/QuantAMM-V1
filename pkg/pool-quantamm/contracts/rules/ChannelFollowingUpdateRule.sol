@@ -197,7 +197,7 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             // this we can just negate the channel portion.
             channelPortion = -channelPortion;
 
-            // The trendPortion varaible so far has been calculated using the absolute value of the price gradient.
+            // The trendPortion variable so far has been calculated using the absolute value of the price gradient.
             // This is because x^y is not defined for negative x if y is not an integer. So we need to reintroduce
             // the sign of the price gradient to the trendPortion. We can use the sign of the price gradient to achieve this.
             if (locals.newWeights[locals.i] < 0) {

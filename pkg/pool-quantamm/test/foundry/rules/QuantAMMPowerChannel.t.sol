@@ -28,6 +28,12 @@ contract PowerChannelUpdateRuleTest is Test, QuantAMMTestUtils {
         assertFalse(valid);
     }
 
+    function test0InitialisedParametersShouldNotBeAccepted() public view {
+        int256[][] memory parameters = new int256[][](0);
+        bool result = rule.validParameters(parameters);
+        assertFalse(result);
+    }
+
     function testKappaZeroQGreaterThanOneShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](1);

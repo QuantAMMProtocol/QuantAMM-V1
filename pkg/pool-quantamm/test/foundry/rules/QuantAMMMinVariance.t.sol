@@ -24,6 +24,12 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         bool valid = rule.validParameters(parameters); // Call the function
         assertFalse(valid); // Assert that the result is false
     }
+    
+    function test0InitialisedParametersShouldNotBeAccepted() public view {
+        int256[][] memory parameters = new int256[][](0);
+        bool result = rule.validParameters(parameters);
+        assertFalse(result);
+    }
 
     function testZeroShouldBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1); // Additional parameters

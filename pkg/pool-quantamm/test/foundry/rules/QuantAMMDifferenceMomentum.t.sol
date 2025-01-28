@@ -65,6 +65,12 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         bool result = rule.validParameters(parameters);
         assertFalse(result);
     }
+    
+    function test0InitialisedParametersShouldNotBeAccepted() public view {
+        int256[][] memory parameters = new int256[][](0);
+        bool result = rule.validParameters(parameters);
+        assertFalse(result);
+    }
 
     function testEmpty1DParametersShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);

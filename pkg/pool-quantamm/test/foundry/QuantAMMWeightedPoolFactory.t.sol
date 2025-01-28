@@ -81,6 +81,18 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         quantAMMWeightedPoolFactory.create(params);
     }
 
+    function testMismatchOracleWeightsArray() public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+
+        params._poolSettings.oracles = new address[][](3);
+        params._poolSettings.oracles[0] = new address[](0);
+        params._poolSettings.oracles[1] = new address[](0);
+        params._poolSettings.oracles[2] = new address[](0);
+
+        vm.expectRevert("OLNWEIG");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
     function testEmptyOracleArrayMixed() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 

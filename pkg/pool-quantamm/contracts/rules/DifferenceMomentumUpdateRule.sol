@@ -87,12 +87,6 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         );
         shortMovingAverages[_poolParameters.pool] = _quantAMMPack128Array(newShortMovingAverages);
 
-        for (uint i; i < newShortMovingAverages.length; ) {
-            unchecked {
-                ++i;
-            }
-        }
-
         locals.prevWeightLength = _prevWeights.length;
 
         // newWeights is reused multiple times to save gas of multiple array initialisation

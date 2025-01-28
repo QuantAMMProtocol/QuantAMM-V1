@@ -6,7 +6,7 @@ import "../../../contracts/mock/mockRules/MockUpdateRule.sol";
 import "../../../contracts/mock/MockPool.sol";
 import "../utils.t.sol";
 
-contract UpdateRuleTest is Test, QuantAMMTestUtils {
+contract WithoutPrevMovingAverageUpdateRuleTest is Test, QuantAMMTestUtils {
     address internal owner;
     address internal addr1;
     address internal addr2;
@@ -370,8 +370,7 @@ contract UpdateRuleTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
     }
 
-    function testMultipleUpdateWithPrevMovingAverage() public {
-        MockPrevMovingAverageUpdateRule rule = new MockPrevMovingAverageUpdateRule(owner);
+    function testMultipleUpdateWithoutPrevMovingAverage() public {
 
         vm.startPrank(owner);
         // Define local variables for the parameters
@@ -409,14 +408,11 @@ contract UpdateRuleTest is Test, QuantAMMTestUtils {
         int256[] memory expectedResults = new int256[](2);
         expectedResults[0] = 0.49775e18;
         expectedResults[1] = 0.50225e18;
-        rule.setWeights(expectedResults);
+        updateRule.setWeights(expectedResults);
 
-        rule.initialisePoolRuleIntermediateValues(address(mockPool), prevMovingAverages, previousAlphas, 2);
+        updateRule.initialisePoolRuleIntermediateValues(address(mockPool), prevMovingAverages, previousAlphas, 2);
 
-        uint256 updatedMovingAverages = rule.movingAveragesLength(address(mockPool));
-        assertEq(updatedMovingAverages, 1, "movingAverages length should be 2");
-
-        rule.CalculateNewWeights(
+        updateRule.CalculateNewWeights(
             prevWeights,
             data,
             address(mockPool),
@@ -425,12 +421,8 @@ contract UpdateRuleTest is Test, QuantAMMTestUtils {
             uint64(uint256(epsilonMax)),
             uint64(0.2e18)
         );
-
-        uint256 updatedMovingAverages2 = rule.movingAveragesLength(address(mockPool));
         
-        assertEq(updatedMovingAverages2, 1, "movingAverages length should be 1");
-
-        rule.CalculateNewWeights(
+        updateRule.CalculateNewWeights(
             prevWeights,
             data,
             address(mockPool),

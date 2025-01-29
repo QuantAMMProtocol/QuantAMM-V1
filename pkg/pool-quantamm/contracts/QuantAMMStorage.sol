@@ -81,7 +81,7 @@ abstract contract ScalarQuantAMMBaseStorage {
                 _seventhInt >= MIN32 &&
                 _eighthInt <= MAX32 &&
                 _eighthInt >= MIN32,
-            "Overflow"
+            "Overflow/Underflow"
         );
 
         int256 firstPacked = int256(uint256(_firstInt << 224) >> 224) << 224;
@@ -272,7 +272,7 @@ abstract contract ScalarQuantAMMBaseStorage {
             for (uint i = nonStickySourceLength; i < _sourceArray.length; ) {
                 unchecked {
                     int256 elem = _sourceArray[i] / 1e9;
-                    require(elem <= MAX32 && elem >= MIN32, "Overflow");
+                    require(elem <= MAX32 && elem >= MIN32, "Overflow/Underflow");
                     packed |= int256(uint256(elem << 224) >> 224) << offset;
                     offset -= 32;
                     ++i;

@@ -131,15 +131,15 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             }
         } else {
             //vector parameter calculation, same as scalar but using the per constituent param inside the loops
-            int256 sumKappa;
+            
             for (locals.i = 0; locals.i < locals.kappa.length; ) {
-                sumKappa += locals.kappa[locals.i];
+                locals.sumKappa += locals.kappa[locals.i];
                 unchecked {
                     ++locals.i;
                 }
             }
 
-            locals.normalizationFactor = locals.normalizationFactor.div(sumKappa);
+            locals.normalizationFactor = locals.normalizationFactor.div(locals.sumKappa);
 
             for (locals.i = 0; locals.i < _prevWeights.length; ) {
                 //κ · ( sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q − ℓp(t)

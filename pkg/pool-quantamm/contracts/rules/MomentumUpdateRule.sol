@@ -110,15 +110,14 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             }
         } else {
             //vector logic separate to vector for efficiency
-            int256 sumKappa;
             for (locals.i = 0; locals.i < locals.kappaStore.length; ) {
-                sumKappa += locals.kappaStore[locals.i];
+                locals.sumKappa += locals.kappaStore[locals.i];
                 unchecked {
                     ++locals.i;
                 }
             }
 
-            locals.normalizationFactor = locals.normalizationFactor.div(sumKappa);
+            locals.normalizationFactor = locals.normalizationFactor.div(locals.sumKappa);
 
             // To avoid intermediate overflows (because of normalization), we only downcast in the end to an uint6
             for (locals.i = 0; locals.i < _prevWeights.length; ) {

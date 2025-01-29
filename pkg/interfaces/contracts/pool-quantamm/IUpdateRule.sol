@@ -22,13 +22,13 @@ interface IUpdateRule {
 
     /// @notice Called on pool creation to preset all the neccessary rule state
     /// @param _poolAddress address of pool being initialised
-    /// @param _newIntermediateValues array of initial intermediate values values
-    /// @param _newParameters array of initial parameters, dynamic to allow flexibility for future rules
+    /// @param _newMovingAverages array of initial moving averages
+    /// @param _newInitialValues the initial intermediate values provided
     /// @param _numberOfAssets number of assets in the pool
     function initialisePoolRuleIntermediateValues(
         address _poolAddress,
-        int256[] memory _newIntermediateValues,
-        int256[] memory _newParameters,
+        int256[] memory _newMovingAverages,
+        int256[] memory _newInitialValues,
         uint _numberOfAssets
     ) external;
 

@@ -102,7 +102,7 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
 
             locals.denominator = _poolParameters.movingAverage[locals.i];
             // (EWMA_short - EWMA_long) / EWMA_long calculated and stored as used in multiple places
-            locals.newWeights[locals.i] = ONE.div(locals.denominator).mul(locals.newWeights[locals.i]);
+            locals.newWeights[locals.i] = ONE.mul(locals.newWeights[locals.i]).div(locals.denominator);
             if (locals.kappaStore.length == 1) {
                 locals.normalizationFactor += locals.newWeights[locals.i];
             } else {

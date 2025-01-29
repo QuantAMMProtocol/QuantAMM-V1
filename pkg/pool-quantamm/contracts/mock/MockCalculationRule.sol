@@ -91,6 +91,10 @@ contract MockCalculationRule is
         _setGradient(poolAddress, _initialValues, _numberOfAssets);
     }
 
+    function getInitialGradient(address poolAddress, uint256 numAssets) external view returns (int256[] memory) {
+        return _quantAMMUnpack128Array(intermediateGradientStates[poolAddress], numAssets);
+    }
+
     function setInitialVariance(address poolAddress, int256[] memory _initialValues, uint _numberOfAssets) external {
         _setIntermediateVariance(poolAddress, _initialValues, _numberOfAssets);
     }

@@ -192,7 +192,13 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
     /// @param _numberOfAssets the number of assets in the pool being initialised
     function _setGradient(address poolAddress, int256[] memory _initialValues, uint _numberOfAssets) internal {
         uint storeLength = intermediateGradientStates[poolAddress].length;
-        if ((storeLength == 0 && _initialValues.length == _numberOfAssets) || _initialValues.length == storeLength) {
+
+        if (_initialValues.length == _numberOfAssets 
+            && (storeLength == 0  
+                || (_initialValues.length % 2 == 0 && (_initialValues.length / 2) == storeLength)
+                //This does not check the last half of the last sticky end, you could set +1 but given numAssets
+                //normally passed by the update weight runner this will be wiped on first run if an extra weight is set
+                || (_initialValues.length % 2 != 0 && (_initialValues.length / 2) + 1 == storeLength))) {
             //should be during create pool
             intermediateGradientStates[poolAddress] = _quantAMMPack128Array(_initialValues);
         } else {

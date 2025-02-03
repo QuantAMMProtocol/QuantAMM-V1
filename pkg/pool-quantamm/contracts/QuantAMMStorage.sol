@@ -462,7 +462,6 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                         targetIndex = 0;
                     }
                     if (targetRow < _numberOfAssets) {
-                        targetArray[targetRow] = new int256[](_numberOfAssets);
                         if (targetIndex < _numberOfAssets) {
                             targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i]));
                             unchecked {
@@ -477,7 +476,6 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                     targetIndex = 0;
                 }
                 if (targetRow < _numberOfAssets) {
-                    targetArray[targetRow] = new int256[](_numberOfAssets);
                     targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i] >> 128));
                     unchecked {
                         ++targetIndex;
@@ -492,9 +490,6 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                         unchecked {
                             ++targetRow;
                             targetIndex = 0;
-                        }
-                        if (targetRow < _numberOfAssets) {
-                            targetArray[targetRow] = new int256[](_numberOfAssets);
                         }
                     }
                 }

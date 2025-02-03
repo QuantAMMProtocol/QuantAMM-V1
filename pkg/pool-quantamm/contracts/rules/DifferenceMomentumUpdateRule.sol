@@ -208,6 +208,9 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         }
         int256[] memory kappa = _parameters[0];
         uint16 valid = uint16(kappa.length) > 0 ? 1 : 0;
+        
+        int256 sumKappa = 0;
+
         for (uint i; i < kappa.length; ) {
             if (kappa[i] == 0) {
                 unchecked {
@@ -215,10 +218,17 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 }
                 break;
             }
+            sumKappa += kappa[i];
+
             unchecked {
                 ++i;
             }
         }
+
+        if (sumKappa == 0) {
+            return false;
+        }
+        
         return valid == 1;
     }
 }

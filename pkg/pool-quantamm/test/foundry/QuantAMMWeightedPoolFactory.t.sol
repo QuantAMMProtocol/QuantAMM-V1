@@ -72,6 +72,39 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         assertEq(pauseWindowDuration, 365 days);
     }
 
+    function testInvalidPoolRegistry(uint) public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        params.poolRegistry = 0; // Invalid pool registry
+
+        vm.expectRevert();
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
+    function testValidBitmapCombinations() public {
+        uint256 MASK_POOL_PERFORM_UPDATE = 1;
+        uint256 MASK_POOL_GET_DATA = 2;
+        uint256 MASK_POOL_OWNER_UPDATES = 8;
+        uint256 MASK_POOL_QUANTAMM_ADMIN_UPDATES = 16;
+        uint256 MASK_POOL_RULE_DIRECT_SET_WEIGHT = 32;
+
+        uint256[] memory validBitmaps = new uint256[](5);
+        validBitmaps[0] = MASK_POOL_PERFORM_UPDATE;
+        validBitmaps[1] = MASK_POOL_GET_DATA;
+        validBitmaps[2] = MASK_POOL_OWNER_UPDATES;
+        validBitmaps[3] = MASK_POOL_QUANTAMM_ADMIN_UPDATES;
+        validBitmaps[4] = MASK_POOL_RULE_DIRECT_SET_WEIGHT;
+
+        for (uint256 i = 0; i < validBitmaps.length; i++) {
+            for (uint256 j = i; j < validBitmaps.length; j++) {
+                uint256 combinedMask = validBitmaps[i] | validBitmaps[j];
+                QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+                params.poolRegistry = combinedMask;
+                quantAMMWeightedPoolFactory.create(params);
+            }
+        }
+    }
+
+
     function testEmptyOracleArrayFirst() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
@@ -321,7 +354,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
             initialWeights,
             initialWeights,
             3600,
-            0,
+            16,
             new string[][](0)
         );
     }

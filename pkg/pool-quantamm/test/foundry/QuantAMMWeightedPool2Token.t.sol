@@ -623,7 +623,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
             initialWeights,
             initialWeights,
             3600,
-            0,
+            16,
             new string[][](0)
         );
     }

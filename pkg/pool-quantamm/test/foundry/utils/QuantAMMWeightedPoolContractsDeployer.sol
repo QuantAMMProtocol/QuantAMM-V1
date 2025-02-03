@@ -191,6 +191,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
             "Pool v1"
         ));
         QuantAMMWeightedPoolFactory.NewPoolParams memory poolCreateSettings = _createPoolParams(tokens, rateProviders);
+        
         (newPoolAddress, poolArgsRet) =  QuantAMMWeightedPoolFactory(deployerFactory).create(poolCreateSettings);
        
         vm.label(newPoolAddress, label);

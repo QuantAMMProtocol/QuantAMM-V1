@@ -255,12 +255,7 @@ abstract contract ScalarQuantAMMBaseStorage {
 
         if (targetArrayLength == 0) {
             unchecked {
-                if (_sourceArray.length <= 8) {
-                    targetArrayLength = 1;
-                } else {
-                    targetArrayLength = (nonStickySourceLength / 8) + 1;
-                }
-
+                targetArrayLength = (nonStickySourceLength / 8) + 1;
                 targetArray = new int256[](targetArrayLength);
             }
         }

@@ -176,7 +176,10 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
             }
             locals.calculationMovingAverage[locals.lastAssetIndex] = locals.updatedMovingAverage[locals.lastAssetIndex];
             if (!locals.requiresPrevAverage) {
-                movingAverages[_pool][locals.nMinusOne] = locals.updatedMovingAverage[locals.lastAssetIndex];
+                movingAverages[_pool][locals.nMinusOne] = _quantAMMPackTwo128(
+                    locals.updatedMovingAverage[locals.lastAssetIndex],
+                    int256(0)
+                );
             }
         }
 

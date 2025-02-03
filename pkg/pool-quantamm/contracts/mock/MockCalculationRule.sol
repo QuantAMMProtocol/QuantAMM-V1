@@ -95,6 +95,10 @@ contract MockCalculationRule is
         _setIntermediateVariance(poolAddress, _initialValues, _numberOfAssets);
     }
 
+    function getIntermediateVariance(address poolAddress, uint _numberOfAssets) external view returns (int256[] memory) {
+        return _quantAMMUnpack128Array(intermediateVarianceStates[poolAddress], _numberOfAssets);
+    }
+
     function setInitialCovariance(
         address poolAddress,
         int256[][] memory _initialValues,

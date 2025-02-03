@@ -77,6 +77,16 @@ contract QuantAMMVarianceTest is Test, QuantAMMTestUtils {
         }
     }
 
+    // Check results with tolerance
+    function checkResult(
+        int256[][] memory res,
+        int256[][] memory expectedRes
+    ) internal pure {
+        for (uint256 i = 0; i < res.length; i++) {
+            assertEq(expectedRes[i], res[i]); // Compare for exact equality
+        }
+    }
+
     // Variance Matrix Calculation
     // 2 tokens
     function testVarianceCalculation2Tokens() public {
@@ -143,4 +153,31 @@ contract QuantAMMVarianceTest is Test, QuantAMMTestUtils {
 
         testVariance(priceData, priceDataBn, movingAverages, initialVariance, expectedRes);
     }
+
+    function testFuzz_VarianceSetIntermediateVariance(uint unboundNumAssets) public {
+        uint numAssets = bound(unboundNumAssets, 2, 8);
+        mockPool.setNumberOfAssets(numAssets);
+        int256[] memory initialVariance = new int256[](numAssets);
+        for(uint i = 0; i < numAssets; i++) {
+            initialVariance[i] = PRBMathSD59x18.fromInt(int256(i));
+        }
+
+        mockCalculationRule.setInitialVariance(address(mockPool), initialVariance, numAssets);
+
+        int256[] memory savedInitialVariance = mockCalculationRule.getIntermediateVariance(address(mockPool), numAssets);
+
+        checkResult(initialVariance, savedInitialVariance);
+        
+        for(uint i = 0; i < numAssets; i++) {
+            initialVariance[i] = PRBMathSD59x18.fromInt(int256(i)) + PRBMathSD59x18.fromInt(int256(1));
+        }
+        
+        //break glass post initialisation
+        mockCalculationRule.setInitialVariance(address(mockPool), initialVariance, numAssets);
+
+        savedInitialVariance = mockCalculationRule.getIntermediateVariance(address(mockPool), numAssets);
+
+        checkResult(initialVariance, savedInitialVariance);
+        
+    } 
 }

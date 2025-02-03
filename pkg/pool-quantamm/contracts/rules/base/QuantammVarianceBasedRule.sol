@@ -200,8 +200,12 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
         uint _numberOfAssets
     ) internal {
         uint storeLength = intermediateVarianceStates[_poolAddress].length;
+        bool evenInitialValues = _initialValues.length % 2 == 0;
 
-        if ((storeLength == 0 && _initialValues.length == _numberOfAssets) || _initialValues.length == storeLength) {
+        if ((_initialValues.length == _numberOfAssets) && 
+        (storeLength == 0 
+        || evenInitialValues && _initialValues.length / 2 == storeLength
+        || !evenInitialValues && (_initialValues.length + 1) / 2 == storeLength)) {
             //should be during create pool
             intermediateVarianceStates[_poolAddress] = _quantAMMPack128Array(_initialValues);
         } else {

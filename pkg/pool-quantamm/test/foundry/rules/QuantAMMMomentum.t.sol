@@ -88,6 +88,62 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         assertTrue(result);
     }
 
+    function testFuzz_TestPositiveNumberUseRawPriceFalseShouldBeAccepted(int256 param) public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18()));
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0;
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
+    function testFuzz_TestPositiveNumberUseRawPriceTrueShouldBeAccepted(int256 param) public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18()));
+        parameters[1] = new int256[](1);
+        parameters[1][0] = PRBMathSD59x18.fromInt(1);
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
+    function testVectorParamUseRawFalsePriceAccepted() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(42);
+        parameters[0][1] = PRBMathSD59x18.fromInt(42);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0;
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
+    function testVectorParamUseRawPriceTrueAccepted() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(42);
+        parameters[0][1] = PRBMathSD59x18.fromInt(42);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = PRBMathSD59x18.fromInt(1);
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
+    function testVectorParamsBadUseRawPriceRejected(int256 badUseRawPrice) public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(42);
+        parameters[0][1] = PRBMathSD59x18.fromInt(42);
+        parameters[1] = new int256[](1);
+        if(badUseRawPrice != 0 && badUseRawPrice != PRBMathSD59x18.fromInt(1)){
+            parameters[1][0] = badUseRawPrice;
+            bool result = rule.validParameters(parameters);
+            assertFalse(result);
+        }
+    }
+
+
     function testFuzz_TestPositiveNumberShouldBeAccepted(int256 param) public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);

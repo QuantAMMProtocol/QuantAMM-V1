@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import "../../rules/UpdateRule.sol";
 
-contract MockUpdateRule is UpdateRule {
+contract MockPrevAverageUpdateRule is UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {}
 
     int256[] weights;
@@ -38,7 +38,7 @@ contract MockUpdateRule is UpdateRule {
     }
 
     function _requiresPrevMovingAverage() internal pure virtual override returns (uint16) {
-        return 0;
+        return 1;
     }
 
     function _setInitialIntermediateValues(

@@ -244,7 +244,7 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
         //initialisation is controlled during the registration process
         //this is to make sure no external actor can call this function
         require(msg.sender == _poolAddress || msg.sender == updateWeightRunner, "UNAUTH");
-        _setInitialMovingAverages(_poolAddress, _newMovingAverages, _numberOfAssets);
+        _setInitialMovingAverages(_poolAddress, _newMovingAverages, _numberOfAssets, _requiresPrevMovingAverage() == REQ_PREV_MAVG_VAL);
         _setInitialIntermediateValues(_poolAddress, _newInitialValues, _numberOfAssets);
     }
 

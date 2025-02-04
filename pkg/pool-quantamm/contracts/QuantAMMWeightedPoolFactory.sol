@@ -15,6 +15,7 @@ import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Vers
 
 import { IQuantAMMWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 import { QuantAMMWeightedPool } from "./QuantAMMWeightedPool.sol";
+import { IHooks } from "@balancer-labs/v3-interfaces/contracts/vault/IHooks.sol";
 
 /**
  * @param name The name of the pool
@@ -36,6 +37,9 @@ import { QuantAMMWeightedPool } from "./QuantAMMWeightedPool.sol";
  */
 contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
     // solhint-disable not-rely-on-time
+
+    /// @notice Unsafe or bad configuration for routers and liquidity management
+    error ImcompatibleRouterConfiguration();
 
     struct NewPoolParams {
         string name;
@@ -87,6 +91,11 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
             revert StandardPoolWithCreator();
         }
 
+        if(params.poolHooksContract != address(0) 
+            && IHooks(params.poolHooksContract).getHookFlags().enableHookAdjustedAmounts != params.disableUnbalancedLiquidity){
+            revert ImcompatibleRouterConfiguration();
+        }
+        
         LiquidityManagement memory liquidityManagement = getDefaultLiquidityManagement();
         liquidityManagement.enableDonation = params.enableDonation;
         // disableUnbalancedLiquidity must be set to true if a hook has the flag enableHookAdjustedAmounts = true.
@@ -132,11 +141,12 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         if (params.roleAccounts.poolCreator != address(0)) {
             revert StandardPoolWithCreator();
         }
-
+        
         LiquidityManagement memory liquidityManagement = getDefaultLiquidityManagement();
         liquidityManagement.enableDonation = params.enableDonation;
         // disableUnbalancedLiquidity must be set to true if a hook has the flag enableHookAdjustedAmounts = true.
         liquidityManagement.disableUnbalancedLiquidity = params.disableUnbalancedLiquidity;
+
         poolArgs = abi.encode(
                 QuantAMMWeightedPool.NewPoolParams({
                     name: params.name,

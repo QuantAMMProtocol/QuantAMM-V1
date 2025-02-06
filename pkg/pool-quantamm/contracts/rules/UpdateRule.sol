@@ -75,7 +75,7 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
     /// @param _parameters the parameters of the rule that are not lambda
     /// @param _lambdaStore either vector or scalar lambda
     /// @param _epsilonMax the maximum weights can change in a given update interval
-    /// @param _absoluteWeightGuardRail the maximum weight a token can have
+    /// @param _absoluteWeightGuardRail the minimum weight a token can have
     function CalculateNewWeights(
         int256[] calldata _prevWeights,
         int256[] calldata _data,

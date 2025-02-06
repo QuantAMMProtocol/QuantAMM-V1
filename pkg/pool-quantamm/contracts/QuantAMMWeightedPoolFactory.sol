@@ -91,6 +91,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         liquidityManagement.enableDonation = params.enableDonation;
         // disableUnbalancedLiquidity must be set to true if a hook has the flag enableHookAdjustedAmounts = true.
         liquidityManagement.disableUnbalancedLiquidity = params.disableUnbalancedLiquidity;
+        require(params.tokens.length == params.normalizedWeights.length, "Token and weight counts must match");
         
         pool = _create(abi.encode(
                 QuantAMMWeightedPool.NewPoolParams({

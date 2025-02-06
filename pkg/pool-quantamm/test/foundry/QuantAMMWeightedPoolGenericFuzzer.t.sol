@@ -1,4 +1,4 @@
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
 
@@ -65,8 +65,8 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
     uint256 private constant _MIN_INVARIANT_RATIO = 70e16; // 70%
 
     //@audit taken from WeightedMath.sol for Swap limits
-    uint256 internal constant _MAX_IN_RATIO = 10e16; // 20%
-    uint256 internal constant _MAX_OUT_RATIO = 10e16; // 20%
+    uint256 internal constant _MAX_IN_RATIO = 0.2e18; // 20%
+    uint256 internal constant _MAX_OUT_RATIO = 0.2e18; // 20%
 
     struct TestParam {
         //@audit convention for struct is camel case starting with capital letter
@@ -251,7 +251,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                     lambda: new uint64[](0),
                     epsilonMax: 0,
                     absoluteWeightGuardRail: 0,
-                    maxTradeSizeRatio: 0.3e18,
+                    maxTradeSizeRatio: 0.1e18,
                     ruleParameters: new int256[][](0),
                     poolManager: address(0)
                 }),
@@ -801,20 +801,6 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
     }
 
     function _testSwapExactIn(FuzzParams memory params, SwapFuzzParams memory swapParams) internal {
-        for(uint i = 0; i < params.numTokens; i++){
-            for(uint j = 0; j < params.numTokens; j++){
-                if(i != j){
-                    // For ExactIn:
-                    uint256 expectedAmountOut = WeightedMath.computeOutGivenExactIn(
-                        variables.balances[variables.firstWeight.index],
-                        poolWeights[variables.firstWeight.index],
-                        variables.balances[variables.secondWeight.index],
-                        poolWeights[variables.secondWeight.index],
-                        swapParams.exactIn
-                    );
-                }
-            }
-        }
         uint40 timestamp = uint40(block.timestamp);
         VariationTestVariables memory variables;
 
@@ -856,6 +842,21 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                         vm.warp(timestamp + params.delay);
                     }
 
+                    // get the pool weights
+                    uint256[] memory poolWeights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
+
+
+                    // For ExactIn:
+                    uint256 expectedAmountOut = WeightedMath.computeOutGivenExactIn(
+                        variables.balances[variables.firstWeight.index],
+                        poolWeights[variables.firstWeight.index],
+                        variables.balances[variables.secondWeight.index],
+                        poolWeights[variables.secondWeight.index],
+                        swapParams.exactIn
+                    );
+
+                    vm.assume(expectedAmountOut < variables.balances[variables.secondWeight.index].mulDown(_min(_MAX_IN_RATIO, uint256(params.poolParams.maxTradeSizeRatio))));
+
                     variables.swapParams = PoolSwapParams({
                         kind: SwapKind.EXACT_IN,
                         amountGivenScaled18: swapParams.exactIn,
@@ -868,18 +869,6 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
 
                     vm.prank(address(vault));
                     uint256 amountOut = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(variables.swapParams);
-
-                    // get the pool weights
-                    uint256[] memory poolWeights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
-
-                    // For ExactIn:
-                    uint256 expectedAmountOut = WeightedMath.computeOutGivenExactIn(
-                        variables.balances[variables.firstWeight.index],
-                        poolWeights[variables.firstWeight.index],
-                        variables.balances[variables.secondWeight.index],
-                        poolWeights[variables.secondWeight.index],
-                        swapParams.exactIn
-                    );
 
                     assertApproxEqRel(amountOut, expectedAmountOut, 1e12); // Allow very small relative error
                 }

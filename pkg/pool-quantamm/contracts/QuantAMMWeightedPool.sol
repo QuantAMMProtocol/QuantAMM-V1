@@ -285,7 +285,6 @@ contract QuantAMMWeightedPool is
                 request.amountGivenScaled18
             );
 
-
             if (amountOutScaled18 > request.balancesScaled18[request.indexOut].mulDown(maxTradeSizeRatio)) {
                 revert maxTradeSizeRatioExceeded();
             }

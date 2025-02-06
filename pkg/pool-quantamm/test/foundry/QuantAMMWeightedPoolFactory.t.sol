@@ -91,6 +91,15 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         quantAMMWeightedPoolFactory.create(params);
     }
 
+    function test0UpdateInterval() public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+
+        params._poolSettings.updateInterval = 0;
+
+        vm.expectRevert("Update interval must be greater than 0");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
     function testUnapprovedOracleArray() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 

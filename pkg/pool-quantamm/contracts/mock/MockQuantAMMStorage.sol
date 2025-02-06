@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24;
 import "../QuantAMMStorage.sol";
+import "forge-std/Test.sol";
 
 contract MockQuantAMMStorage is ScalarRuleQuantAMMStorage, ScalarQuantAMMBaseStorage, VectorRuleQuantAMMStorage {
     int256[] public mockQuantAMMMatrix;
@@ -8,6 +9,12 @@ contract MockQuantAMMStorage is ScalarRuleQuantAMMStorage, ScalarQuantAMMBaseSto
 
     function ExternalEncode(int256 leftInt, int256 rightInt) external pure returns (int256 result) {
         result = _quantAMMPackTwo128(leftInt, rightInt);
+    }
+
+    function ExternalDecode(int256 sourceInt) external pure returns (int256[] memory result) {
+        int256[] memory sourceArray = new int256[](1);
+        sourceArray[0] = sourceInt;
+        return _quantAMMUnpack128Array(sourceArray, 2);
     }
 
     function ExternalEncode(int64 leftInt, int128 rightInt) external pure returns (int256 result) {

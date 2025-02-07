@@ -184,6 +184,35 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
         assertEq(retType, "error");
         assertEq(name, "detail not found");
     }
+    
+
+    function testOwnerSetUpdateWeightRunnerAddress() public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        vm.startPrank(owner);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
+        QuantAMMWeightedPool(quantAMMWeightedPool).setUpdateWeightRunnerAddress(addr1);
+        vm.stopPrank();
+        assertEq(address(QuantAMMWeightedPool(quantAMMWeightedPool).updateWeightRunner()), addr1);
+    }
+
+    function testNonOwnerSetUpdateWeightRunnerAddress() public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        vm.startPrank(owner);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
+        vm.stopPrank();
+
+        vm.startPrank(addr1);
+        vm.expectRevert("ONLYADMIN");
+        QuantAMMWeightedPool(quantAMMWeightedPool).setUpdateWeightRunnerAddress(addr1);
+    }
+
+    function test0AddressSetUpdateWeightRunnerAddress() public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        vm.startPrank(owner);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
+        vm.expectRevert("INVADDRESS");
+        QuantAMMWeightedPool(quantAMMWeightedPool).setUpdateWeightRunnerAddress(address(0));
+    }
 
     function testGetPoolDetailsNameNotFound() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();

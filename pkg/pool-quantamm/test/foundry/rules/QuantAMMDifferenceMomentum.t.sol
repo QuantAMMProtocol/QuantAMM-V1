@@ -147,7 +147,7 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(42);
-        parameters[0][1] = PRBMathSD59x18.fromInt(-42);
+        parameters[0][1] = PRBMathSD59x18.fromInt(-43);
         parameters[1] = new int256[](1);
         parameters[1][0] = 0.5e18;
         bool result = rule.validParameters(parameters);
@@ -200,12 +200,24 @@ contract DifferenceMomentumRuleTest is Test, QuantAMMTestUtils {
         int256[][] memory parameters = new int256[][](2);
         parameters[0] = new int256[](2);
         parameters[0][0] = PRBMathSD59x18.fromInt(1);
-        parameters[0][1] = -PRBMathSD59x18.fromInt(1);
+        parameters[0][1] = -PRBMathSD59x18.fromInt(2);
         parameters[1] = new int256[](2);
         parameters[1][0] = 0.5e18;
         parameters[1][1] = 0.5e18;
         bool result = rule.validParameters(parameters);
         assertTrue(result);
+    }
+
+    function testSumKappa0ShouldNotBeAccepted() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(1);
+        parameters[0][1] = -PRBMathSD59x18.fromInt(1);
+        parameters[1] = new int256[](2);
+        parameters[1][0] = 0.5e18;
+        parameters[1][1] = 0.5e18;
+        bool result = rule.validParameters(parameters);
+        assertFalse(result);
     }
 
     function testCorrectUpdateWithHigherPrice_scalarParams() public {

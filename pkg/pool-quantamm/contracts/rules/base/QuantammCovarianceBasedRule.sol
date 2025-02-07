@@ -30,7 +30,6 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
     /// @param intermediateState intermediate state during a covariance matrix calculation
     struct QuantAMMCovariance {
         uint256 n;
-        uint256 nSquared;
         int256[][] intermediateCovarianceState;
         int256[][] newState;
         int256[] u;
@@ -50,13 +49,12 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
     ) internal returns (int256[][] memory) {
         QuantAMMCovariance memory locals;
         locals.n = _poolParameters.numberOfAssets; // Dimension of square matrix
-        locals.nSquared = locals.n * locals.n;
         int256[][] memory intermediateCovarianceState = _quantAMMUnpack128Matrix(
             intermediateCovarianceStates[_poolParameters.pool],
             locals.n
         );
 
-        int256[][] memory newState = new int256[][](locals.nSquared);
+        int256[][] memory newState = new int256[][](locals.n);
 
         locals.u = new int256[](locals.n); // (p(t) - p̅(t - 1))
         locals.v = new int256[](locals.n); // (p(t) - p̅(t))

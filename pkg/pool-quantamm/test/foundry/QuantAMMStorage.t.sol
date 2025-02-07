@@ -34,7 +34,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
 
         for(uint256 i = 0; i < boundArrayLength; i++) {
             targetValues[i] = boundOverMax32;
-            vm.expectRevert("Overflow");
+            vm.expectRevert("Overflow/Underflow");
             mockQuantAMMStorage.ExternalQuantAMMPack32Array(targetValues);
             targetValues[i] = 1e9;
         }
@@ -50,7 +50,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
 
         for(uint256 i = 0; i < boundArrayLength; i++) {
             targetValues[i] = boundUnder32;
-            vm.expectRevert("Overflow");
+            vm.expectRevert("Overflow/Underflow");
             mockQuantAMMStorage.ExternalQuantAMMPack32Array(targetValues);
             targetValues[i] = 1e9;
         }

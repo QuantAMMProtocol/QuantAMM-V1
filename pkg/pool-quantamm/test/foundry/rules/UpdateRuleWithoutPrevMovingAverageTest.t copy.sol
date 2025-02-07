@@ -2,7 +2,9 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
+
 import "../../../contracts/mock/mockRules/MockUpdateRule.sol";
+import "../../../contracts/mock/mockRules/MockPrevAverageRule.sol";
 import "../../../contracts/mock/MockPool.sol";
 import "../utils.t.sol";
 
@@ -13,13 +15,15 @@ contract WithoutPrevMovingAverageUpdateRuleTest is Test, QuantAMMTestUtils {
 
     MockPool public mockPool;
     MockUpdateRule updateRule;
+    MockPrevAverageUpdateRule prevAverageUpdateRule;
 
     function setUp() public {
         (address ownerLocal, address addr1Local, address addr2Local) = (vm.addr(1), vm.addr(2), vm.addr(3));
         owner = ownerLocal;
         addr1 = addr1Local;
         addr2 = addr2Local;
-        updateRule = new MockUpdateRule(owner);        
+        updateRule = new MockUpdateRule(owner);      
+        prevAverageUpdateRule = new MockPrevAverageUpdateRule(owner);  
     }
 
     function testUpdateRuleUnAuthCalc() public {
@@ -153,6 +157,92 @@ contract WithoutPrevMovingAverageUpdateRuleTest is Test, QuantAMMTestUtils {
 
         checkResult(movingAverages, savedMovAverages);
 
+        vm.stopPrank();
+    }
+
+    function testFuzz_UpdateRuleMovingAverageStorage(uint unboundNumAssets, bool requiresPrevMovingAverage) public {
+        IUpdateRule targetRule = requiresPrevMovingAverage ? IUpdateRule(prevAverageUpdateRule) : IUpdateRule(updateRule);
+        uint numAssets = bound(unboundNumAssets, 2, 8);
+        vm.startPrank(owner);
+        uint numMovingAverages = requiresPrevMovingAverage ? numAssets * 2 : numAssets;
+
+        int256 one = PRBMathSD59x18.fromInt(1);
+
+         // Define local variables for the parameters
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(1);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = PRBMathSD59x18.fromInt(1);
+
+        int256[] memory previousAlphas = new int256[](numAssets);
+        for(uint i = 0; i < numAssets; i++) {
+            previousAlphas[i] = PRBMathSD59x18.fromInt(int256(i)) + one;
+        }
+
+        int256[] memory movingAverages = new int256[](numMovingAverages);
+        for(uint i = 0; i < numMovingAverages; i++) {
+            movingAverages[i] = PRBMathSD59x18.fromInt(int256(i)) + one;
+        }
+
+        uint64[] memory lambdas = new uint64[](1);
+        lambdas[0] = uint64(0.7e18);
+
+        int256[] memory prevWeights = new int256[](numAssets);
+        for(uint i = 0; i < numAssets; i++) {
+            prevWeights[i] = PRBMathSD59x18.fromInt(1) / int256(numAssets);
+        }
+
+        int256[] memory data = new int256[](numAssets);
+        for(uint i = 0; i < numAssets; i++) {
+            data[i] = PRBMathSD59x18.fromInt(int256(i)) + one;
+        }
+
+        if(requiresPrevMovingAverage) {
+            MockPrevAverageUpdateRule(address(targetRule)).setWeights(prevWeights);
+        }
+        else{
+            MockUpdateRule(address(targetRule)).setWeights(prevWeights);
+        }
+        
+        targetRule.initialisePoolRuleIntermediateValues(
+            address(mockPool),
+            movingAverages,
+            previousAlphas,
+            numAssets
+        );
+
+        int256[] memory savedMovAverages;
+        if(requiresPrevMovingAverage) {
+            savedMovAverages = MockPrevAverageUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numMovingAverages);
+        }
+        else{
+            savedMovAverages = MockUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numMovingAverages);
+        }
+
+        checkResult(movingAverages, savedMovAverages);
+        
+        for(uint i = 0; i < numMovingAverages; i++) {
+            movingAverages[i] = movingAverages[i] + one;
+        }
+
+        //break glass set again after initialisation
+        targetRule.initialisePoolRuleIntermediateValues(
+            address(mockPool),
+            movingAverages,
+            previousAlphas,
+            numAssets
+        );
+
+        if(requiresPrevMovingAverage) {
+            savedMovAverages = MockPrevAverageUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numMovingAverages);
+        }
+        else{
+            savedMovAverages = MockUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numMovingAverages);
+        }
+
+        checkResult(movingAverages, savedMovAverages);
+        
         vm.stopPrank();
     }
     

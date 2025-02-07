@@ -62,11 +62,13 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
     function _setInitialMovingAverages(
         address _poolAddress,
         int256[] memory _initialMovingAverages,
-        uint _numberOfAssets
+        uint _numberOfAssets,
+        bool _requiresPrevMovingAverage
     ) internal {
-        uint movingAverageLength = movingAverages[_poolAddress].length;
-
-        if (movingAverageLength == 0 || _initialMovingAverages.length == _numberOfAssets) {
+        uint prevAverageDivider = _requiresPrevMovingAverage ? 2 : 1;
+        
+        if (_initialMovingAverages.length == _numberOfAssets * prevAverageDivider)  
+        {
             //should be during create pool
             movingAverages[_poolAddress] = _quantAMMPack128Array(_initialMovingAverages);
         } else {

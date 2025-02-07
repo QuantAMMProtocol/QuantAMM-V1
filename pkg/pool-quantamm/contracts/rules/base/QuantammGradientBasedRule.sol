@@ -93,6 +93,7 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
                     locals.intermediateGradientState[i],
                     locals.secondIntermediateValue
                 );
+                
                 // the storage array is tracked separately
                 unchecked {
                     i += 2;
@@ -112,7 +113,10 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
                         oneMinusLambda
                     );
 
-                intermediateGradientStates[_poolParameters.pool][locals.storageArrayIndex] = locals.intermediateValue;
+                intermediateGradientStates[_poolParameters.pool][locals.storageArrayIndex] = _quantAMMPackTwo128(
+                    locals.intermediateValue,
+                    int256(0)
+                );
 
                 locals.finalValues[numberOfAssetsMinusOne] = locals.mulFactor.mul(locals.intermediateValue);
             }

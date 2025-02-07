@@ -97,7 +97,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
                     name: params.name,
                     symbol: params.symbol,
                     numTokens: params.normalizedWeights.length,
-                    version: "version",
+                    version: _poolVersion,
                     updateWeightRunner: _updateWeightRunner,
                     poolRegistry: params.poolRegistry,
                     poolDetails: params.poolDetails

@@ -236,6 +236,7 @@ contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
         require(address(rules[msg.sender]) == address(0), "Rule already set");
         require(_poolSettings.oracles.length > 0, "Empty oracles array");
         require(poolOracles[msg.sender].length == 0, "pool rule already set");
+        
 
         for (uint i; i < _poolSettings.oracles.length; ++i) {
             require(_poolSettings.oracles[i].length > 0, "Empty oracles array");

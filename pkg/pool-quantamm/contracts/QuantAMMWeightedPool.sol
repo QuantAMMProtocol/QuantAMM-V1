@@ -786,6 +786,7 @@ contract QuantAMMWeightedPool is
         ); //Invalid absoluteWeightGuardRail value
 
         require(_poolSettings.oracles.length > 0, "NOPROVORC"); //No oracle indices provided
+        require(_poolSettings.oracles.length == _initialWeights.length, "OLNWEIG"); //Oracle length not equal to weights length
         require(_poolSettings.rule.validParameters(_poolSettings.ruleParameters), "INVRLEPRM"); //Invalid rule parameters
 
         //0 is hodl, 1 is trade whole pool which invariant doesnt let you do anyway

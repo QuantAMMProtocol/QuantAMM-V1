@@ -578,8 +578,8 @@ contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
         //CYFRIN L-02
         for (uint i; i < _weights.length; i++) {
             if (i < _numberOfAssets) {
-                require(_weights[i] > 0, "Negative weight not allowed");
-                require(_weights[i] < 1e18, "greater than 1 weight not allowed");
+                require(_weights[i] >= 0.01e18, "Below min allowed weight");
+                require(_weights[i] <= 0.99e18, "Above max allowed weight");
             }
         }
 

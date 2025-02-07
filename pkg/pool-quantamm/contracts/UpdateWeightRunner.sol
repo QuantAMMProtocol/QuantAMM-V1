@@ -418,7 +418,7 @@ contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
     function _performUpdateAndGetData(
         address _poolAddress,
         PoolRuleSettings memory _ruleSettings
-    ) private returns (int256[] memory) {
+    ) private {
         uint256[] memory currentWeightsUnsigned = IWeightedPool(_poolAddress).getNormalizedWeights();
         int256[] memory currentWeights = new int256[](currentWeightsUnsigned.length);
 
@@ -430,7 +430,7 @@ contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
             }
         }
 
-        (int256[] memory updatedWeights, int256[] memory data) = _getUpdatedWeightsAndOracleData(
+        (int256[] memory updatedWeights, ) = _getUpdatedWeightsAndOracleData(
             _poolAddress,
             currentWeights,
             _ruleSettings
@@ -445,8 +445,6 @@ contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
                 poolAddress: _poolAddress
             })
         );
-
-        return data;
     }
 
     struct CalculateMuliplierAndSetWeightsLocal {

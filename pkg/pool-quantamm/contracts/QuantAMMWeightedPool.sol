@@ -153,7 +153,7 @@ contract QuantAMMWeightedPool is
     ///@dev Maximum allowed delta for a weight update, stored as SD59x18 number
     uint64 public epsilonMax; // Maximum allowed delta for a weight update, stored as SD59x18 number
 
-    ///@dev Maximum allowed absolute weight allowed.
+    ///@dev Minimum absolute weight allowed.
     uint64 public absoluteWeightGuardRail;
 
     ///@dev maximum trade size allowed as a fraction of the pool

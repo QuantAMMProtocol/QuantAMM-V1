@@ -47,7 +47,7 @@ interface IQuantAMMWeightedPool {
         * @param ruleParameters The parameters for the rule, validated in each rule separately during set rule
         * @param lambda Decay parameter for exponentially-weighted moving average (0 < λ < 1)
         * @param epsilonMax Maximum allowed delta for a weight update, stored as SD59x18 number
-        * @param absoluteWeightGuardRail Maximum allowed absolute weight allowed.
+        * @param absoluteWeightGuardRail Minimum absolute weight allowed.
         * @param maxTradeSizeRatio maximum trade size allowed as a fraction of the pool
         * @param updateInterval Minimum amount of seconds between two updates
      */

@@ -93,7 +93,7 @@ contract QuantAMMWeightedPool is
     //packed: [weight5,weight6,weight7,weight8,multiplier5,multiplier6,multiplier7,multiplier8]
     int256 internal _normalizedSecondFourWeights;
 
-    UpdateWeightRunner internal updateWeightRunner;
+    UpdateWeightRunner public updateWeightRunner;
 
     address internal immutable quantammAdmin;
 
@@ -816,6 +816,8 @@ contract QuantAMMWeightedPool is
     /// @inheritdoc IQuantAMMWeightedPool
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
+        require(_updateWeightRunner != address(0), "INVADDRESS");
+
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
         emit UpdateWeightRunnerAddressUpdated(address(updateWeightRunner), _updateWeightRunner);
     }

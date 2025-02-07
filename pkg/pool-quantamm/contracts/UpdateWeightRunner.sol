@@ -48,7 +48,7 @@ updates and guard rails.
 
 /// @title UpdateWeightRunner singleton contract that is responsible for running all weight updates
 
-contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
+contract UpdateWeightRunner is IUpdateWeightRunner {
     event OracleAdded(address indexed oracleAddress);
     event OracleRemved(address indexed oracleAddress);
     event SetWeightManual(
@@ -226,6 +226,7 @@ contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
     /// @param _pool Pool to set actions for
     function setApprovedActionsForPool(address _pool, uint256 _actions) external {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
+        require(_action != )
         approvedPoolActions[_pool] = _actions;
         emit SetApprovedActionsForPool(msg.sender, _pool, _actions);
     }

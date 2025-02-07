@@ -294,10 +294,6 @@ contract QuantAMMWeightedPool is
         }
 
         if (request.kind == SwapKind.EXACT_IN) {
-            if (request.amountGivenScaled18 > request.balancesScaled18[request.indexIn].mulDown(maxTradeSizeRatio)) {
-                revert maxTradeSizeRatioExceeded();
-            }
-
             uint256 amountOutScaled18 = WeightedMath.computeOutGivenExactIn(
                 request.balancesScaled18[request.indexIn],
                 tokenInWeight,
@@ -306,13 +302,12 @@ contract QuantAMMWeightedPool is
                 request.amountGivenScaled18
             );
 
-            return amountOutScaled18;
-        } else {
-            // Cannot exceed maximum out ratio
-            if (request.amountGivenScaled18 > request.balancesScaled18[request.indexOut].mulDown(maxTradeSizeRatio)) {
+            if (amountOutScaled18 > request.balancesScaled18[request.indexOut].mulDown(maxTradeSizeRatio)) {
                 revert maxTradeSizeRatioExceeded();
             }
 
+            return amountOutScaled18;
+        } else {
             uint256 amountInScaled18 = WeightedMath.computeInGivenExactOut(
                 request.balancesScaled18[request.indexIn],
                 tokenInWeight,

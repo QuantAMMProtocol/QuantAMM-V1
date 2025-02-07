@@ -196,16 +196,16 @@ contract QuantAMMWeightedPool is
         uint256 invariantRatio
     ) external view returns (uint256 newBalance) {
         uint40 multiplierTime = uint40(block.timestamp);
-        uint40 lastInterpolationTime = poolSettings.quantAMMBaseInterpolationDetails.lastPossibleInterpolationTime;
+        QuantAMMBaseInterpolationVariables memory variables = poolSettings.quantAMMBaseInterpolationDetails;
 
-        if (block.timestamp >= lastInterpolationTime) {
+        if (block.timestamp >= variables.lastPossibleInterpolationTime) {
             //we have gone beyond the first variable hitting the guard rail. We cannot interpolate any further and an update is needed
-            multiplierTime = lastInterpolationTime;
+            multiplierTime = variables.lastPossibleInterpolationTime;
         }
 
         unchecked {
             uint256 timeSinceLastUpdate = uint256(
-                multiplierTime - poolSettings.quantAMMBaseInterpolationDetails.lastUpdateIntervalTime
+                multiplierTime - variables.lastUpdateIntervalTime
             );
 
             return

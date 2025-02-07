@@ -258,7 +258,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                 _initialMovingAverages: initialWeights,
                 _initialIntermediateValues: initialWeights,
                 _oracleStalenessThreshold: 3600,
-                poolRegistry: 0,
+                poolRegistry: 16,
                 poolDetails: new string[][](0)
             });
     }

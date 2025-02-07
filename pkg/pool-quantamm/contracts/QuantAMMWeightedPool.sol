@@ -178,6 +178,23 @@ contract QuantAMMWeightedPool is
         _totalTokens = params.numTokens;
         updateWeightRunner = UpdateWeightRunner(params.updateWeightRunner);
         quantammAdmin = updateWeightRunner.quantammAdmin();
+
+        //from update weight runner
+        uint256 MASK_POOL_PERFORM_UPDATE = 1;
+        uint256 MASK_POOL_GET_DATA = 2;
+        uint256 MASK_POOL_OWNER_UPDATES = 8;
+        uint256 MASK_POOL_QUANTAMM_ADMIN_UPDATES = 16;
+        uint256 MASK_POOL_RULE_DIRECT_SET_WEIGHT = 32;
+
+        require(
+            (params.poolRegistry & MASK_POOL_PERFORM_UPDATE > 0) ||
+            (params.poolRegistry & MASK_POOL_GET_DATA > 0) ||
+            (params.poolRegistry & MASK_POOL_OWNER_UPDATES > 0) ||
+            (params.poolRegistry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0) ||
+            (params.poolRegistry & MASK_POOL_RULE_DIRECT_SET_WEIGHT > 0),
+            "Invalid pool registry"
+        );
+
         poolRegistry = params.poolRegistry;
 
         require(params.poolDetails.length <= 50, "Limit exceeds array length");

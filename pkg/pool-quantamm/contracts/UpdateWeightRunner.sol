@@ -275,7 +275,7 @@ contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
         );
     }
 
-    /// @notice Run the update for the provided rule. Last update must be performed more than updateInterval seconds ago.
+    /// @notice Run the update for the provided rule. Last update must be performed more than or equal to updateInterval seconds ago.
     function performUpdate(address _pool) public {
         //Main external access point to trigger an update
         address rule = address(rules[_pool]);

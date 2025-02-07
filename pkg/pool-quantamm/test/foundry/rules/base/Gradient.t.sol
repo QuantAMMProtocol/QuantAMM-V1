@@ -9,7 +9,7 @@ import { MockQuantAMMMathGuard } from "../../../../contracts/mock/MockQuantAMMMa
 
 import { QuantAMMTestUtils } from "../../utils.t.sol";
 
-contract QuantAMMGradientTests is Test, QuantAMMTestUtils {
+contract QuantAMMGradientRuleTests is Test, QuantAMMTestUtils {
     using PRBMathSD59x18 for int256;
 
     MockCalculationRule mockCalculationRule;

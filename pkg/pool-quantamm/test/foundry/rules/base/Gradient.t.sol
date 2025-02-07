@@ -74,6 +74,56 @@ contract QuantAMMGradientRuleTests is Test, QuantAMMTestUtils {
         }
     }
 
+    function testInitialSettingOfGradients(uint256 unboundedNumberOfAssets) public {
+        uint256 numberOfAssets = bound(unboundedNumberOfAssets,2,8);
+
+        mockPool.setNumberOfAssets(numberOfAssets);
+
+        int256[] memory initialGradients = new int256[](numberOfAssets);
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            initialGradients[i] = PRBMathSD59x18.fromInt(int256(i + 1));
+        }
+
+        mockCalculationRule.setInitialGradient(address(mockPool), initialGradients, numberOfAssets);
+
+        int256[] memory results = mockCalculationRule.getInitialGradient(address(mockPool), numberOfAssets);
+
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            assertEq(results[i], initialGradients[i]);
+        }
+    }
+
+    function testBreakGlassSettingOfGradients(uint256 unboundedNumberOfAssets) public {
+        uint256 numberOfAssets = bound(unboundedNumberOfAssets,2,8);
+
+        mockPool.setNumberOfAssets(numberOfAssets);
+
+        int256[] memory initialGradients = new int256[](numberOfAssets);
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            initialGradients[i] = PRBMathSD59x18.fromInt(int256(i + 1));
+        }
+
+        mockCalculationRule.setInitialGradient(address(mockPool), initialGradients, numberOfAssets);
+
+        int256[] memory results = mockCalculationRule.getInitialGradient(address(mockPool), numberOfAssets);
+
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            assertEq(results[i], initialGradients[i]);
+        }
+
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            initialGradients[i] = PRBMathSD59x18.fromInt(int256(i + 3));
+        }
+
+        mockCalculationRule.setInitialGradient(address(mockPool), initialGradients, numberOfAssets);
+
+        results = mockCalculationRule.getInitialGradient(address(mockPool), numberOfAssets);
+
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            assertEq(results[i], initialGradients[i]);
+        }
+    }
+
     // Mock gradient calculation for different datasets
     // Scalar Lambda parameters
     // 2 tokens

@@ -26,20 +26,12 @@ contract QuantAMMVarianceTest is Test, QuantAMMTestUtils {
         mockQuantAMMMathGuard = new MockQuantAMMMathGuard();
     }
 
-    // Utility to compare results with some tolerance
-    function closeTo(int256 a, int256 b, int256 tolerance) internal pure {
-        int256 delta = (a - b).abs();
-        require(delta <= tolerance, "Values are not within tolerance");
-    }
-
-    // Function to test Variance calculation
-    function testVariance(
+    function calculateVariance (
         int256[][] memory priceData,
         int256[][] memory priceDataBn,
         int256[][] memory movingAverages,
-        int256[] memory initialVariance,
-        int256[][] memory expectedRes
-    ) internal {
+        int256[] memory initialVariance
+    ) internal returns (int256[][] memory) {
         mockCalculationRule.setInitialVariance(address(mockPool), initialVariance, priceData[0].length);
         mockCalculationRule.setPrevMovingAverage(movingAverages[0]);
 
@@ -60,6 +52,17 @@ contract QuantAMMVarianceTest is Test, QuantAMMTestUtils {
             );
             results[i] = mockCalculationRule.getResults();
         }
+        return results;
+    }
+    // Function to test Variance calculation
+    function testVariance(
+        int256[][] memory priceData,
+        int256[][] memory priceDataBn,
+        int256[][] memory movingAverages,
+        int256[] memory initialVariance,
+        int256[][] memory expectedRes
+    ) internal {
+        int256[][] memory results = calculateVariance(priceData, priceDataBn, movingAverages, initialVariance);
 
         checkResult(priceData, results, expectedRes);
     }
@@ -142,5 +145,36 @@ contract QuantAMMVarianceTest is Test, QuantAMMTestUtils {
         );
 
         testVariance(priceData, priceDataBn, movingAverages, initialVariance, expectedRes);
+    }
+        
+    // Fuzz test for Variance calculation with varying number of assets
+    function testVarianceStorageAccessFuzz(uint256 unboundNumAssets, uint256 unboundNumCalcs) public {
+        uint256 numAssets = bound(unboundNumAssets,2,8);
+        uint256 boundNumCalcs = bound(unboundNumCalcs,1,20);
+        mockPool.setNumberOfAssets(numAssets);
+
+        int256[][] memory priceData = new int256[][](boundNumCalcs);
+        int256[][] memory priceDataBn = new int256[][](boundNumCalcs);
+        int256[][] memory movingAverages = new int256[][](boundNumCalcs);
+        int256[] memory initialVariance = new int256[](numAssets);
+
+        for (uint256 i = 0; i < boundNumCalcs; i++) {
+            priceData[i] = new int256[](numAssets);
+            priceDataBn[i] = new int256[](numAssets);
+            movingAverages[i] = new int256[](numAssets * 2);
+
+            for (uint256 j = 0; j < numAssets; j++) {
+                priceData[i][j] = PRBMathSD59x18.fromInt(int256(1000 + i * 100 + j * 10));
+                priceDataBn[i][j] = PRBMathSD59x18.fromInt(int256(1000 + i * 100 + j * 10));
+                movingAverages[i][j] = PRBMathSD59x18.fromInt(int256(1000 + i * 50 + j * 5));
+                movingAverages[i][j + numAssets] = PRBMathSD59x18.fromInt(int256(1000 + i * 50 + j * 5));
+            }
+        }
+
+        for (uint256 i = 0; i < numAssets; i++) {
+            initialVariance[i] = 0;
+        }
+
+        calculateVariance(priceData, priceDataBn, movingAverages, initialVariance);
     }
 }

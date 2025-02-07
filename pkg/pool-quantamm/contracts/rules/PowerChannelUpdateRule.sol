@@ -93,7 +93,7 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 locals.denominator = _data[locals.i];
             }
 
-            locals.intermediateRes = ONE.div(locals.denominator).mul(locals.newWeights[locals.i]);
+            locals.intermediateRes = ONE.mul(locals.newWeights[locals.i]).div(locals.denominator);
 
             unchecked {
                 locals.sign = locals.intermediateRes >= 0 ? ONE : -ONE;

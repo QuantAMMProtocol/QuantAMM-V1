@@ -698,7 +698,9 @@ contract QuantAMMWeightedPool is
         int256[] memory _initialIntermediateValues,
         uint _oracleStalenessThreshold
     ) public initializer {
-        require(_poolSettings.assets.length > 0 && _poolSettings.assets.length == _initialWeights.length, "INVASSWEIG"); //Invalid assets / weights array
+        require(_poolSettings.assets.length > 0 
+        && _poolSettings.assets.length == _initialWeights.length 
+        && _initialWeights.length == _totalTokens, "INVASSWEIG"); //Invalid assets / weights array
 
         assets = _poolSettings.assets;
         poolSettings.assets = new address[](_poolSettings.assets.length);

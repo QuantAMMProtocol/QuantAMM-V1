@@ -22,6 +22,8 @@ import { OracleWrapper } from "@balancer-labs/v3-interfaces/contracts/pool-quant
 import { MockUpdateWeightRunner } from "../../contracts/mock/MockUpdateWeightRunner.sol";
 import { MockMomentumRule } from "../../contracts/mock/mockRules/MockMomentumRule.sol";
 import { MockChainlinkOracle } from "../../contracts/mock/MockChainlinkOracles.sol";
+import { PoolRoleAccounts, TokenConfig, TokenType } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
+import { IRateProvider } from "@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IRateProvider.sol";
 
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 
@@ -170,6 +172,31 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         params._poolSettings.lambda = new uint64[](1);
         params._poolSettings.lambda[0] = 1e18 + 1;
         vm.expectRevert("INVLAM");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
+    function testDifferentWeightLengths() public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        
+        params.normalizedWeights = new uint256[](3);
+        params.normalizedWeights[0] = uint256(0.5e18);
+        params.normalizedWeights[1] = uint256(0.25e18);
+        params.normalizedWeights[2] = uint256(0.25e18);
+
+        vm.expectRevert("INVASSWEIG");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
+    function testDifferentAssetLengths() public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        
+        TokenConfig[] memory tokens = new TokenConfig[](3);
+        tokens[0] = params.tokens[0];
+        tokens[1] = params.tokens[1];
+        tokens[2] = params.tokens[1];
+
+        params.tokens = tokens;
+        vm.expectRevert("INVASSWEIG");
         quantAMMWeightedPoolFactory.create(params);
     }
 

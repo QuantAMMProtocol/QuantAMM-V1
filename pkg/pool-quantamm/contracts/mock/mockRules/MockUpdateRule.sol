@@ -49,3 +49,14 @@ contract MockUpdateRule is UpdateRule {
         intermediateValues = _initialValues;
     }
 }
+contract MockPrevMovingAverageUpdateRule is MockUpdateRule {
+    constructor(address _updateWeightRunner) MockUpdateRule(_updateWeightRunner) {}
+
+    function _requiresPrevMovingAverage() internal pure virtual override returns (uint16) {
+        return 1;
+    }
+
+    function movingAveragesLength(address _pool) public view returns (uint) {
+        return movingAverages[_pool].length;
+    }
+}

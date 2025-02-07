@@ -6,7 +6,7 @@ import "../../../contracts/mock/mockRules/MockUpdateRule.sol";
 import "../../../contracts/mock/MockPool.sol";
 import "../utils.t.sol";
 
-contract UpdateRuleTest is Test, QuantAMMTestUtils {
+contract WithoutPrevMovingAverageUpdateRuleTest is Test, QuantAMMTestUtils {
     address internal owner;
     address internal addr1;
     address internal addr2;
@@ -367,6 +367,71 @@ contract UpdateRuleTest is Test, QuantAMMTestUtils {
             2
         );
         
+        vm.stopPrank();
+    }
+
+    function testMultipleUpdateWithoutPrevMovingAverage() public {
+
+        vm.startPrank(owner);
+        // Define local variables for the parameters
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(1);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = PRBMathSD59x18.fromInt(1);
+
+        int256[] memory previousAlphas = new int256[](2);
+        previousAlphas[0] = PRBMathSD59x18.fromInt(1);
+        previousAlphas[1] = PRBMathSD59x18.fromInt(2);
+
+        int256[] memory prevMovingAverages = new int256[](2);
+        prevMovingAverages[0] = PRBMathSD59x18.fromInt(0);
+        prevMovingAverages[1] = PRBMathSD59x18.fromInt(0);
+
+        int256[] memory movingAverages = new int256[](2);
+        movingAverages[0] = 0.9e18;
+        movingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.2e18;
+
+        uint64[] memory lambdas = new uint64[](2);
+        lambdas[0] = uint64(0.7e18);
+
+        int256[] memory prevWeights = new int256[](2);
+        prevWeights[0] = 0.5e18;
+        prevWeights[1] = 0.5e18;
+
+        int256[] memory data = new int256[](2);
+        data[0] = PRBMathSD59x18.fromInt(3);
+        data[1] = PRBMathSD59x18.fromInt(4);
+
+        int256 epsilonMax = 0.1e18;
+
+        int256[] memory expectedResults = new int256[](2);
+        expectedResults[0] = 0.49775e18;
+        expectedResults[1] = 0.50225e18;
+        updateRule.setWeights(expectedResults);
+
+        updateRule.initialisePoolRuleIntermediateValues(address(mockPool), prevMovingAverages, previousAlphas, 2);
+
+        updateRule.CalculateNewWeights(
+            prevWeights,
+            data,
+            address(mockPool),
+            parameters,
+            lambdas,
+            uint64(uint256(epsilonMax)),
+            uint64(0.2e18)
+        );
+        
+        updateRule.CalculateNewWeights(
+            prevWeights,
+            data,
+            address(mockPool),
+            parameters,
+            lambdas,
+            uint64(uint256(epsilonMax)),
+            uint64(0.2e18)
+        );
+
         vm.stopPrank();
     }
 }

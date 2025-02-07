@@ -832,11 +832,12 @@ contract QuantAMMWeightedPool is
     /// @inheritdoc IQuantAMMWeightedPool
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
+        address oldAddress = address(updateWeightRunner);
         require(_updateWeightRunner != address(0), "INVADDRESS");
         require(_updateWeightRunner != address(updateWeightRunner), "SAMEADDRESS");
 
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
-        emit UpdateWeightRunnerAddressUpdated(address(updateWeightRunner), _updateWeightRunner);
+        emit UpdateWeightRunnerAddressUpdated(oldAddress, _updateWeightRunner);
     }
 
     function getRate() public pure override returns (uint256) {

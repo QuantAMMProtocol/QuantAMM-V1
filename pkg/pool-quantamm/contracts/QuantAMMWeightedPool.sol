@@ -682,7 +682,7 @@ contract QuantAMMWeightedPool is
             lastUpdateIntervalTime: uint40(block.timestamp)
         });
 
-        emit WeightsUpdated(address(this), _weights);
+        emit WeightsUpdated(address(this), _weightsAndBlockMultiplier);
     }
 
     /// @notice Initialize the pool

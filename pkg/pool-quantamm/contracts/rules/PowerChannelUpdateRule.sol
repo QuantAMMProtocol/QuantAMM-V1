@@ -5,6 +5,8 @@ import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "./base/QuantammGradientBasedRule.sol";
 import "./UpdateRule.sol";
 
+import "forge-std/Test.sol";
+
 /// @title PowerChannelUpdateRule contract for QuantAMM power channel update rule
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the power channel update rule
 contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
@@ -175,7 +177,7 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
 
     /// @notice Check if the given parameters are valid for the rule
     /// @dev If parameters are not valid, either reverts or returns false
-    function validParameters(int256[][] calldata parameters) external pure override returns (bool valid) {
+    function validParameters(int256[][] calldata parameters) external view override returns (bool valid) {
         if (
             (parameters.length == 2 || (parameters.length == 3 && parameters[2].length == 1)) &&
             (parameters[0].length > 0) &&
@@ -185,6 +187,7 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             valid = true;
             for (uint i; i < parameters[0].length; ) {
                 if (!(parameters[0][i] > 0)) {
+                    console.log("False0");
                     valid = false;
                     break;
                 }
@@ -195,6 +198,7 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
 
             for (uint i; i < parameters[1].length; ) {
                 if(parameters[1][i] <= ONE){
+                    console.log("False2");
                     valid = false;
                     break;
                 }
@@ -202,8 +206,18 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                     ++i;
                 }
             }
+
+            if(parameters.length == 3 && parameters[2].length == 1){            
+                if (!(parameters[2][0] == 0 || parameters[2][0] == PRBMathSD59x18.fromInt(1))) {
+                    console.log("False1");
+                    valid = false;
+                }
+            }
+
             return valid;   
         }
+
+        console.log("False3");
         return false;
     }
 }

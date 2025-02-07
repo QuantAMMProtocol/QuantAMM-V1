@@ -56,6 +56,9 @@ abstract contract QuantAMMMathGuard {
                     _weights[i] = absoluteMax;
                     sumOtherWeights += absoluteMax;
                 }
+                else{
+                    sumOtherWeights += _weights[i];
+                }
             }
             if (sumOtherWeights != 0) {
                 int256 proportionalRemainder = sumRemainerWeight.div(sumOtherWeights);

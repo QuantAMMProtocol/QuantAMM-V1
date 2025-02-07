@@ -127,7 +127,6 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[0], 0.6e18);
         assertEq(res[1], 0.4e18);
     }
-
     // 2 tokens clamped
     function testFuzz_WeightGuards2TokensClamped(int256 newWeight) public view {
         int256[] memory prevWeights = new int256[](2);
@@ -380,5 +379,34 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[1], 0.25e18);
         assertEq(res[2], 0.175e18);
         assertEq(res[3], 0.175e18);
+    }
+
+    function test_EpsilonViolationExact() public {
+        // Exact values from second fuzzing failure
+        int256[] memory prevWeights = new int256[]();
+        prevWeights[0] = 0.979999999999999947e18;  // ~98%
+        prevWeights[1] = 0.018530000200344578e18;  // ~1.85%
+        prevWeights[2] = 0.001469999799655475e18;  // ~0.15%
+
+        int256[] memory newWeights = new int256[]();
+        newWeights[0] = 0.949168597366431485e18;   // Attempted ~3% decrease
+        newWeights[1] = 0.049361402833913040e18;   // Attempted large increase
+        newWeights[2] = 0.001469999799655475e18;   // No change
+
+        int256 epsilonMax = 0.015415701316784231e18; // ~1.54%
+
+
+        int256[] memory result = mockQuantAMMMathGuard.mockGuardQuantAMMWeights(
+            newWeights,
+            prevWeights,
+            epsilonMax,
+            0.01e18  // absoluteWeightGuardRail
+        );
+
+        // Log all weight changes for analysis
+        for(uint i = 0; i < 3; i++) {
+            int256 change = (result[i] - prevWeights[i]).abs();
+            assertLe(change, epsilonMax, "Change exceeded epsilonMax");
+        }
     }
 }

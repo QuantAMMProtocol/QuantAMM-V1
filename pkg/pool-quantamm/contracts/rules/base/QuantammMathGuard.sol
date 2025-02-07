@@ -15,7 +15,7 @@ abstract contract QuantAMMMathGuard {
     /// @param _weights Raw weights to be guarded and normalized
     /// @param _prevWeights Previous weights to be used for normalization
     /// @param _epsilonMax  Maximum allowed change in weights per update step (epsilon) in the QuantAMM whitepaper
-    /// @param _absoluteWeightGuardRail Maximum allowed weight in the QuantAMM whitepaper
+    /// @param _absoluteWeightGuardRail Minimum allowed weight in the QuantAMM whitepaper
     function _guardQuantAMMWeights(
         int256[] memory _weights,
         int256[] calldata _prevWeights,

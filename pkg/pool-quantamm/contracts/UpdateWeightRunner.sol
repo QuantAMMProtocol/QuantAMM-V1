@@ -366,6 +366,10 @@ contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
                     numAssetOracles = poolBackupOracles[_pool][i].length;
                 }
 
+                if (numAssetOracles == 1) {
+                    revert("No fresh oracle values available");
+                }
+                
                 for (uint j = 1 /*0 already done via optimised poolOracles*/; j < numAssetOracles; ) {
                     oracleResult = _getOracleData(
                         // poolBackupOracles[_pool][asset][oracle]

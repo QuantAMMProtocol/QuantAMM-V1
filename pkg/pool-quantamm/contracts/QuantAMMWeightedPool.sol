@@ -202,11 +202,12 @@ contract QuantAMMWeightedPool is
             multiplierTime = lastInterpolationTime;
         }
 
-        unchecked {
-            uint256 timeSinceLastUpdate = uint256(
-                multiplierTime - poolSettings.quantAMMBaseInterpolationDetails.lastUpdateIntervalTime
-            );
+        //Lifted outside of unchecked in case of race condition of combined bad user setting last update in the future and chain downtime
+        uint256 timeSinceLastUpdate = uint256(
+            multiplierTime - poolSettings.quantAMMBaseInterpolationDetails.lastUpdateIntervalTime
+        );
 
+        unchecked {
             return
                 WeightedMath.computeBalanceOutGivenInvariant(
                     balancesLiveScaled18[tokenInIndex],

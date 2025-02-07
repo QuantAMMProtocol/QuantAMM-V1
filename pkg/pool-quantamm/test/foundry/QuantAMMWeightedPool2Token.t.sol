@@ -214,6 +214,15 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
         QuantAMMWeightedPool(quantAMMWeightedPool).setUpdateWeightRunnerAddress(address(0));
     }
 
+    function testSameAddressSetUpdateWeightRunnerAddress() public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        vm.startPrank(owner);
+        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
+        address current = address(QuantAMMWeightedPool(quantAMMWeightedPool).updateWeightRunner());
+        vm.expectRevert("SAMEADDRESS");
+        QuantAMMWeightedPool(quantAMMWeightedPool).setUpdateWeightRunnerAddress(current);
+    }
+
     function testGetPoolDetailsNameNotFound() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params.poolDetails = new string[][](1);

@@ -832,6 +832,7 @@ contract QuantAMMWeightedPool is
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
         require(_updateWeightRunner != address(0), "INVADDRESS");
+        require(_updateWeightRunner != address(updateWeightRunner), "SAMEADDRESS");
 
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
         emit UpdateWeightRunnerAddressUpdated(address(updateWeightRunner), _updateWeightRunner);

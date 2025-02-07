@@ -182,6 +182,13 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         quantAMMWeightedPoolFactory.create(params);
     }
 
+    function testStaleness0Invalid() public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        params._oracleStalenessThreshold = 0;
+        vm.expectRevert("INVORCSTAL");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
     function testEpsilonMaxInvalidBelow() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         params._poolSettings.epsilonMax = 0e18;

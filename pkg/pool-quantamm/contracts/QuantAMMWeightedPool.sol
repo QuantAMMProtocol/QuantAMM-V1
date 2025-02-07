@@ -722,7 +722,8 @@ contract QuantAMMWeightedPool is
                 ++i;
             }
         }
-
+        require(_oracleStalenessThreshold > 0, "INVORCSTAL"); //Invalid oracle staleness threshold
+        
         oracleStalenessThreshold = _oracleStalenessThreshold;
         updateInterval = _poolSettings.updateInterval;
         _setRule(_initialWeights, _initialIntermediateValues, _initialMovingAverages, _poolSettings);

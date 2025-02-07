@@ -107,6 +107,37 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertEq(updateWeightRunner.getQuantAMMUpliftFeeTake(), boundFee);
     }
 
+    function testOwnerCanSetEthUsdOracle() public {
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+
+        chainlinkOracle = deployOracle(fixedValue, delay);
+        vm.startPrank(owner);
+        updateWeightRunner.setETHUSDOracle(address(OracleWrapper(chainlinkOracle)));
+        vm.stopPrank();
+        assertEq(address(updateWeightRunner.ethOracle()), address(chainlinkOracle));
+    }
+
+    function testNoneOwnerSetEthUsdOracle() public {
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+
+        chainlinkOracle = deployOracle(fixedValue, delay);
+        vm.startPrank(owner);
+        updateWeightRunner.setETHUSDOracle(address(OracleWrapper(chainlinkOracle)));
+        vm.stopPrank();
+        vm.startPrank(addr1);
+        vm.expectRevert("ONLYADMIN");
+        updateWeightRunner.setETHUSDOracle(address(OracleWrapper(chainlinkOracle)));
+    }
+
+    function testAddress0CannotBeSetAsEthUsdOracle() public {
+        vm.startPrank(owner);
+        vm.expectRevert("INVETHUSDORACLE");
+        updateWeightRunner.setETHUSDOracle(address(0));
+        vm.stopPrank();
+    }
+
     function testOwnerCannotAddUpliftFeeGreaterThan100(uint256 fee) public {
         uint256 oldFee = updateWeightRunner.getQuantAMMSwapFeeTake();
         uint256 boundFee = bound(fee, 1e18 + 1, type(uint256).max);

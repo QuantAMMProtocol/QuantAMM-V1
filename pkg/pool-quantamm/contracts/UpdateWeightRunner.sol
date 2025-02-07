@@ -84,7 +84,7 @@ contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
 
     /// @notice main eth oracle that could be used to determine value of pools and assets.
     /// @dev this could be used for things like uplift only withdrawal fee hooks
-    OracleWrapper private ethOracle;
+    OracleWrapper public ethOracle;
 
     /// @notice Mask to check if a pool is allowed to perform an update, some might only want to get data
     uint256 private constant MASK_POOL_PERFORM_UPDATE = 1;
@@ -304,6 +304,7 @@ contract UpdateWeightRunner is Ownable2Step, IUpdateWeightRunner {
     /// @param _ethUsdOracle The new oracle address to use for ETH/USD
     function setETHUSDOracle(address _ethUsdOracle) public {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
+        require(_ethUsdOracle != address(0), "INVETHUSDORACLE");
         ethOracle = OracleWrapper(_ethUsdOracle);
         emit ETHUSDOracleSet(_ethUsdOracle);
     }

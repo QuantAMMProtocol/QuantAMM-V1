@@ -164,7 +164,6 @@ contract WithoutPrevMovingAverageUpdateRuleTest is Test, QuantAMMTestUtils {
         IUpdateRule targetRule = requiresPrevMovingAverage ? IUpdateRule(prevAverageUpdateRule) : IUpdateRule(updateRule);
         uint numAssets = bound(unboundNumAssets, 2, 8);
         vm.startPrank(owner);
-        uint numMovingAverages = requiresPrevMovingAverage ? numAssets * 2 : numAssets;
 
         int256 one = PRBMathSD59x18.fromInt(1);
 
@@ -180,8 +179,8 @@ contract WithoutPrevMovingAverageUpdateRuleTest is Test, QuantAMMTestUtils {
             previousAlphas[i] = PRBMathSD59x18.fromInt(int256(i)) + one;
         }
 
-        int256[] memory movingAverages = new int256[](numMovingAverages);
-        for(uint i = 0; i < numMovingAverages; i++) {
+        int256[] memory movingAverages = new int256[](numAssets);
+        for(uint i = 0; i < numAssets; i++) {
             movingAverages[i] = PRBMathSD59x18.fromInt(int256(i)) + one;
         }
 
@@ -214,15 +213,15 @@ contract WithoutPrevMovingAverageUpdateRuleTest is Test, QuantAMMTestUtils {
 
         int256[] memory savedMovAverages;
         if(requiresPrevMovingAverage) {
-            savedMovAverages = MockPrevAverageUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numMovingAverages);
+            savedMovAverages = MockPrevAverageUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numAssets);
         }
         else{
-            savedMovAverages = MockUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numMovingAverages);
+            savedMovAverages = MockUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numAssets);
         }
 
         checkResult(movingAverages, savedMovAverages);
         
-        for(uint i = 0; i < numMovingAverages; i++) {
+        for(uint i = 0; i < numAssets; i++) {
             movingAverages[i] = movingAverages[i] + one;
         }
 
@@ -235,10 +234,10 @@ contract WithoutPrevMovingAverageUpdateRuleTest is Test, QuantAMMTestUtils {
         );
 
         if(requiresPrevMovingAverage) {
-            savedMovAverages = MockPrevAverageUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numMovingAverages);
+            savedMovAverages = MockPrevAverageUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numAssets);
         }
         else{
-            savedMovAverages = MockUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numMovingAverages);
+            savedMovAverages = MockUpdateRule(address(targetRule)).GetMovingAverages(address(mockPool), numAssets);
         }
 
         checkResult(movingAverages, savedMovAverages);

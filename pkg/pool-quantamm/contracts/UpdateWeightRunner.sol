@@ -101,7 +101,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     /// @notice Mask to check if a pool is allowed to perform direct weight update from a rule
     uint256 private constant MASK_POOL_RULE_DIRECT_SET_WEIGHT = 32;
 
-    constructor(address _quantammAdmin, address _ethOracle) Ownable(msg.sender) {
+    constructor(address _quantammAdmin, address _ethOracle) {
         require(_quantammAdmin != address(0), "Admin cannot be default address");
         require(_ethOracle != address(0), "eth oracle cannot be default address");
 
@@ -226,7 +226,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     /// @param _pool Pool to set actions for
     function setApprovedActionsForPool(address _pool, uint256 _actions) external {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
-        require(_action != )
+        require(_actions != approvedPoolActions[_pool],"DUPEACTION");
         approvedPoolActions[_pool] = _actions;
         emit SetApprovedActionsForPool(msg.sender, _pool, _actions);
     }

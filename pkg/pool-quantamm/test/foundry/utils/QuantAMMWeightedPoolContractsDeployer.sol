@@ -110,6 +110,17 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
 
         return tokenConfig;
     }
+
+    function _getOracles(uint numAssets) internal view returns (address[][] memory) {
+        address[][] memory oracles = new address[][](numAssets);
+        for (uint i = 0; i < numAssets; i++) {
+            oracles[i] = new address[](1);
+            oracles[i][0] = address(chainlinkOracle);
+        }        
+        
+        return oracles;
+    }
+
     function _createPoolParams(address[] memory tokens, IRateProvider[] memory rateProviders) internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
         PoolRoleAccounts memory roleAccounts;
 
@@ -120,9 +131,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         parameters[0] = new int256[](1);
         parameters[0][0] = 0.2e18;
 
-        address[][] memory oracles = new address[][](1);
-        oracles[0] = new address[](1);
-        oracles[0][0] = address(chainlinkOracle);
+        address[][] memory oracles = _getOracles(tokens.length);
 
         uint256[] memory normalizedWeights = new uint256[](tokens.length);
         normalizedWeights[0] = uint256(0.5e18);

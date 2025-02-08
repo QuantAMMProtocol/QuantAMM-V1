@@ -630,9 +630,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
         parameters[0] = new int256[](1);
         parameters[0][0] = 0.2e18;
 
-        address[][] memory oracles = new address[][](1);
-        oracles[0] = new address[](1);
-        oracles[0][0] = address(chainlinkOracle);
+        address[][] memory oracles = _getOracles(2);
 
         retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
             "Pool With Donation",

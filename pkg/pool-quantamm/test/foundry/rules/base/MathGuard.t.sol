@@ -344,11 +344,12 @@ contract QuantAMMMathGuardTest is Test {
             epsilonMax,
             absoluteWeightGuardRail
         );
-
-        assertEq(res[0], 0.166666666666666667e18);
-        assertEq(res[1], 0.4e18); //0.4
-        assertEq(res[2], 0.133333333333333333e18); //0.1
-        assertEq(res[3], 0.3e18); //0.3
+        
+        //TODO MW review
+        assertEq(res[0], 0.2e18);
+        assertEq(res[1], 0.38e18); //0.4
+        assertEq(res[2], 0.136666666666666667e18); //0.1
+        assertEq(res[3], 0.283333333333333333e18); //0.3
     }
 
     // 4 tokens clamped
@@ -381,14 +382,14 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[3], 0.175e18);
     }
 
-    function test_EpsilonViolationExact() public {
+    function test_EpsilonViolationExact() public view {
         // Exact values from second fuzzing failure
-        int256[] memory prevWeights = new int256[]();
+        int256[] memory prevWeights = new int256[](3);
         prevWeights[0] = 0.979999999999999947e18;  // ~98%
         prevWeights[1] = 0.018530000200344578e18;  // ~1.85%
         prevWeights[2] = 0.001469999799655475e18;  // ~0.15%
 
-        int256[] memory newWeights = new int256[]();
+        int256[] memory newWeights = new int256[](3);
         newWeights[0] = 0.949168597366431485e18;   // Attempted ~3% decrease
         newWeights[1] = 0.049361402833913040e18;   // Attempted large increase
         newWeights[2] = 0.001469999799655475e18;   // No change

@@ -2,6 +2,7 @@
 
 pragma solidity >=0.8.24;
 
+import "forge-std/Test.sol";
 import {
     IWeightedPool,
     WeightedPoolDynamicData,
@@ -801,6 +802,9 @@ contract QuantAMMWeightedPool is
         ); //Invalid absoluteWeightGuardRail value
 
         require(_poolSettings.oracles.length > 0, "NOPROVORC"); //No oracle indices provided
+        console.log(_poolSettings.oracles.length);
+        console.log(_initialWeights.length);
+
         require(_poolSettings.oracles.length == _initialWeights.length, "OLNWEIG"); //Oracle length not equal to weights length
         require(_poolSettings.rule.validParameters(_poolSettings.ruleParameters), "INVRLEPRM"); //Invalid rule parameters
 

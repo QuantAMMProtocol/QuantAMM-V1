@@ -520,7 +520,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         weights[14] = 0.025e18;
         weights[15] = 0.025e18;
     }
-
+    
     function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
         PoolRoleAccounts memory roleAccounts;
         IERC20[] memory tokens = [
@@ -572,9 +572,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         parameters[0] = new int256[](1);
         parameters[0][0] = 0.2e18;
 
-        address[][] memory oracles = new address[][](1);
-        oracles[0] = new address[](1);
-        oracles[0][0] = address(chainlinkOracle);
+        address[][] memory oracles = _getOracles(8);
 
         retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
             "Pool With Donation",

@@ -48,8 +48,8 @@ contract WithPrevMovingAverageUpdateRuleTest is Test, QuantAMMTestUtils {
         previousAlphas[1] = PRBMathSD59x18.fromInt(2);
 
         int256[] memory prevMovingAverages = new int256[](2);
-        prevMovingAverages[0] = PRBMathSD59x18.fromInt(0);
-        prevMovingAverages[1] = PRBMathSD59x18.fromInt(0);
+        prevMovingAverages[0] = PRBMathSD59x18.fromInt(1);
+        prevMovingAverages[1] = PRBMathSD59x18.fromInt(2);
 
         int256[] memory movingAverages = new int256[](2);
         movingAverages[0] = 0.9e18;

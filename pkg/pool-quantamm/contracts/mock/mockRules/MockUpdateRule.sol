@@ -52,7 +52,7 @@ contract MockUpdateRule is UpdateRule {
 contract MockPrevMovingAverageUpdateRule is MockUpdateRule {
     constructor(address _updateWeightRunner) MockUpdateRule(_updateWeightRunner) {}
 
-    function _requiresPrevMovingAverage() internal pure virtual override returns (uint16) {
+    function _requiresPrevMovingAverage() internal pure override returns (uint16) {
         return 1;
     }
 

@@ -200,6 +200,16 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertEq(updateWeightRunner.getPoolApprovedActions(address(mockPool)), 3);
     }
 
+    function tesUpdateWeightRunnerDupeSettingOfAction() public {
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 3);
+        vm.expectRevert("DUPEACTION");
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 3);
+        vm.stopPrank();
+        assertEq(updateWeightRunner.getPoolApprovedActions(address(mockPool)), 3);
+    }
+
+
     function testNonOwnabeCannotApprovePoolUses() public {
         vm.startPrank(owner);
         updateWeightRunner.setApprovedActionsForPool(address(mockPool), 3);

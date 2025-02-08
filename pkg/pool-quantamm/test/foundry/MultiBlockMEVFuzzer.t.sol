@@ -274,7 +274,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
                 _poolSettings: IQuantAMMWeightedPool.PoolSettings({
                     assets: new IERC20[](0),
                     rule: IUpdateRule(address(0)),
-                    oracles: new address[][](0),
+                    oracles: _getOracles(numTokens),
                     updateInterval: 0,
                     lambda: new uint64[](0),
                     epsilonMax: 0,
@@ -324,9 +324,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
         uint64[] memory lambdas = new uint64[](1);
         lambdas[0] = _LAMBDA;
 
-        address[][] memory oracles = new address[][](1);
-        oracles[0] = new address[](1);
-        oracles[0][0] = address(chainlinkOracle);
+        address[][] memory oracles = _getOracles(params.numTokens);
 
         return
             IQuantAMMWeightedPool.PoolSettings({

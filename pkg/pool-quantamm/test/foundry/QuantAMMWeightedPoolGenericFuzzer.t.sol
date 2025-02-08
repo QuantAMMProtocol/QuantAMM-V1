@@ -244,10 +244,10 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                 salt: keccak256(abi.encodePacked(uint256(1))),
                 _initialWeights: initialWeights,
                 _poolSettings: IQuantAMMWeightedPool.PoolSettings({
-                    assets: new IERC20[](0),
+                    assets: _getTokens(numTokens),
                     rule: IUpdateRule(address(0)),
-                    oracles: new address[][](0),
-                    updateInterval: 0,
+                    oracles: _getOracles(numTokens),
+                    updateInterval: 1,
                     lambda: new uint64[](0),
                     epsilonMax: 0,
                     absoluteWeightGuardRail: 0,
@@ -294,9 +294,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         uint64[] memory lambdas = new uint64[](1);
         lambdas[0] = poolParams.lambda;
 
-        address[][] memory oracles = new address[][](1);
-        oracles[0] = new address[](1);
-        oracles[0][0] = address(chainlinkOracle);
+        address[][] memory oracles = _getOracles(numTokens);
 
         return
             IQuantAMMWeightedPool.PoolSettings({

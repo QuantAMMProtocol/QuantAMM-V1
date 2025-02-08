@@ -79,7 +79,7 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             }
 
             // 1/p(t) * ∂p(t)/∂t calculated and stored as used in multiple places
-            locals.newWeights[locals.i] = ONE.mul(locals.newWeights[locals.i]).div(locals.denominator);
+            locals.newWeights[locals.i] = ONE.div(locals.denominator).mul(locals.newWeights[locals.i]);
 
             if (locals.kappaStore.length == 1) {
                 locals.normalizationFactor += locals.newWeights[locals.i];

@@ -1219,7 +1219,6 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         vm.startPrank(owner);
 
-        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 16);
         updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
 
         vm.stopPrank();

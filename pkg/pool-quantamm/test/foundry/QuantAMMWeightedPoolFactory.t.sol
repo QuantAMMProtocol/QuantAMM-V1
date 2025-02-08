@@ -131,8 +131,9 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
     function testEmptyOracleArrayMixed() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
-        params._poolSettings.oracles = new address[][](1);
+        params._poolSettings.oracles = new address[][](2);
         params._poolSettings.oracles[0] = new address[](0);
+        params._poolSettings.oracles[1] = new address[](0);
 
         vm.expectRevert("Empty oracles array");
         quantAMMWeightedPoolFactory.create(params);
@@ -147,19 +148,39 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         quantAMMWeightedPoolFactory.create(params);
     }
 
+    function testUnapprovedOracleBackupArray() public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        MockChainlinkOracle unapprovedOracle = _deployOracle(fixedValue, delay);
+        params._poolSettings.oracles = new address[][](2);
+        params._poolSettings.oracles[0] = new address[](2);
+        params._poolSettings.oracles[0][0] = address(chainlinkOracle);
+        params._poolSettings.oracles[0][1] = address(unapprovedOracle);
+        params._poolSettings.oracles[1] = new address[](1);
+        params._poolSettings.oracles[1][0] = address(chainlinkOracle);
+
+        vm.expectRevert("Not approved oracled used");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
     function testUnapprovedOracleArray() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
 
         int216 fixedValue = 1000;
         uint delay = 3600;
         chainlinkOracle = _deployOracle(fixedValue, delay);
-        params._poolSettings.oracles = new address[][](1);
-        params._poolSettings.oracles[0] = new address[](1);
+        params._poolSettings.oracles = new address[][](2);
+        params._poolSettings.oracles[0] = new address[](2);
         params._poolSettings.oracles[0][0] = address(chainlinkOracle);
+        params._poolSettings.oracles[1] = new address[](1);
+        params._poolSettings.oracles[1][0] = address(chainlinkOracle);
 
         vm.expectRevert("Not approved oracled used");
         quantAMMWeightedPoolFactory.create(params);
     }
+
 
     function testInvalidRule() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
@@ -232,20 +253,32 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         params.normalizedWeights[1] = uint256(0.25e18);
         params.normalizedWeights[2] = uint256(0.25e18);
 
-        vm.expectRevert("INVASSWEIG");
+        vm.expectRevert("Token and weight counts must match");
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testDifferentAssetLengths() public {
         QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
         
+        IERC20[] memory altTokens = [address(weth), address(dai), address(usdc)].toMemoryArray().asIERC20();
+        
+        params._poolSettings.assets = altTokens;
+        vm.expectRevert("INVASSWEIG");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
+    function testDifferentTokenLengths() public {
+        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        
+        IERC20[] memory altTokens = [address(weth)].toMemoryArray().asIERC20();
+        
         TokenConfig[] memory tokens = new TokenConfig[](3);
         tokens[0] = params.tokens[0];
-        tokens[1] = params.tokens[1];
+        tokens[1] = vault.buildTokenConfig(altTokens)[0];
         tokens[2] = params.tokens[1];
 
         params.tokens = tokens;
-        vm.expectRevert("INVASSWEIG");
+        vm.expectRevert("Token and weight counts must match");
         quantAMMWeightedPoolFactory.create(params);
     }
 

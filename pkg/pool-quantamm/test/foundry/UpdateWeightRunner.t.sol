@@ -297,7 +297,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.startPrank(address(mockPool));
 
         address[][] memory oracles = new address[][](1);
-        oracles[0] = new address[](1);
+        oracles[0] = new address[](2);
         oracles[0][0] = address(chainlinkOracle);
 
         uint64[] memory lambda = new uint64[](1);

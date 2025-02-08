@@ -147,6 +147,10 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         variances[0] = PRBMathSD59x18.fromInt(1);
         variances[1] = PRBMathSD59x18.fromInt(1);
 
+        int256[] memory initialMovingAverages = new int256[](2);
+        initialMovingAverages[0] = PRBMathSD59x18.fromInt(1);
+        initialMovingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
+
         int256[] memory prevMovingAverages = new int256[](4);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(1);
         prevMovingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -159,7 +163,7 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         // Initialize pool rule intermediate values
         rule.initialisePoolRuleIntermediateValues(
             address(mockPool),
-            prevMovingAverages,
+            initialMovingAverages,
             variances,
             mockPool.numAssets()
         );
@@ -199,6 +203,10 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         variances[0] = PRBMathSD59x18.fromInt(1);
         variances[1] = PRBMathSD59x18.fromInt(1);
 
+        int256[] memory initialMovingAverages = new int256[](2);
+        initialMovingAverages[0] = PRBMathSD59x18.fromInt(1);
+        initialMovingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
+
         int256[] memory prevMovingAverages = new int256[](4);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(1);
         prevMovingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -212,7 +220,7 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         // Initialize pool rule intermediate values
         rule.initialisePoolRuleIntermediateValues(
             address(mockPool),
-            prevMovingAverages,
+            initialMovingAverages,
             variances,
             mockPool.numAssets()
         );
@@ -251,6 +259,10 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         variances[0] = PRBMathSD59x18.fromInt(1);
         variances[1] = PRBMathSD59x18.fromInt(1);
 
+        int256[] memory initialMovingAverages = new int256[](2);
+        initialMovingAverages[0] = PRBMathSD59x18.fromInt(1);
+        initialMovingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
+
         int256[] memory prevMovingAverages = new int256[](4);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(1);
         prevMovingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -264,7 +276,7 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         // Initialize pool rule intermediate values
         rule.initialisePoolRuleIntermediateValues(
             address(mockPool),
-            prevMovingAverages,
+            initialMovingAverages,
             variances,
             mockPool.numAssets()
         );
@@ -307,6 +319,10 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         variances[0] = PRBMathSD59x18.fromInt(1);
         variances[1] = PRBMathSD59x18.fromInt(1);
 
+        int256[] memory initialMovingAverages = new int256[](2);
+        initialMovingAverages[0] = PRBMathSD59x18.fromInt(1);
+        initialMovingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
+
         int256[] memory prevMovingAverages = new int256[](4);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(1);
         prevMovingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -319,7 +335,7 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         // Initialize pool rule intermediate values
         rule.initialisePoolRuleIntermediateValues(
             address(mockPool),
-            prevMovingAverages,
+            initialMovingAverages,
             variances,
             mockPool.numAssets()
         );
@@ -361,6 +377,10 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         variances[0] = PRBMathSD59x18.fromInt(1);
         variances[1] = PRBMathSD59x18.fromInt(1);
 
+        int256[] memory initialMovingAverages = new int256[](2);
+        initialMovingAverages[0] = PRBMathSD59x18.fromInt(1);
+        initialMovingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
+
         int256[] memory prevMovingAverages = new int256[](4);
         prevMovingAverages[0] = PRBMathSD59x18.fromInt(1);
         prevMovingAverages[1] = PRBMathSD59x18.fromInt(1) + 0.5e18;
@@ -374,7 +394,7 @@ contract MinVarianceUpdateRuleTest is Test, QuantAMMTestUtils {
         // Initialize pool rule intermediate values
         rule.initialisePoolRuleIntermediateValues(
             address(mockPool),
-            prevMovingAverages,
+            initialMovingAverages,
             variances,
             mockPool.numAssets()
         );

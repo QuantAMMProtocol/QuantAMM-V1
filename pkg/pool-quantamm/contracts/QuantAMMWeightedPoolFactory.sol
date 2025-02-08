@@ -160,7 +160,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
                 }),
                 getVault()
             );
-
+        
         pool = _create(poolArgs, params.salt);
 
         QuantAMMWeightedPool(pool).initialize(

@@ -673,7 +673,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         console.log("boundNumParameters: ", boundNumParameters);
         parameters[0] = new int256[](boundNumParameters);
         for(uint i = 0; i < boundNumParameters; i++){
-            parameters[0][i] = PRBMathSD59x18.fromInt(bound(params.kappa, 1, 20));
+            parameters[0][i] = PRBMathSD59x18.fromInt(bound(params.kappa, 1, 500));
         }
         if(params.useRawPriceDefined){
             parameters[1] = new int256[](1);
@@ -683,21 +683,21 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
 
         int256[] memory previousAlphas = new int256[](boundNumAssets);
         for(uint i = 0; i < boundNumAssets; i++){
-            previousAlphas[i] = PRBMathSD59x18.fromInt(bound(params.prevAlpha, -10000000000, 10000000000));
+            previousAlphas[i] = PRBMathSD59x18.fromInt(bound(params.prevAlpha, -1000000000000, 1000000000000));
         }
 
         int256[] memory prevMovingAverages = new int256[](boundNumAssets);
         for(uint i = 0; i < boundNumAssets; i++){
-            prevMovingAverages[i] = PRBMathSD59x18.fromInt(bound(params.prevMovingAverage, 1, 10000000000));
+            prevMovingAverages[i] = PRBMathSD59x18.fromInt(bound(params.prevMovingAverage, 1, 1000000000000));
         }
 
         int256[] memory movingAverages = new int256[](boundNumAssets);
         for(uint i = 0; i < boundNumAssets; i++){
-            movingAverages[i] = PRBMathSD59x18.fromInt(bound(params.prevMovingAverage, 1, 10000000000));
+            movingAverages[i] = PRBMathSD59x18.fromInt(bound(params.prevMovingAverage, 1, 1000000000000));
         }
 
-        int128[] memory lambdas = new int128[](boundNumAssets);
-        for(uint i = 0; i < boundNumAssets; i++){
+        int128[] memory lambdas = new int128[](boundNumParameters);
+        for(uint i = 0; i < boundNumParameters; i++){
             lambdas[i] = int128(int256(bound(params.lambda, 0.5e18, 0.99999e18)));
         }
 
@@ -715,7 +715,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
 
         int256[] memory oracleData = new int256[](boundNumAssets);
         for(uint i = 0; i < boundNumAssets; i++){
-            oracleData[i] = PRBMathSD59x18.fromInt(bound(params.data, 1, 10000000000));
+            oracleData[i] = PRBMathSD59x18.fromInt(bound(params.data, 1, 1000000000000));
         }       
 
         // Now pass the variables into the runAndVerifyInitialUpdate function

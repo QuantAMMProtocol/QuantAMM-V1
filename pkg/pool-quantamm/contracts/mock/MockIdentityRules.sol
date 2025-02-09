@@ -56,7 +56,7 @@ contract MockIdentityRule is IUpdateRule {
                 require(data[i] == expectedDataValue[i], "Data value does not match expected value");
             }
         }
-        
+
         if(weights.length == 0) {
             return new int256[](prevWeights.length);
         }
@@ -101,5 +101,9 @@ contract MockIdentityRule is IUpdateRule {
 
     function setWeights(int256[] memory newCalculatedWeights) public {
         weights = newCalculatedWeights;
+    }
+
+    function setExpectedDataValue(int256[] memory _expectedDataValue) public {
+        expectedDataValue = _expectedDataValue;
     }
 }

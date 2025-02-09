@@ -657,4 +657,84 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
             expectedResults
         );
     }
+
+    struct FuzzRuleParams {
+        int256 numAssets;
+        bool vectorParams;
+        int256 lambda;
+        int256 kappa;
+        int256 prevWeight;
+        int256 prevMovingAverage;
+        int256 prevAlpha;
+        int256 data;
+        bool useRawPriceDefined;
+        bool useRawPrice;
+    }
+
+    function testFuzz_reasonableRanges(FuzzRuleParams memory params) public {
+        // Define local variables for the parameters
+        uint boundNumAssets = uint(bound(params.numAssets, 2, 8));
+        uint boundNumParameters = params.vectorParams ? boundNumAssets : 1;
+
+        int256[][] memory parameters = new int256[][](params.useRawPriceDefined ? 2 : 1);
+        console.log("boundNumParameters: ", boundNumParameters);
+        parameters[0] = new int256[](boundNumParameters);
+        for(uint i = 0; i < boundNumParameters; i++){
+            parameters[0][i] = PRBMathSD59x18.fromInt(bound(params.kappa, 1, 20));
+        }
+        if(params.useRawPriceDefined){
+            parameters[1] = new int256[](1);
+            int256 useRawPriceInt = params.useRawPrice ? PRBMathSD59x18.fromInt(1) : PRBMathSD59x18.fromInt(0);
+            parameters[1][0] = PRBMathSD59x18.fromInt(useRawPriceInt);
+        }
+
+        int256[] memory previousAlphas = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            previousAlphas[i] = PRBMathSD59x18.fromInt(bound(params.prevAlpha, -10000000000, 10000000000));
+        }
+
+        int256[] memory prevMovingAverages = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            prevMovingAverages[i] = PRBMathSD59x18.fromInt(bound(params.prevMovingAverage, 1, 10000000000));
+        }
+
+        int256[] memory movingAverages = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            movingAverages[i] = PRBMathSD59x18.fromInt(bound(params.prevMovingAverage, 1, 10000000000));
+        }
+
+        int128[] memory lambdas = new int128[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            lambdas[i] = int128(int256(bound(params.lambda, 0.5e18, 0.99999e18)));
+        }
+
+        int256[] memory prevWeights = new int256[](boundNumAssets);
+        for (uint i = 0; i < boundNumAssets; i++) {
+            prevWeights[i] = PRBMathSD59x18.fromInt(bound(params.prevWeight, 0.01e18, 0.99e18));
+        }
+        int256 totalWeight = 0;
+        for (uint i = 0; i < boundNumAssets; i++) {
+            totalWeight += prevWeights[i];
+        }
+        for (uint i = 0; i < boundNumAssets; i++) {
+            prevWeights[i] = (prevWeights[i] * 1e18) / totalWeight;
+        }
+
+        int256[] memory oracleData = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            oracleData[i] = PRBMathSD59x18.fromInt(bound(params.data, 1, 10000000000));
+        }       
+
+        // Now pass the variables into the runAndVerifyInitialUpdate function
+        assertRunCompletes(
+            boundNumAssets, // numAssets
+            parameters,
+            previousAlphas,
+            prevMovingAverages,
+            movingAverages,
+            lambdas,
+            prevWeights,
+            oracleData
+        );
+    }
 }

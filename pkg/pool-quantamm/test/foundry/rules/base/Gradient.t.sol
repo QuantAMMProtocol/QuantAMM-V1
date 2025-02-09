@@ -400,7 +400,7 @@ function calculateGradient(
     }
 
     // Fuzz test for gradient calculation with random number of assets
-    function testGradientCalculationAccessFuzz(uint256 unboundNumAssets, uint256 unboundNumberOfCalculations) public {
+    function testFuzz_GradientCalculationAccess(uint256 unboundNumAssets, uint256 unboundNumberOfCalculations, bool scalarLambda) public {
         uint256 numAssets = bound(unboundNumAssets, 2, 8);
         uint256 numberOfCalculations = bound(unboundNumberOfCalculations, 1, 20);
 
@@ -422,10 +422,21 @@ function calculateGradient(
         }
 
         int256[] memory gradients = new int256[](numAssets);
-        int128[] memory lambdas = new int128[](numAssets);
-        for (uint256 i = 0; i < numAssets; i++) {
+        
+        for(uint256 i = 0; i < numAssets; i++){
             gradients[i] = PRBMathSD59x18.fromInt(0);
-            lambdas[i] = LAMBDA;
+        }
+        
+        int128[] memory lambdas;
+        if(scalarLambda){
+            lambdas = new int128[](1);
+            lambdas[0] = LAMBDA;
+        }
+        else{
+            lambdas = new int128[](numAssets);
+            for (uint256 i = 0; i < numAssets; i++) {
+                lambdas[i] = LAMBDA;
+            }
         }
 
         calculateGradient(priceData, priceDataBn, movingAverages, gradients, lambdas);

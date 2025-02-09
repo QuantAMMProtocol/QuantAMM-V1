@@ -5,8 +5,6 @@ import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "./base/QuantammGradientBasedRule.sol";
 import "./UpdateRule.sol";
 
-import "forge-std/Test.sol";
-
 /// @title PowerChannelUpdateRule contract for QuantAMM power channel update rule
 /// @notice Contains the logic for calculating the new weights of a QuantAMM pool using the power channel update rule
 contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {

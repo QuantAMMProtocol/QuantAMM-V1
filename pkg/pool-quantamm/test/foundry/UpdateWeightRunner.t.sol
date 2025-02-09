@@ -288,7 +288,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
 
         int216 fixedValue = 1000;
-        chainlinkOracle = deployOracle(fixedValue, 3601);
+        chainlinkOracle = deployOracle(fixedValue, 0);
 
         vm.startPrank(owner);
         updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
@@ -296,9 +296,11 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         vm.startPrank(address(mockPool));
 
-        address[][] memory oracles = new address[][](1);
-        oracles[0] = new address[](2);
+        address[][] memory oracles = new address[][](2);
+        oracles[0] = new address[](1);
         oracles[0][0] = address(chainlinkOracle);
+        oracles[1] = new address[](1);
+        oracles[1][0] = address(chainlinkOracle);
 
         uint64[] memory lambda = new uint64[](1);
         lambda[0] = 0.0000000005e18;

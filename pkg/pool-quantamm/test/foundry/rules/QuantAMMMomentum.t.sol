@@ -28,6 +28,7 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         mockPool = new MockPool(3600, 1 ether, address(rule));
     }
 
+
     function runInitialUpdate(
         uint256 numAssets,
         int256[][] memory parameters,
@@ -36,9 +37,8 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         int256[] memory movingAverages,
         int128[] memory lambdas,
         int256[] memory prevWeights,
-        int256[] memory data,
-        int256[] memory results
-    ) internal {
+        int256[] memory data
+    ) internal returns (int256[] memory calculated){
         // Simulate setting number of assets and calculating intermediate values
         mockPool.setNumberOfAssets(numAssets);
         vm.startPrank(owner);
@@ -49,7 +49,31 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
 
         // Check results against expected weights
-        int256[] memory res = rule.GetResultWeights();
+        return rule.GetResultWeights();
+    }
+
+    function runAndVerifyInitialUpdate(
+        uint256 numAssets,
+        int256[][] memory parameters,
+        int256[] memory previousAlphas,
+        int256[] memory prevMovingAverages,
+        int256[] memory movingAverages,
+        int128[] memory lambdas,
+        int256[] memory prevWeights,
+        int256[] memory data,
+        int256[] memory results
+    ) internal {
+        int256[] memory res = runInitialUpdate(
+            numAssets,
+            parameters,
+            previousAlphas,
+            prevMovingAverages,
+            movingAverages,
+            lambdas,
+            prevWeights,
+            data
+        );
+
         checkResult(res, results);
     }
 
@@ -245,8 +269,8 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         expectedResults[0] = 0.49775e18;
         expectedResults[1] = 0.50225e18;
 
-        // Now pass the variables into the runInitialUpdate function
-        runInitialUpdate(
+        // Now pass the variables into the runAndVerifyInitialUpdate function
+        runAndVerifyInitialUpdate(
             2, // numAssets
             parameters,
             previousAlphas,
@@ -301,8 +325,8 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         expectedResults[0] = 0.4775e18;
         expectedResults[1] = 0.5225e18;
 
-        // Now pass the variables into the runInitialUpdate function
-        runInitialUpdate(
+        // Now pass the variables into the runAndVerifyInitialUpdate function
+        runAndVerifyInitialUpdate(
             2, // numAssets
             parameters,
             previousAlphas,
@@ -352,8 +376,8 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         expectedResults[0] = 0.4973e18;
         expectedResults[1] = 0.5027e18;
 
-        // Now pass the variables into the runInitialUpdate function
-        runInitialUpdate(
+        // Now pass the variables into the runAndVerifyInitialUpdate function
+        runAndVerifyInitialUpdate(
             2, // numAssets
             parameters,
             previousAlphas,
@@ -404,8 +428,8 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         expectedResults[0] = 0.473e18;
         expectedResults[1] = 0.527e18;
 
-        // Now pass the variables into the runInitialUpdate function
-        runInitialUpdate(
+        // Now pass the variables into the runAndVerifyInitialUpdate function
+        runAndVerifyInitialUpdate(
             2, // numAssets
             parameters,
             previousAlphas,
@@ -460,8 +484,8 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         expectedResults[0] = 0.492500000000000001e18;
         expectedResults[1] = 0.5075e18;
 
-        // Now pass the variables into the runInitialUpdate function
-        runInitialUpdate(
+        // Now pass the variables into the runAndVerifyInitialUpdate function
+        runAndVerifyInitialUpdate(
             2, // numAssets
             parameters,
             previousAlphas,
@@ -514,8 +538,8 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         expectedResults[0] = 0.481583333333333333e18;
         expectedResults[1] = 0.518416666666666666e18;
 
-        // Now pass the variables into the runInitialUpdate function
-        runInitialUpdate(
+        // Now pass the variables into the runAndVerifyInitialUpdate function
+        runAndVerifyInitialUpdate(
             2, // numAssets
             parameters,
             previousAlphas,
@@ -563,8 +587,8 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         expectedResults[0] = 0.4973e18;
         expectedResults[1] = 0.5027e18;
 
-        // Now pass the variables into the runInitialUpdate function
-        runInitialUpdate(
+        // Now pass the variables into the runAndVerifyInitialUpdate function
+        runAndVerifyInitialUpdate(
             2, // numAssets
             parameters,
             previousAlphas,
@@ -613,8 +637,8 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
         expectedResults[0] = 0.4779e18;
         expectedResults[1] = 0.5221e18;
 
-        // Now pass the variables into the runInitialUpdate function
-        runInitialUpdate(
+        // Now pass the variables into the runAndVerifyInitialUpdate function
+        runAndVerifyInitialUpdate(
             2, // numAssets
             parameters,
             previousAlphas,
@@ -624,6 +648,86 @@ contract MomentumRuleTest is Test, QuantAMMTestUtils {
             prevWeights,
             data,
             expectedResults
+        );
+    }
+
+    struct FuzzRuleParams {
+        int256 numAssets;
+        bool vectorParams;
+        int256 lambda;
+        int256 kappa;
+        int256 prevWeight;
+        int256 prevMovingAverage;
+        int256 prevAlpha;
+        int256 data;
+        bool useRawPriceDefined;
+        bool useRawPrice;
+    }
+
+    function testFuzz_reasonableRanges(FuzzRuleParams memory params) public {
+        // Define local variables for the parameters
+        uint boundNumAssets = uint(bound(params.numAssets, 2, 8));
+        uint boundNumParameters = params.vectorParams ? boundNumAssets : 1;
+
+        int256[][] memory parameters = new int256[][](params.useRawPriceDefined ? 2 : 1);
+        console.log("boundNumParameters: ", boundNumParameters);
+        parameters[0] = new int256[](boundNumParameters);
+        for(uint i = 0; i < boundNumParameters; i++){
+            parameters[0][i] = PRBMathSD59x18.fromInt(bound(params.kappa, 1, 20));
+        }
+        if(params.useRawPriceDefined){
+            parameters[1] = new int256[](1);
+            int256 useRawPriceInt = params.useRawPrice ? PRBMathSD59x18.fromInt(1) : PRBMathSD59x18.fromInt(0);
+            parameters[1][0] = PRBMathSD59x18.fromInt(useRawPriceInt);
+        }
+
+        int256[] memory previousAlphas = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            previousAlphas[i] = PRBMathSD59x18.fromInt(bound(params.prevAlpha, -10000000000, 10000000000));
+        }
+
+        int256[] memory prevMovingAverages = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            prevMovingAverages[i] = PRBMathSD59x18.fromInt(bound(params.prevMovingAverage, 1, 10000000000));
+        }
+
+        int256[] memory movingAverages = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            movingAverages[i] = PRBMathSD59x18.fromInt(bound(params.prevMovingAverage, 1, 10000000000));
+        }
+
+        int128[] memory lambdas = new int128[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            lambdas[i] = int128(int256(bound(params.lambda, 0.5e18, 0.99999e18)));
+        }
+
+        int256[] memory prevWeights = new int256[](boundNumAssets);
+        for (uint i = 0; i < boundNumAssets; i++) {
+            prevWeights[i] = PRBMathSD59x18.fromInt(bound(params.prevWeight, 0.01e18, 0.99e18));
+        }
+        int256 totalWeight = 0;
+        for (uint i = 0; i < boundNumAssets; i++) {
+            totalWeight += prevWeights[i];
+        }
+        for (uint i = 0; i < boundNumAssets; i++) {
+            prevWeights[i] = (prevWeights[i] * 1e18) / totalWeight;
+        }
+
+        int256[] memory oracleData = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            oracleData[i] = PRBMathSD59x18.fromInt(bound(params.data, 1, 10000000000));
+        }       
+
+        // Now pass the variables into the runAndVerifyInitialUpdate function
+        runInitialUpdate(
+            boundNumAssets, // numAssets
+            parameters,
+            previousAlphas,
+            prevMovingAverages,
+            movingAverages,
+            lambdas,
+            prevWeights,
+            oracleData
         );
     }
 }

@@ -193,9 +193,9 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
                 locals.finalState[locals.nMinusOne] = locals.oneMinusLambda.mul(locals.intermediateState);
                 
                 intermediateVarianceStates[_poolParameters.pool][locals.storageIndex] = _quantAMMPackTwo128(
+                    int256(0),
                     locals
-                    .intermediateVarianceState[locals.nMinusOne],
-                    int256(0)
+                    .intermediateVarianceState[locals.nMinusOne]
                 );
             }
         }

@@ -12,12 +12,22 @@ contract ChainlinkOracle is OracleWrapper {
 
     ///@notice Difference of feed result to 18 decimals. We store the difference instead of the oracle decimals for optimization reasons (saves a subtraction in _getData)
     uint internal immutable normalizationFactor;
+    bool internal immutable isDecimalsGreaterThan18;
 
     /// @param _chainlinkFeed the address of the Chainlink oracle to wrap  
     constructor(address _chainlinkFeed) {
         require(_chainlinkFeed != address(0), "INVADDR"); //Invalid address provided
         priceFeed = AggregatorV3Interface(_chainlinkFeed);
+        
+        uint decimals = priceFeed.decimals();
         // Chainlink oracles have <= 18 decimals, cannot underflow
+        if (decimals > 18) {
+        normalizationFactor = decimals - 18;
+        isDecimalsGreaterThan18 = true;
+    } else {
+        normalizationFactor = 18 - decimals;
+        isDecimalsGreaterThan18 = false;
+    }
         normalizationFactor = 18 - priceFeed.decimals();
     }
 
@@ -28,7 +38,9 @@ contract ChainlinkOracle is OracleWrapper {
         (, /*uint80 roundID*/ int data, , /*uint startedAt*/ uint timestamp, ) = /*uint80 answeredInRound*/
         priceFeed.latestRoundData();
         require(data > 0, "INVLDDATA");
-        data = data * int(10 ** normalizationFactor);
+        data = isDecimalsGreaterThan18 ? 
+           data / int256(10 ** normalizationFactor) : 
+           data * int256(10 ** normalizationFactor);
         return (int216(data), uint40(timestamp)); // Overflow of data is extremely improbable and uint40 is large enough for timestamps for a very long time
     }
 }

@@ -118,7 +118,7 @@ contract QuantAMMWeightedPool is
     }
 
     ///@dev Emitted when the weights of the pool are updated
-    event WeightsUpdated(address indexed poolAddress, int256[] weights);
+    event WeightsUpdated(address indexed poolAddress, int256[] weights, uint40 lastInterpolationTimePossible, uint40 lastUpdateTime);
 
     ///@dev Emitted when the update weight runner is updated
     event UpdateWeightRunnerAddressUpdated(address indexed oldAddress, address indexed newAddress);
@@ -648,7 +648,7 @@ contract QuantAMMWeightedPool is
             lastUpdateIntervalTime: uint40(block.timestamp)
         });
 
-        emit WeightsUpdated(_poolAddress, _weights);
+        emit WeightsUpdated(_poolAddress, _weights, _lastInterpolationTimePossible, uint40(block.timestamp));
     }
 
     /// @notice the initialising function during registration of the pool with the vault to set the initial weights
@@ -694,7 +694,7 @@ contract QuantAMMWeightedPool is
             lastUpdateIntervalTime: uint40(block.timestamp)
         });
 
-        emit WeightsUpdated(address(this), _weights);
+        emit WeightsUpdated(address(this), _weights, uint40(block.timestamp), uint40(block.timestamp));
     }
 
     /// @notice Initialize the pool

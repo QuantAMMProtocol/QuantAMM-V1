@@ -55,7 +55,8 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         address indexed caller,
         address indexed pool,
         int256[] weights,
-        uint40 lastInterpolationTimePossible
+        uint40 lastInterpolationTimePossible,
+        uint40 lastUpdateTime
     );
     event SetIntermediateValuesManually(
         address indexed caller,
@@ -589,7 +590,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
 
         IQuantAMMWeightedPool(_poolAddress).setWeights(_weights, _poolAddress, _lastInterpolationTimePossible);
 
-        emit SetWeightManual(msg.sender, _poolAddress, _weights, _lastInterpolationTimePossible);
+        emit SetWeightManual(msg.sender, _poolAddress, _weights, _lastInterpolationTimePossible, uint40(block.timestamp));
     }
 
     /// @notice Breakglass function to allow the admin or the pool manager to set the intermediate values of the rule manually

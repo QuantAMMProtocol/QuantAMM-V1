@@ -218,8 +218,8 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     /// @notice Removes an existing oracle from the approved oracles
     /// @param _oracleToRemove The oracle to remove
     function removeOracle(OracleWrapper _oracleToRemove) external {
-        approvedOracles[address(_oracleToRemove)] = false;
         require(msg.sender == quantammAdmin, "ONLYADMIN");
+        approvedOracles[address(_oracleToRemove)] = false;
         emit OracleRemved(address(_oracleToRemove));
     }
 

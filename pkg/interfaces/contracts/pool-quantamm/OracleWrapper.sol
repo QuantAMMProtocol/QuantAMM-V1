@@ -3,11 +3,6 @@ pragma solidity >=0.8.24;
 
 /// @notice Generic wrapper around an arbitrary oracle that returns normalized values.
 abstract contract OracleWrapper {
-    /// @notice Type of the oracle (price, volume, variance, ...). Only price supported for now
-    enum OracleType {
-        PRICE
-    }
-
     /// @notice Get the data of the underlying oracle, interpretation of data depends on oracle type
     /// @param data The underlying data (can be negative), normalized to 18 decimals
     /// @return data Retrieved oracle data

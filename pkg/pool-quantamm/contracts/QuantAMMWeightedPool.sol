@@ -301,7 +301,7 @@ contract QuantAMMWeightedPool is
                 tokenOutWeight,
                 request.amountGivenScaled18
             );
-
+            //CODEHAWKS M-09 check amountOUTScaled18 
             if (amountOutScaled18 > request.balancesScaled18[request.indexOut].mulDown(maxTradeSizeRatio)) {
                 revert maxTradeSizeRatioExceeded();
             }
@@ -694,7 +694,8 @@ contract QuantAMMWeightedPool is
             lastUpdateIntervalTime: uint40(block.timestamp)
         });
 
-        emit WeightsUpdated(address(this), _weights, uint40(block.timestamp), uint40(block.timestamp));
+        //CODEHAWKS L-05 emit weights and multiplier
+        emit WeightsUpdated(address(this), _weightsAndBlockMultiplier, uint40(block.timestamp), uint40(block.timestamp));
     }
 
     /// @notice Initialize the pool
@@ -838,6 +839,7 @@ contract QuantAMMWeightedPool is
         require(_updateWeightRunner != address(updateWeightRunner), "SAMEADDRESS");
 
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
+        //CODEHAWKS L-04
         emit UpdateWeightRunnerAddressUpdated(oldAddress, _updateWeightRunner);
     }
 

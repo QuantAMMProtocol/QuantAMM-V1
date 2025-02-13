@@ -57,6 +57,7 @@ abstract contract QuantAMMMathGuard {
                     sumOtherWeights += absoluteMax;
                 }
                 else{
+                    //CODEHAWKS M-14
                     sumOtherWeights += _weights[i];
                 }
             }

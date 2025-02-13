@@ -117,7 +117,8 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 // w(t − 1) + κ ·(ℓp(t) − 1/p(t) · ∂p(t)/∂t)
                 int256 res = int256(_prevWeights[locals.i]) +
                     int256(locals.kappa[locals.i]).mul(locals.normalizationFactor - locals.newWeights[locals.i]);
-                
+
+                //CODEHAWKS M-05 remove preguard +ve weight requirement same for scalar 
                 newWeightsConverted[locals.i] = res;
                 unchecked {
                     ++locals.i;

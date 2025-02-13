@@ -186,7 +186,8 @@ abstract contract UpdateRule is QuantAMMMathGuard, QuantAMMMathMovingAverage, IU
         //because of mixing of prev and current if the numassets is odd it is makes normal code unreadable to do inline
         //this means for rules requiring prev moving average there is an addition SSTORE and local packed array
         if (locals.requiresPrevAverage) {
-           movingAverages[_pool] = _quantAMMPack128Array(locals.updatedMovingAverage);
+            //CODEHAWKS H-04 no need to store prev averages anymore. 
+            movingAverages[_pool] = _quantAMMPack128Array(locals.updatedMovingAverage);
         }
 
         QuantAMMPoolParameters memory poolParameters;

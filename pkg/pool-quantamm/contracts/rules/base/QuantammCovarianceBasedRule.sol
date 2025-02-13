@@ -54,6 +54,7 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
             locals.n
         );
 
+        //CODEHAWKS L-08
         int256[][] memory newState = new int256[][](locals.n);
 
         locals.u = new int256[](locals.n); // (p(t) - p̅(t - 1))

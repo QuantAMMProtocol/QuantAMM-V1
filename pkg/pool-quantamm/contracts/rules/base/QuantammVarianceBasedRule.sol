@@ -128,6 +128,7 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
                     .intermediateVarianceState[locals.nMinusOne];
             }
         } else {
+            //CODEHAWKS H-01
             if (locals.notDivisibleByTwo) {
                 unchecked {
                     --locals.nMinusOne;
@@ -214,6 +215,7 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
         uint storeLength = intermediateVarianceStates[_poolAddress].length;
         bool evenInitialValues = _initialValues.length % 2 == 0;
 
+        //CODEHAWKS M-18
         if ((_initialValues.length == _numberOfAssets) && 
         (storeLength == 0 
         || evenInitialValues && _initialValues.length / 2 == storeLength

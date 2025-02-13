@@ -124,7 +124,8 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 locals.res =
                     int256(_prevWeights[locals.i]) +
                     locals.kappaStore[locals.i].mul(locals.newWeights[locals.i] - locals.normalizationFactor);
-                    
+                
+                //CODEHAWKS M-05 remove preguard +ve weight requirement same for scalar 
                 newWeightsConverted[locals.i] = locals.res;
                 unchecked {
                     ++locals.i;

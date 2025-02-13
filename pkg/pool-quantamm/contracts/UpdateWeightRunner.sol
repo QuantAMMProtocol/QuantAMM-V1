@@ -368,6 +368,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
                     numAssetOracles = poolBackupOracles[_pool][i].length;
                 }
 
+                //CODEHAWKS M-11 throw if no backup
                 if (numAssetOracles == 1) {
                     revert("No fresh oracle values available");
                 }
@@ -583,6 +584,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         //CYFRIN L-02
         for (uint i; i < _weights.length; i++) {
             if (i < _numberOfAssets) {
+                //CODEHAWKS M-08 change to weighted math underlying limits
                 require(_weights[i] >= 0.01e18, "Below min allowed weight");
                 require(_weights[i] <= 0.99e18, "Above max allowed weight");
             }

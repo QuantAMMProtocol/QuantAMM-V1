@@ -23,6 +23,314 @@ contract QuantAMMMathGuardTest is Test {
         mockQuantAMMMathGuard = new MockQuantAMMMathGuard();
     }
 
+
+
+    function testClampWeights_AllWeightsWithinGuardRail() public view {
+        int256[] memory weights = new int256[](3);
+        weights[0] = 0.3e18;
+        weights[1] = 0.3e18;
+        weights[2] = 0.4e18;
+
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory clampedWeights = mockQuantAMMMathGuard.mockClampWeights(weights, absoluteWeightGuardRail);
+
+        assertEq(clampedWeights[0], 0.3e18, "Weight should remain unchanged");
+        assertEq(clampedWeights[1], 0.3e18, "Weight should remain unchanged");
+        assertEq(clampedWeights[2], 0.4e18, "Weight should remain unchanged");
+    }
+
+    function testClampWeights_WeightBelowGuardRail() public view {
+        int256[] memory weights = new int256[](3);
+        weights[0] = 0.05e18;
+        weights[1] = 0.45e18;
+        weights[2] = 0.5e18;
+
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory clampedWeights = mockQuantAMMMathGuard.mockClampWeights(weights, absoluteWeightGuardRail);
+
+        assertEq(clampedWeights[0], 0.1e18, "Weight should be clamped to minimum guard rail");
+        assertEq(clampedWeights[1], 0.426315789473684210e18, "Weight should remain unchanged");
+        assertEq(clampedWeights[2], 0.473684210526315789e18, "Weight should be adjusted proportionally");
+    }
+
+    function testClampWeights_WeightAboveGuardRail() public view {
+        int256[] memory weights = new int256[](3);
+        weights[0] = 0.8e18;
+        weights[1] = 0.1e18;
+        weights[2] = 0.1e18;
+
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory clampedWeights = mockQuantAMMMathGuard.mockClampWeights(weights, absoluteWeightGuardRail);
+
+        assertEq(clampedWeights[0], 0.8e18, "Weight should remain unchanged");
+        assertEq(clampedWeights[1], 0.1e18, "Weight should remain unchanged");
+        assertEq(clampedWeights[2], 0.1e18, "Weight should remain unchanged");
+    }
+
+    function testClampWeights_WeightExceedsMax() public view {
+        int256[] memory weights = new int256[](3);
+        weights[0] = 0.95e18;
+        weights[1] = 0.025e18;
+        weights[2] = 0.025e18;
+
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory clampedWeights = mockQuantAMMMathGuard.mockClampWeights(weights, absoluteWeightGuardRail);
+
+        assertEq(clampedWeights[0], 0.8e18, "Weight should be clamped to maximum guard rail");
+        assertEq(clampedWeights[1], 0.1e18, "Weight should be adjusted proportionally");
+        assertEq(clampedWeights[2], 0.1e18, "Weight should be adjusted proportionally");
+    }
+
+    function testClampWeights_ProportionalAdjustment() public view {
+        int256[] memory weights = new int256[](3);
+        weights[0] = 0.2e18;
+        weights[1] = 0.2e18;
+        weights[2] = 0.6e18;
+
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory clampedWeights = mockQuantAMMMathGuard.mockClampWeights(weights, absoluteWeightGuardRail);
+
+        assertEq(clampedWeights[0], 0.2e18, "Weight should remain unchanged");
+        assertEq(clampedWeights[1], 0.2e18, "Weight should remain unchanged");
+        assertEq(clampedWeights[2], 0.6e18, "Weight should remain unchanged");
+    }
+
+    function testClampWeights_ZeroWeights() public view {
+        int256[] memory weights = new int256[](3);
+        weights[0] = 0;
+        weights[1] = 0;
+        weights[2] = 0;
+
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory clampedWeights = mockQuantAMMMathGuard.mockClampWeights(weights, absoluteWeightGuardRail);
+
+        assertEq(clampedWeights[0], 0.1e18, "Weight should be clamped to minimum guard rail");
+        assertEq(clampedWeights[1], 0.1e18, "Weight should be clamped to minimum guard rail");
+        assertEq(clampedWeights[2], 0.1e18, "Weight should be clamped to minimum guard rail");
+    }
+
+    function testClampWeights_NegativeWeights() public view {
+        int256[] memory weights = new int256[](3);
+        weights[0] = -0.1e18;
+        weights[1] = 0.5e18;
+        weights[2] = 0.6e18;
+
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory clampedWeights = mockQuantAMMMathGuard.mockClampWeights(weights, absoluteWeightGuardRail);
+        
+        //TODO MW review
+        assertEq(clampedWeights[0], 0.1e18, "Negative weight should be clamped to minimum guard rail");
+        assertEq(clampedWeights[1], 0.409090909090909091e18, "Weight should be adjusted proportionally");
+        assertEq(clampedWeights[2], 0.490909090909090909e18, "Weight should be adjusted proportionally");
+    }
+
+    function testClampWeights_SumExceedsOne() public view {
+        int256[] memory weights = new int256[](3);
+        weights[0] = 0.5e18;
+        weights[1] = 0.5e18;
+        weights[2] = 0.5e18;
+
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory clampedWeights = mockQuantAMMMathGuard.mockClampWeights(weights, absoluteWeightGuardRail);
+
+        assertEq(clampedWeights[0], 0.333333333333333333e18, "Weight should be adjusted proportionally");
+        assertEq(clampedWeights[1], 0.333333333333333333e18, "Weight should be adjusted proportionally");
+        assertEq(clampedWeights[2], 0.333333333333333333e18, "Weight should be adjusted proportionally");
+    }
+
+    function testClampWeights_SumLessThanOne() public view {
+        int256[] memory weights = new int256[](3);
+        weights[0] = 0.1e18;
+        weights[1] = 0.1e18;
+        weights[2] = 0.1e18;
+
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory clampedWeights = mockQuantAMMMathGuard.mockClampWeights(weights, absoluteWeightGuardRail);
+
+        assertEq(clampedWeights[0], 0.1e18, "Weight should remain unchanged");
+        assertEq(clampedWeights[1], 0.1e18, "Weight should remain unchanged");
+        assertEq(clampedWeights[2], 0.1e18, "Weight should remain unchanged");
+    }
+
+    function testNormalizeWeightUpdates_RoundingErrorPositive() public view {
+        int256[] memory prevWeights = new int256[](3);
+        prevWeights[0] = 0.4e18;
+        prevWeights[1] = 0.3e18;
+        prevWeights[2] = 0.3e18;
+
+        int256[] memory newWeights = new int256[](3);
+        newWeights[0] = 0.45e18;
+        newWeights[1] = 0.25e18;
+        newWeights[2] = 0.3e18;
+
+        int256 epsilonMax = 0.1e18;
+
+        int256[] memory res = mockQuantAMMMathGuard.mockNormalizeWeightUpdates(
+            prevWeights,
+            newWeights,
+            epsilonMax
+        );
+
+        int256 sum = res[0] + res[1] + res[2];
+        assertEq(sum, 1e18, "Weights do not sum to 1");
+
+        // Check if rounding error is handled correctly
+        assertEq(res[1], 0.25e18 + (1e18 - sum), "Rounding error not handled correctly");
+    }
+
+    function testNormalizeWeightUpdates_RoundingErrorNegative() public view {
+        int256[] memory prevWeights = new int256[](3);
+        prevWeights[0] = 0.4e18;
+        prevWeights[1] = 0.3e18;
+        prevWeights[2] = 0.3e18;
+
+        int256[] memory newWeights = new int256[](3);
+        newWeights[0] = 0.45e18;
+        newWeights[1] = 0.25e18;
+        newWeights[2] = 0.3e18;
+
+        int256 epsilonMax = 0.1e18;
+
+        int256[] memory res = mockQuantAMMMathGuard.mockNormalizeWeightUpdates(
+            prevWeights,
+            newWeights,
+            epsilonMax
+        );
+
+        int256 sum = res[0] + res[1] + res[2];
+        assertEq(sum, 1e18, "Weights do not sum to 1");
+
+        // Check if rounding error is handled correctly
+        assertEq(res[0], 0.45e18 - (sum - 1e18), "Rounding error not handled correctly");
+    }
+
+    function testNormalizeWeightUpdates_MaxAbsChange() public view {
+        int256[] memory prevWeights = new int256[](3);
+        prevWeights[0] = 0.4e18;
+        prevWeights[1] = 0.3e18;
+        prevWeights[2] = 0.3e18;
+
+        int256[] memory newWeights = new int256[](3);
+        newWeights[0] = 0.6e18;
+        newWeights[1] = 0.2e18;
+        newWeights[2] = 0.2e18;
+
+        int256 epsilonMax = 0.1e18;
+
+        int256[] memory res = mockQuantAMMMathGuard.mockNormalizeWeightUpdates(
+            prevWeights,
+            newWeights,
+            epsilonMax
+        );
+
+        int256 sum = res[0] + res[1] + res[2];
+        assertEq(sum, 1e18, "Weights do not sum to 1");
+
+        // Check if maxAbsChange is handled correctly
+        assertLe((res[0] - prevWeights[0]).abs(), epsilonMax, "MaxAbsChange not handled correctly");
+    }
+
+    function testNormalizeWeightUpdates_ZeroWeights() public view {
+        int256[] memory prevWeights = new int256[](3);
+        prevWeights[0] = 0;
+        prevWeights[1] = 0;
+        prevWeights[2] = 0;
+
+        int256[] memory newWeights = new int256[](3);
+        newWeights[0] = 0.4e18;
+        newWeights[1] = 0.3e18;
+        newWeights[2] = 0.3e18;
+
+        int256 epsilonMax = 0.1e18;
+
+        int256[] memory res = mockQuantAMMMathGuard.mockNormalizeWeightUpdates(
+            prevWeights,
+            newWeights,
+            epsilonMax
+        );
+
+        int256 sum = res[0] + res[1] + res[2];
+        assertEq(sum, 1e18, "Weights do not sum to 1");
+    }
+
+    function testNormalizeWeightUpdates_ProportionalAdjustment() public view {
+        int256[] memory prevWeights = new int256[](3);
+        prevWeights[0] = 0.2e18;
+        prevWeights[1] = 0.2e18;
+        prevWeights[2] = 0.6e18;
+
+        int256[] memory newWeights = new int256[](3);
+        newWeights[0] = 0.3e18;
+        newWeights[1] = 0.3e18;
+        newWeights[2] = 0.4e18;
+
+        int256 epsilonMax = 0.1e18;
+
+        int256[] memory res = mockQuantAMMMathGuard.mockNormalizeWeightUpdates(
+            prevWeights,
+            newWeights,
+            epsilonMax
+        );
+
+        int256 sum = res[0] + res[1] + res[2];
+        assertEq(sum, 1e18, "Weights do not sum to 1");
+    }
+
+    function testNormalizeWeightUpdates_ZeroEpsilonMax() public view {
+        int256[] memory prevWeights = new int256[](3);
+        prevWeights[0] = 0.4e18;
+        prevWeights[1] = 0.3e18;
+        prevWeights[2] = 0.3e18;
+
+        int256[] memory newWeights = new int256[](3);
+        newWeights[0] = 0.45e18;
+        newWeights[1] = 0.25e18;
+        newWeights[2] = 0.3e18;
+
+        int256 epsilonMax = 0;
+
+        int256[] memory res = mockQuantAMMMathGuard.mockNormalizeWeightUpdates(
+            prevWeights,
+            newWeights,
+            epsilonMax
+        );
+
+        int256 sum = res[0] + res[1] + res[2];
+        assertEq(sum, 1e18, "Weights do not sum to 1");
+    }
+
+    function testNormalizeWeightUpdates_MaxEpsilonMax() public view {
+        int256[] memory prevWeights = new int256[](3);
+        prevWeights[0] = 0.4e18;
+        prevWeights[1] = 0.3e18;
+        prevWeights[2] = 0.3e18;
+
+        int256[] memory newWeights = new int256[](3);
+        newWeights[0] = 0.45e18;
+        newWeights[1] = 0.25e18;
+        newWeights[2] = 0.3e18;
+
+        int256 epsilonMax = 1e18;
+
+        int256[] memory res = mockQuantAMMMathGuard.mockNormalizeWeightUpdates(
+            prevWeights,
+            newWeights,
+            epsilonMax
+        );
+
+        int256 sum = res[0] + res[1] + res[2];
+        assertEq(sum, 1e18, "Weights do not sum to 1");
+    }
+
     // Weight Guards
     // the correct behavior.
     // 2 tokens below epsilon max
@@ -159,7 +467,7 @@ contract QuantAMMMathGuardTest is Test {
         }
     }
 
-    function testWeightGuards2TokensBelowEpsilonMax() public {
+    function testWeightGuards2TokensBelowEpsilonMax() public view {
         int256[] memory prevWeights = new int256[](2);
         prevWeights[0] = 0.5e18;
         prevWeights[1] = 0.5e18;
@@ -182,7 +490,7 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[1], newWeights[1]);
     }
 
-    function testWeightGuards2TokensAboveEpsilonMax() public {
+    function testWeightGuards2TokensAboveEpsilonMax() public view {
         int256[] memory prevWeights = new int256[](2);
         prevWeights[0] = 0.5e18;
         prevWeights[1] = 0.5e18;
@@ -205,7 +513,7 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[1], 0.4e18);
     }
 
-    function testWeightGuards2TokensClamped() public {
+    function testWeightGuards2TokensClamped() public view {
         int256[] memory prevWeights = new int256[](2);
         prevWeights[0] = 0.5e18;
         prevWeights[1] = 0.5e18;
@@ -228,7 +536,7 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[1], 0.4e18);
     }
 
-    function testWeightGuards3TokensBelowEpsilonMax() public {
+    function testWeightGuards3TokensBelowEpsilonMax() public view {
         int256[] memory prevWeights = new int256[](3);
         prevWeights[0] = 0.3e18;
         prevWeights[1] = 0.3e18;
@@ -254,7 +562,7 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[2], newWeights[2]);
     }
 
-    function testWeightGuards3TokensAboveEpsilonMax() public {
+    function testWeightGuards3TokensAboveEpsilonMax() public view {
         int256[] memory prevWeights = new int256[](3);
         prevWeights[0] = 0.3e18;
         prevWeights[1] = 0.3e18;
@@ -280,7 +588,7 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[2], 0.4e18);
     }
 
-    function testWeightGuards3TokensClamped() public {
+    function testWeightGuards3TokensClamped() public view {
         int256[] memory prevWeights = new int256[](3);
         prevWeights[0] = 0.3e18;
         prevWeights[1] = 0.3e18;
@@ -306,7 +614,7 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[2], 0.34e18);
     }
 
-    function testWeightGuards4TokensBelowEpsilonMax() public {
+    function testWeightGuards4TokensBelowEpsilonMax() public view {
         int256[] memory prevWeights = new int256[](4);
         prevWeights[0] = 0.3e18;
         prevWeights[1] = 0.3e18;
@@ -335,7 +643,7 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[3], newWeights[3]);
     }
 
-    function testWeightGuards4TokensAboveEpsilonMax() public {
+    function testWeightGuards4TokensAboveEpsilonMax() public view {
         int256[] memory prevWeights = new int256[](4);
         prevWeights[0] = 0.3e18;
         prevWeights[1] = 0.3e18;
@@ -364,7 +672,7 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[3], 0.283333333333333333e18);
     }
 
-    function testWeightGuards4TokensClamped() public {
+    function testWeightGuards4TokensClamped() public view {
         int256[] memory prevWeights = new int256[](4);
         prevWeights[0] = 0.3e18;
         prevWeights[1] = 0.3e18;

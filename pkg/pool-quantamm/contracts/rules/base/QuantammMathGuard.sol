@@ -142,7 +142,7 @@ abstract contract QuantAMMMathGuard {
             //CODEHAWKS M-17
             if(newWeightsSum != ONE){
                 if(newWeightsSum > ONE){
-                    _newWeights[maxWeightIndex] = _newWeights[secondMaxWeightIndex] - (newWeightsSum - ONE);
+                    _newWeights[maxWeightIndex] = _newWeights[maxWeightIndex] - (newWeightsSum - ONE);
                 }else{
                     _newWeights[secondMaxWeightIndex] = _newWeights[secondMaxWeightIndex] + (ONE - newWeightsSum);
                 }

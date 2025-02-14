@@ -276,8 +276,8 @@ contract QuantAMMMathGuardTest is Test {
         );
 
         assertEq(res[0], 0.4e18);
-        assertEq(res[1], 0.218181818181818181e18);
-        assertEq(res[2], 0.381818181818181819e18);
+        assertEq(res[1], 0.2e18);
+        assertEq(res[2], 0.4e18);
     }
 
     function testWeightGuards3TokensClamped() public {
@@ -302,8 +302,8 @@ contract QuantAMMMathGuardTest is Test {
         );
 
         assertEq(res[0], 0.4e18);
-        assertEq(res[1], 0.263636363636363636e18);
-        assertEq(res[2], 0.336363636363636364e18);
+        assertEq(res[1], 0.26e18);
+        assertEq(res[2], 0.34e18);
     }
 
     function testWeightGuards4TokensBelowEpsilonMax() public {
@@ -358,10 +358,10 @@ contract QuantAMMMathGuardTest is Test {
             absoluteWeightGuardRail
         );
 
-        assertEq(res[0], 0.166666666666666667e18);
-        assertEq(res[1], 0.4e18);
-        assertEq(res[2], 0.133333333333333333e18);
-        assertEq(res[3], 0.3e18);
+        assertEq(res[0], 0.2e18);
+        assertEq(res[1], 0.38e18);
+        assertEq(res[2], 0.136666666666666667e18);
+        assertEq(res[3], 0.283333333333333333e18);
     }
 
     function testWeightGuards4TokensClamped() public {

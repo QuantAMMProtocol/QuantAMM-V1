@@ -736,7 +736,7 @@ contract QuantAMMWeightedPool is
 
         _setInitialWeights(initialiseParams._initialWeights);
 
-        //
+        //CODEHAWKS L-09 emit during creation rather than setruleforpool with creator address also
         // emit event for easier tracking of rule changes
         emit PoolRuleSet(
             address(initialiseParams._poolSettings.rule),

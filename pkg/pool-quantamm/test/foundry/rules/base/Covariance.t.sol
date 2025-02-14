@@ -26,10 +26,69 @@ contract QuantAMMCoVarianceRuleTest is Test, QuantAMMTestUtils {
         mockQuantAMMMathGuard = new MockQuantAMMMathGuard();
     }
 
-    // Utility to compare results with some tolerance
-    function closeTo(int256 a, int256 b, int256 tolerance) internal pure {
-        int256 delta = (a - b).abs();
-        require(delta <= tolerance, "Values are not within tolerance");
+    function testInitialSettingOfCovariance(uint256 unboundedNumberOfAssets) public {
+        uint256 numberOfAssets = bound(unboundedNumberOfAssets,2,8);
+
+        mockPool.setNumberOfAssets(numberOfAssets);
+
+        int256[][] memory initialCovariances = new int256[][](numberOfAssets);
+        for(uint256 i = 0; i < numberOfAssets; i++){
+            initialCovariances[i] = new int256[](numberOfAssets);
+
+            for (uint256 j = 0; j < numberOfAssets; j++) {
+                initialCovariances[i][j] = PRBMathSD59x18.fromInt(int256(j + 1));
+            }
+        }
+
+        mockCalculationRule.setInitialCovariance(address(mockPool), initialCovariances, numberOfAssets);
+
+        int256[][] memory results = mockCalculationRule.getIntermediateCovariance(address(mockPool), numberOfAssets);
+
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            for(uint256 j = 0; j < numberOfAssets; j++){
+                assertEq(results[i][j], initialCovariances[i][j]);
+            }
+        }
+    }
+
+    function testBreakGlassSettingOfCovariances(uint256 unboundedNumberOfAssets) public {
+        uint256 numberOfAssets = bound(unboundedNumberOfAssets,2,8);
+
+        mockPool.setNumberOfAssets(numberOfAssets);
+
+        int256[][] memory initialCovariances = new int256[][](numberOfAssets);
+        for(uint256 i = 0; i < numberOfAssets; i++){
+            initialCovariances[i] = new int256[](numberOfAssets);
+
+            for (uint256 j = 0; j < numberOfAssets; j++) {
+                initialCovariances[i][j] = PRBMathSD59x18.fromInt(int256(j + 1));
+            }
+        }
+
+        mockCalculationRule.setInitialCovariance(address(mockPool), initialCovariances, numberOfAssets);
+
+        int256[][] memory results = mockCalculationRule.getIntermediateCovariance(address(mockPool), numberOfAssets);
+
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            for(uint256 j = 0; j < numberOfAssets; j++){
+                assertEq(results[i][j], initialCovariances[i][j]);
+            }
+        }
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            for(uint256 j = 0; j < numberOfAssets; j++){
+                initialCovariances[i][j] = PRBMathSD59x18.fromInt(int256(i + 3));
+            }
+        }
+
+        mockCalculationRule.setInitialCovariance(address(mockPool), initialCovariances, numberOfAssets);
+
+        results = mockCalculationRule.getIntermediateCovariance(address(mockPool), numberOfAssets);
+
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            for(uint256 j = 0; j < numberOfAssets; j++){
+                assertEq(results[i][j], initialCovariances[i][j]);
+            }
+        }
     }
 
     function testCovariance(

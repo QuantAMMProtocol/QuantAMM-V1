@@ -111,6 +111,10 @@ contract MockCalculationRule is
         _setIntermediateCovariance(poolAddress, _initialValues, _numberOfAssets);
     }
 
+    function getIntermediateCovariance(address poolAddress, uint _numberOfAssets) external view returns (int256[][] memory) {
+        return _quantAMMUnpack128Matrix(intermediateCovarianceStates[poolAddress], _numberOfAssets);
+    }
+
     function CalculateNewWeights(
         int256[] calldata prevWeights,
         int256[] calldata data,

@@ -23,37 +23,6 @@ contract QuantAMMMathGuardTest is Test {
         mockQuantAMMMathGuard = new MockQuantAMMMathGuard();
     }
 
-    // Utility to compare results with some tolerance
-    function closeTo(int256 a, int256 b, int256 tolerance) internal pure {
-        int256 delta = (a - b).abs();
-        require(delta <= tolerance, "Values are not within tolerance");
-    }
-
-    // Weight Guards
-    // the correct behavior.
-    // 2 tokens below epsilon max
-    function testWeightGuards2TokensBelowEpsilonMax() public view {
-        int256[] memory prevWeights = new int256[](2);
-        prevWeights[0] = 0.5e18;
-        prevWeights[1] = 0.5e18;
-
-        int256[] memory newWeights = new int256[](2);
-        newWeights[0] = 0.55e18;
-        newWeights[1] = 0.45e18;
-
-        int256 epsilonMax = 0.1e18;
-        int256 absoluteWeightGuardRail = 0.1e18;
-
-        int256[] memory res = mockQuantAMMMathGuard.mockGuardQuantAMMWeights(
-            newWeights,
-            prevWeights,
-            epsilonMax,
-            absoluteWeightGuardRail
-        );
-
-        assertEq(res[0], newWeights[0]);
-        assertEq(res[1], newWeights[1]);
-    }
     // Weight Guards
     // the correct behavior.
     // 2 tokens below epsilon max
@@ -104,29 +73,7 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[1], 0.4e18);
     }
 
-    // 2 tokens clamped
-    function testWeightGuards2TokensClamped() public view {
-        int256[] memory prevWeights = new int256[](2);
-        prevWeights[0] = 0.5e18;
-        prevWeights[1] = 0.5e18;
 
-        int256[] memory newWeights = new int256[](2);
-        newWeights[0] = 0.95e18;
-        newWeights[1] = 0.05e18;
-
-        int256 epsilonMax = 0.1e18;
-        int256 absoluteWeightGuardRail = 0.1e18;
-
-        int256[] memory res = mockQuantAMMMathGuard.mockGuardQuantAMMWeights(
-            newWeights,
-            prevWeights,
-            epsilonMax,
-            absoluteWeightGuardRail
-        );
-
-        assertEq(res[0], 0.6e18);
-        assertEq(res[1], 0.4e18);
-    }
     // 2 tokens clamped
     function testFuzz_WeightGuards2TokensClamped(int256 newWeight) public view {
         int256[] memory prevWeights = new int256[](2);
@@ -151,32 +98,7 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[1], 0.1e18);
     }
 
-    // 3 tokens below epsilon max
-    function testWeightGuards3TokensBelowEpsilonMax() public view {
-        int256[] memory prevWeights = new int256[](3);
-        prevWeights[0] = 0.3e18;
-        prevWeights[1] = 0.3e18;
-        prevWeights[2] = 0.4e18;
 
-        int256[] memory newWeights = new int256[](3);
-        newWeights[0] = 0.35e18;
-        newWeights[1] = 0.24e18;
-        newWeights[2] = 0.41e18;
-
-        int256 epsilonMax = 0.1e18;
-        int256 absoluteWeightGuardRail = 0.1e18;
-
-        int256[] memory res = mockQuantAMMMathGuard.mockGuardQuantAMMWeights(
-            newWeights,
-            prevWeights,
-            epsilonMax,
-            absoluteWeightGuardRail
-        );
-
-        assertEq(res[0], newWeights[0]);
-        assertEq(res[1], newWeights[1]);
-        assertEq(res[2], newWeights[2]);
-    }
 
     function testFuzz_WeightGuardsNTokensBelowEpsilonMax(
         uint256 tokens,
@@ -237,8 +159,102 @@ contract QuantAMMMathGuardTest is Test {
         }
     }
 
-    // 3 tokens above epsilon max
-    function testWeightGuards3TokensAboveEpsilonMax() public view {
+    function testWeightGuards2TokensBelowEpsilonMax() public {
+        int256[] memory prevWeights = new int256[](2);
+        prevWeights[0] = 0.5e18;
+        prevWeights[1] = 0.5e18;
+
+        int256[] memory newWeights = new int256[](2);
+        newWeights[0] = 0.55e18;
+        newWeights[1] = 0.45e18;
+
+        int256 epsilonMax = 0.1e18;
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory res = mockQuantAMMMathGuard.mockGuardQuantAMMWeights(
+            newWeights,
+            prevWeights,
+            epsilonMax,
+            absoluteWeightGuardRail
+        );
+
+        assertEq(res[0], newWeights[0]);
+        assertEq(res[1], newWeights[1]);
+    }
+
+    function testWeightGuards2TokensAboveEpsilonMax() public {
+        int256[] memory prevWeights = new int256[](2);
+        prevWeights[0] = 0.5e18;
+        prevWeights[1] = 0.5e18;
+
+        int256[] memory newWeights = new int256[](2);
+        newWeights[0] = 0.7e18;
+        newWeights[1] = 0.3e18;
+
+        int256 epsilonMax = 0.1e18;
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory res = mockQuantAMMMathGuard.mockGuardQuantAMMWeights(
+            newWeights,
+            prevWeights,
+            epsilonMax,
+            absoluteWeightGuardRail
+        );
+
+        assertEq(res[0], 0.6e18);
+        assertEq(res[1], 0.4e18);
+    }
+
+    function testWeightGuards2TokensClamped() public {
+        int256[] memory prevWeights = new int256[](2);
+        prevWeights[0] = 0.5e18;
+        prevWeights[1] = 0.5e18;
+
+        int256[] memory newWeights = new int256[](2);
+        newWeights[0] = 0.95e18;
+        newWeights[1] = 0.05e18;
+
+        int256 epsilonMax = 0.1e18;
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory res = mockQuantAMMMathGuard.mockGuardQuantAMMWeights(
+            newWeights,
+            prevWeights,
+            epsilonMax,
+            absoluteWeightGuardRail
+        );
+
+        assertEq(res[0], 0.6e18);
+        assertEq(res[1], 0.4e18);
+    }
+
+    function testWeightGuards3TokensBelowEpsilonMax() public {
+        int256[] memory prevWeights = new int256[](3);
+        prevWeights[0] = 0.3e18;
+        prevWeights[1] = 0.3e18;
+        prevWeights[2] = 0.4e18;
+
+        int256[] memory newWeights = new int256[](3);
+        newWeights[0] = 0.35e18;
+        newWeights[1] = 0.24e18;
+        newWeights[2] = 0.41e18;
+
+        int256 epsilonMax = 0.1e18;
+        int256 absoluteWeightGuardRail = 0.1e18;
+
+        int256[] memory res = mockQuantAMMMathGuard.mockGuardQuantAMMWeights(
+            newWeights,
+            prevWeights,
+            epsilonMax,
+            absoluteWeightGuardRail
+        );
+
+        assertEq(res[0], newWeights[0]);
+        assertEq(res[1], newWeights[1]);
+        assertEq(res[2], newWeights[2]);
+    }
+
+    function testWeightGuards3TokensAboveEpsilonMax() public {
         int256[] memory prevWeights = new int256[](3);
         prevWeights[0] = 0.3e18;
         prevWeights[1] = 0.3e18;
@@ -260,12 +276,11 @@ contract QuantAMMMathGuardTest is Test {
         );
 
         assertEq(res[0], 0.4e18);
-        assertEq(res[1], 0.2e18);
-        assertEq(res[2], 0.4e18);
+        assertEq(res[1], 0.218181818181818181e18);
+        assertEq(res[2], 0.381818181818181819e18);
     }
 
-    // 3 tokens clamped
-    function testWeightGuards3TokensClamped() public view {
+    function testWeightGuards3TokensClamped() public {
         int256[] memory prevWeights = new int256[](3);
         prevWeights[0] = 0.3e18;
         prevWeights[1] = 0.3e18;
@@ -287,12 +302,11 @@ contract QuantAMMMathGuardTest is Test {
         );
 
         assertEq(res[0], 0.4e18);
-        assertEq(res[1], 0.26e18);
-        assertEq(res[2], 0.34e18);
+        assertEq(res[1], 0.263636363636363636e18);
+        assertEq(res[2], 0.336363636363636364e18);
     }
 
-    // 4 tokens below epsilon max
-    function testWeightGuards4TokensBelowEpsilonMax() public view {
+    function testWeightGuards4TokensBelowEpsilonMax() public {
         int256[] memory prevWeights = new int256[](4);
         prevWeights[0] = 0.3e18;
         prevWeights[1] = 0.3e18;
@@ -321,8 +335,7 @@ contract QuantAMMMathGuardTest is Test {
         assertEq(res[3], newWeights[3]);
     }
 
-    // 4 tokens above epsilon max
-    function testWeightGuards4TokensAboveEpsilonMax() public view {
+    function testWeightGuards4TokensAboveEpsilonMax() public {
         int256[] memory prevWeights = new int256[](4);
         prevWeights[0] = 0.3e18;
         prevWeights[1] = 0.3e18;
@@ -344,16 +357,14 @@ contract QuantAMMMathGuardTest is Test {
             epsilonMax,
             absoluteWeightGuardRail
         );
-        
-        //TODO MW review
-        assertEq(res[0], 0.2e18);
-        assertEq(res[1], 0.38e18); //0.4
-        assertEq(res[2], 0.136666666666666667e18); //0.1
-        assertEq(res[3], 0.283333333333333333e18); //0.3
+
+        assertEq(res[0], 0.166666666666666667e18);
+        assertEq(res[1], 0.4e18);
+        assertEq(res[2], 0.133333333333333333e18);
+        assertEq(res[3], 0.3e18);
     }
 
-    // 4 tokens clamped
-    function testWeightGuards4TokensClamped() public view {
+    function testWeightGuards4TokensClamped() public {
         int256[] memory prevWeights = new int256[](4);
         prevWeights[0] = 0.3e18;
         prevWeights[1] = 0.3e18;

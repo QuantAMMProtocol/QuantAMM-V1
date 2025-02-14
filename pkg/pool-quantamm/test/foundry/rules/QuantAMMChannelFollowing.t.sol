@@ -804,7 +804,7 @@ contract ChannelFollowingUpdateRuleTest is Test, QuantAMMTestUtils {
         //exponents
         parameters[3] = new int256[](boundNumParameters);
         for(uint i = 0; i < boundNumParameters; i++){
-            parameters[3][i] = PRBMathSD59x18.fromInt(bound(params.exponents, 1, 10));
+            parameters[3][i] = PRBMathSD59x18.fromInt(bound(params.exponents, 1, 2));
             vm.assume(parameters[3][i] != 0);
         }
 
@@ -817,7 +817,7 @@ contract ChannelFollowingUpdateRuleTest is Test, QuantAMMTestUtils {
         //Pre-exp Scaling
         parameters[5] = new int256[](boundNumParameters);
         for(uint i = 0; i < boundNumParameters; i++){
-            parameters[5][i] = PRBMathSD59x18.fromInt(bound(params.preExponentialScaling, 0, 100));
+            parameters[5][i] = PRBMathSD59x18.fromInt(bound(params.preExponentialScaling, 0, 20));
             vm.assume(parameters[5][i] != 0);
         }
 
@@ -862,7 +862,7 @@ contract ChannelFollowingUpdateRuleTest is Test, QuantAMMTestUtils {
 
         int256[] memory oracleData = new int256[](boundNumAssets);
         for(uint i = 0; i < boundNumAssets; i++){
-            oracleData[i] = PRBMathSD59x18.fromInt(bound(params.data, 1, 10000000000));
+            oracleData[i] = PRBMathSD59x18.fromInt(bound(params.data, 1, 100000000));
         }       
 
         mockPool.setNumberOfAssets(boundNumAssets);

@@ -67,7 +67,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testGetNormalizedWeightsInitial() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._initialWeights[6] = 0.1e18;
         params._initialWeights[7] = 0.15e18;
 
@@ -86,7 +86,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testSetWeightInitial() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -114,7 +114,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testSetWeightNBlocksAfter() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -142,7 +142,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testSetWeightAfterLimit() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -180,7 +180,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         uint delay,
         uint256 expected
     ) internal {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -273,7 +273,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         uint delay,
         uint256 expected
     ) internal {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -396,7 +396,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         uint delay,
         uint256 expected
     ) internal {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -521,7 +521,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
         weights[15] = 0.025e18;
     }
     
-    function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
+    function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.CreationNewPoolParams memory retParams) {
         PoolRoleAccounts memory roleAccounts;
         IERC20[] memory tokens = [
             address(dai),
@@ -574,7 +574,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         address[][] memory oracles = _getOracles(8);
 
-        retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
+        retParams = QuantAMMWeightedPoolFactory.CreationNewPoolParams(
             "Pool With Donation",
             "PwD",
             vault.buildTokenConfig(tokens),

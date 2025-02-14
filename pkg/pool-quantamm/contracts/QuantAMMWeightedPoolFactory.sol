@@ -41,7 +41,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
     /// @notice Unsafe or bad configuration for routers and liquidity management
     error ImcompatibleRouterConfiguration();
 
-    struct NewPoolParams {
+    struct CreationNewPoolParams {
         string name;
         string symbol;
         TokenConfig[] tokens;
@@ -86,7 +86,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         return _poolVersion;
     }
 
-    function createWithoutArgs(NewPoolParams memory params) external returns (address pool) {
+    function createWithoutArgs(CreationNewPoolParams memory params) external returns (address pool) {
         if (params.roleAccounts.poolCreator != address(0)) {
             revert StandardPoolWithCreator();
         }
@@ -115,13 +115,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
                 getVault()
             ), params.salt);
 
-        QuantAMMWeightedPool(pool).initialize(
-            params._initialWeights,
-            params._poolSettings,
-            params._initialMovingAverages,
-            params._initialIntermediateValues,
-            params._oracleStalenessThreshold
-        );
+        QuantAMMWeightedPool(pool).initialize(params);
 
         _registerPoolWithVault(
             pool,
@@ -138,7 +132,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
      * @notice Deploys a new `WeightedPool`.
      * @dev Tokens must be sorted for pool registration.
      */
-    function create(NewPoolParams memory params) external returns (address pool, bytes memory poolArgs) {
+    function create(CreationNewPoolParams memory params) external returns (address pool, bytes memory poolArgs) {
         if (params.roleAccounts.poolCreator != address(0)) {
             revert StandardPoolWithCreator();
         }
@@ -165,13 +159,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         
         pool = _create(poolArgs, params.salt);
 
-        QuantAMMWeightedPool(pool).initialize(
-            params._initialWeights,
-            params._poolSettings,
-            params._initialMovingAverages,
-            params._initialIntermediateValues,
-            params._oracleStalenessThreshold
-        );
+        QuantAMMWeightedPool(pool).initialize(params);
 
         _registerPoolWithVault(
             pool,

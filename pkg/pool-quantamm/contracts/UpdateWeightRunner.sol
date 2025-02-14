@@ -71,16 +71,6 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     event UpdatePerformedQuantAMM(address indexed caller, address indexed pool);
     event SetApprovedActionsForPool(address indexed caller, address indexed pool, uint256 actions);
     event ETHUSDOracleSet(address ethUsdOracle);
-    event PoolRuleSet(
-        address rule,
-        address[][] poolOracles,
-        uint64[] lambda,
-        int256[][] ruleParameters,
-        uint64 epsilonMax,
-        uint64 absoluteWeightGuardRail,
-        uint40 updateInterval,
-        address poolManager
-    );
     event PoolLastRunSet(address poolAddress, uint40 time);
 
     /// @notice main eth oracle that could be used to determine value of pools and assets.
@@ -264,18 +254,6 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
             timingSettings: PoolTimingSettings({ updateInterval: _poolSettings.updateInterval, lastPoolUpdateRun: 0 }),
             poolManager: _poolSettings.poolManager
         });
-
-        // emit event for easier tracking of rule changes
-        emit PoolRuleSet(
-            address(_poolSettings.rule),
-            _poolSettings.oracles,
-            _poolSettings.lambda,
-            _poolSettings.ruleParameters,
-            _poolSettings.epsilonMax,
-            _poolSettings.absoluteWeightGuardRail,
-            _poolSettings.updateInterval,
-            _poolSettings.poolManager
-        );
     }
 
     /// @notice Run the update for the provided rule. Last update must be performed more than or equal to updateInterval seconds ago.

@@ -69,7 +69,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testQuantAMMWeightedPoolGetNormalizedWeightsInitial() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._initialWeights[0] = 0.6e18;
         params._initialWeights[1] = 0.4e18;
 
@@ -82,7 +82,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testGetNormalizedWeightSetWeightInitial() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -106,7 +106,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testSetPoolDetailsThrowIfTooLarge(uint size) public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params.poolDetails = new string[][](bound(size, 51,100));
 
         vm.expectRevert();
@@ -115,7 +115,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testSetPoolDetailsThrowIfWrongShapeTooShort(uint size) public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params.poolDetails = new string[][](1);
         params.poolDetails[0] = new string[](bound(size, 0,3));
 
@@ -124,7 +124,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testSetPoolDetailsThrowIfWrongShapeTooLong(uint size) public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params.poolDetails = new string[][](1);
         params.poolDetails[0] = new string[](bound(size, 5,10));//could make longer but resource intensive
 
@@ -133,13 +133,13 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testSetPoolDetailsAcceptEmpty() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testGetPoolDetailsEmptyDetailsNotFound() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -150,7 +150,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testGetPoolDetailSuccess() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params.poolDetails = new string[][](1);
         params.poolDetails[0] = new string[](4);
 
@@ -168,7 +168,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testGetPoolDetailsCategoryNotFound() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params.poolDetails = new string[][](1);
         params.poolDetails[0] = new string[](4);
 
@@ -187,7 +187,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     
 
     function testOwnerSetUpdateWeightRunnerAddress() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         vm.startPrank(owner);
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
         QuantAMMWeightedPool(quantAMMWeightedPool).setUpdateWeightRunnerAddress(addr1);
@@ -196,7 +196,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testNonOwnerSetUpdateWeightRunnerAddress() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         vm.startPrank(owner);
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
         vm.stopPrank();
@@ -207,7 +207,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function test0AddressSetUpdateWeightRunnerAddress() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         vm.startPrank(owner);
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
         vm.expectRevert("INVADDRESS");
@@ -215,7 +215,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testSameAddressSetUpdateWeightRunnerAddress() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         vm.startPrank(owner);
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
         address current = address(QuantAMMWeightedPool(quantAMMWeightedPool).updateWeightRunner());
@@ -224,7 +224,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testGetPoolDetailsNameNotFound() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params.poolDetails = new string[][](1);
         params.poolDetails[0] = new string[](4);
 
@@ -242,7 +242,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testSetWeightNBlocksAfter() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -268,7 +268,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testSetWeightAfterLimit() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -294,7 +294,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testComputeBalanceInitial() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -321,7 +321,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testComputeBalanceNBlocksAfter() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -350,7 +350,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testComputeBalanceAfterLimit() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -379,7 +379,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testOnSwapOutGivenInInitial() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -416,7 +416,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testOnSwapOutGivenInNBlocksAfter() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -455,7 +455,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testOnSwapOutGivenInAfterLimit() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -494,7 +494,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testOnSwapInGivenOutInitial() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -531,7 +531,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testOnSwapInGivenOutNBlocksAfter() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -570,7 +570,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
     }
 
     function testOnSwapInGivenOutAfterLimit() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
 
@@ -608,7 +608,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
         assertEq(newBalance, 34.933148109829107000e18);
     }
 
-    function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
+    function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.CreationNewPoolParams memory retParams) {
         PoolRoleAccounts memory roleAccounts;
         IERC20[] memory tokens = [address(dai), address(usdc)].toMemoryArray().asIERC20();
         MockMomentumRule momentumRule = new MockMomentumRule(owner);
@@ -632,7 +632,7 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         address[][] memory oracles = _getOracles(2);
 
-        retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
+        retParams = QuantAMMWeightedPoolFactory.CreationNewPoolParams(
             "Pool With Donation",
             "PwD",
             vault.buildTokenConfig(tokens),

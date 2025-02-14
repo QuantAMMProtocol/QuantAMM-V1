@@ -121,7 +121,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         return oracles;
     }
 
-    function _createPoolParams(address[] memory tokens, IRateProvider[] memory rateProviders) internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
+    function _createPoolParams(address[] memory tokens, IRateProvider[] memory rateProviders) internal returns (QuantAMMWeightedPoolFactory.CreationNewPoolParams memory retParams) {
         PoolRoleAccounts memory roleAccounts;
 
         uint64[] memory lambdas = new uint64[](1);
@@ -154,7 +154,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
 
         tokenConfig = sortTokenConfig(tokenConfig);
         
-        retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
+        retParams = QuantAMMWeightedPoolFactory.CreationNewPoolParams(
             "Pool With Donation",
             "PwD",
             tokenConfig,
@@ -199,7 +199,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
             "Factory v1",
             "Pool v1"
         ));
-        QuantAMMWeightedPoolFactory.NewPoolParams memory poolCreateSettings = _createPoolParams(tokens, rateProviders);
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory poolCreateSettings = _createPoolParams(tokens, rateProviders);
         
         (newPoolAddress, poolArgsRet) =  QuantAMMWeightedPoolFactory(deployerFactory).create(poolCreateSettings);
        

@@ -131,7 +131,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         TestParam firstWeight;
         TestParam secondWeight;
         TestParam otherWeights;
-        QuantAMMWeightedPoolFactory.NewPoolParams params;
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams params;
         PoolSwapParams swapParams;
         IQuantAMMWeightedPool.QuantAMMWeightedPoolDynamicData dynamicData;
         IQuantAMMWeightedPool.QuantAMMWeightedPoolImmutableData immutableData;
@@ -208,9 +208,9 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         uint256 numTokens,
         PoolFuzzParams memory poolParams,
         RuleFuzzParams memory ruleParams
-    ) internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory) {
+    ) internal returns (QuantAMMWeightedPoolFactory.CreationNewPoolParams memory) {
         // Create base params first
-        QuantAMMWeightedPoolFactory.NewPoolParams memory baseParams = _createBaseParams(
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory baseParams = _createBaseParams(
             numTokens,
             poolParams.maxSwapfee
         );
@@ -224,14 +224,14 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
     function _createBaseParams(
         uint256 numTokens,
         uint64 maxSwapFee
-    ) internal view returns (QuantAMMWeightedPoolFactory.NewPoolParams memory) {
+    ) internal view returns (QuantAMMWeightedPoolFactory.CreationNewPoolParams memory) {
         PoolRoleAccounts memory roleAccounts;
         IERC20[] memory poolTokens = _getTokens(numTokens);
 
         (uint256[] memory initialWeightsUint, int256[] memory initialWeights) = _createInitialWeights(numTokens);
 
         return
-            QuantAMMWeightedPoolFactory.NewPoolParams({
+            QuantAMMWeightedPoolFactory.CreationNewPoolParams({
                 name: "Pool With Donation",
                 symbol: "PwD",
                 tokens: vault.buildTokenConfig(poolTokens),

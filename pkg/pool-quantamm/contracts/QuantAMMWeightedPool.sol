@@ -35,6 +35,7 @@ import { ScalarQuantAMMBaseStorage } from "./QuantAMMStorage.sol";
 import { UpdateWeightRunner } from "./UpdateWeightRunner.sol";
 import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { QuantAMMWeightedPoolFactory } from "./QuantAMMWeightedPoolFactory.sol";
 
 /**
  * @notice QuantAMM Base Weighted pool. One per pool.
@@ -122,6 +123,18 @@ contract QuantAMMWeightedPool is
 
     ///@dev Emitted when the update weight runner is updated
     event UpdateWeightRunnerAddressUpdated(address indexed oldAddress, address indexed newAddress);
+
+    event PoolRuleSet(
+        address rule,
+        address[][] poolOracles,
+        uint64[] lambda,
+        int256[][] ruleParameters,
+        uint64 epsilonMax,
+        uint64 absoluteWeightGuardRail,
+        uint40 updateInterval,
+        address poolManager,
+        address creatorAddress
+    );
 
     /// @dev Indicates that one of the pool tokens' weight is below the minimum allowed.
     error MinWeight();
@@ -699,37 +712,43 @@ contract QuantAMMWeightedPool is
     }
 
     /// @notice Initialize the pool
-    /// @param _initialWeights Initial weights to set
-    /// @param _poolSettings Settings for the pool
-    /// @param _initialMovingAverages Initial moving averages to set
-    /// @param _initialIntermediateValues Initial intermediate values to set for a given rule
-    /// @param _oracleStalenessThreshold Maximum amount of seconds that can pass between two oracle updates
+    /// @param initialiseParams parameters defined by the factory
     function initialize(
-        int256[] memory _initialWeights,
-        PoolSettings memory _poolSettings,
-        int256[] memory _initialMovingAverages,
-        int256[] memory _initialIntermediateValues,
-        uint _oracleStalenessThreshold
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory initialiseParams
     ) public initializer {
-        require(_poolSettings.assets.length > 0 
-        && _poolSettings.assets.length == _initialWeights.length 
-        && _initialWeights.length == _totalTokens, "INVASSWEIG"); //Invalid assets / weights array
+        require(initialiseParams._poolSettings.assets.length > 0 
+        && initialiseParams._poolSettings.assets.length == initialiseParams._initialWeights.length 
+        && initialiseParams._initialWeights.length == _totalTokens, "INVASSWEIG"); //Invalid assets / weights array
 
-        assets = _poolSettings.assets;
-        poolSettings.assets = new address[](_poolSettings.assets.length);
-        for (uint i; i < _poolSettings.assets.length; ) {
-            poolSettings.assets[i] = address(_poolSettings.assets[i]);
+        assets = initialiseParams._poolSettings.assets;
+        poolSettings.assets = new address[](initialiseParams._poolSettings.assets.length);
+        for (uint i; i < initialiseParams._poolSettings.assets.length; ) {
+            poolSettings.assets[i] = address(initialiseParams._poolSettings.assets[i]);
             unchecked {
                 ++i;
             }
         }
-        require(_oracleStalenessThreshold > 0, "INVORCSTAL"); //Invalid oracle staleness threshold
+        require(initialiseParams._oracleStalenessThreshold > 0, "INVORCSTAL"); //Invalid oracle staleness threshold
         
-        oracleStalenessThreshold = _oracleStalenessThreshold;
-        updateInterval = _poolSettings.updateInterval;
-        _setRule(_initialWeights, _initialIntermediateValues, _initialMovingAverages, _poolSettings);
+        oracleStalenessThreshold = initialiseParams._oracleStalenessThreshold;
+        updateInterval = initialiseParams._poolSettings.updateInterval;
+        _setRule(initialiseParams);
 
-        _setInitialWeights(_initialWeights);
+        _setInitialWeights(initialiseParams._initialWeights);
+
+        //
+        // emit event for easier tracking of rule changes
+        emit PoolRuleSet(
+            address(initialiseParams._poolSettings.rule),
+            initialiseParams._poolSettings.oracles,
+            initialiseParams._poolSettings.lambda,
+            initialiseParams._poolSettings.ruleParameters,
+            initialiseParams._poolSettings.epsilonMax,
+            initialiseParams._poolSettings.absoluteWeightGuardRail,
+            initialiseParams._poolSettings.updateInterval,
+            initialiseParams._poolSettings.poolManager,
+            msg.sender //this should be the factory and only factory sent creations should be listened to.
+        );
     }
 
     /// @notice Split the weights and multipliers into two arrays
@@ -765,28 +784,22 @@ contract QuantAMMWeightedPool is
     }
 
     /// @notice Set the rule for this pool
-    /// @param _initialWeights Initial weights to set
-    /// @param _ruleIntermediateValues Intermediate values for the rule
-    /// @param _initialMovingAverages Initial moving averages to set
-    /// @param _poolSettings Settings for the pool
+    /// @param params parameters defined by the factory creation process
     function _setRule(
-        int256[] memory _initialWeights,
-        int256[] memory _ruleIntermediateValues,
-        int256[] memory _initialMovingAverages,
-        IQuantAMMWeightedPool.PoolSettings memory _poolSettings
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params
     ) internal {
-        require(address(_poolSettings.rule) != address(0), "Invalid rule");
+        require(address(params._poolSettings.rule) != address(0), "Invalid rule");
 
-        for (uint i; i < _poolSettings.lambda.length; ++i) {
-            int256 currentLambda = int256(uint256(_poolSettings.lambda[i]));
+        for (uint i; i < params._poolSettings.lambda.length; ++i) {
+            int256 currentLambda = int256(uint256(params._poolSettings.lambda[i]));
             require(currentLambda > PRBMathSD59x18.fromInt(0) && currentLambda < PRBMathSD59x18.fromInt(1), "INVLAM"); //Invalid lambda value
         }
 
         require(
-            _poolSettings.lambda.length == 1 || _poolSettings.lambda.length == _initialWeights.length,
+            params._poolSettings.lambda.length == 1 || params._poolSettings.lambda.length == params._initialWeights.length,
             "Either scalar or vector"
         );
-        int256 currentEpsilonMax = int256(uint256(_poolSettings.epsilonMax));
+        int256 currentEpsilonMax = int256(uint256(params._poolSettings.epsilonMax));
         require(
             currentEpsilonMax > PRBMathSD59x18.fromInt(0) && currentEpsilonMax <= PRBMathSD59x18.fromInt(1),
             "INV_EPMX"
@@ -795,35 +808,35 @@ contract QuantAMMWeightedPool is
         //applied both as a max (1 - x) and a min, so it cant be more than 0.49 or less than 0.01
         //all pool logic assumes that absolute guard rail is already stored as an 18dp int256
         require(
-            int256(uint256(_poolSettings.absoluteWeightGuardRail)) <
-                PRBMathSD59x18.fromInt(1) / int256(uint256((_initialWeights.length))) &&
-                int256(uint256(_poolSettings.absoluteWeightGuardRail)) >= 0.01e18,
+            int256(uint256(params._poolSettings.absoluteWeightGuardRail)) <
+                PRBMathSD59x18.fromInt(1) / int256(uint256((params._initialWeights.length))) &&
+                int256(uint256(params._poolSettings.absoluteWeightGuardRail)) >= 0.01e18,
             "INV_ABSWGT"
         ); //Invalid absoluteWeightGuardRail value
 
-        require(_poolSettings.oracles.length > 0, "NOPROVORC"); //No oracle indices provided"
+        require(params._poolSettings.oracles.length > 0, "NOPROVORC"); //No oracle indices provided"
 
-        require(_poolSettings.oracles.length == _initialWeights.length, "OLNWEIG"); //Oracle length not equal to weights length
-        require(_poolSettings.rule.validParameters(_poolSettings.ruleParameters), "INVRLEPRM"); //Invalid rule parameters
+        require(params._poolSettings.oracles.length == params._initialWeights.length, "OLNWEIG"); //Oracle length not equal to weights length
+        require(params._poolSettings.rule.validParameters(params._poolSettings.ruleParameters), "INVRLEPRM"); //Invalid rule parameters
 
         //0 is hodl, 1 is trade whole pool which invariant doesnt let you do anyway
-        require(_poolSettings.maxTradeSizeRatio > 0 && _poolSettings.maxTradeSizeRatio <= 0.3e18, "INVMAXTRADE"); //Invalid max trade size
+        require(params._poolSettings.maxTradeSizeRatio > 0 && params._poolSettings.maxTradeSizeRatio <= 0.3e18, "INVMAXTRADE"); //Invalid max trade size
 
-        lambda = _poolSettings.lambda;
-        epsilonMax = _poolSettings.epsilonMax;
-        absoluteWeightGuardRail = _poolSettings.absoluteWeightGuardRail;
-        maxTradeSizeRatio = _poolSettings.maxTradeSizeRatio;
+        lambda = params._poolSettings.lambda;
+        epsilonMax = params._poolSettings.epsilonMax;
+        absoluteWeightGuardRail = params._poolSettings.absoluteWeightGuardRail;
+        maxTradeSizeRatio = params._poolSettings.maxTradeSizeRatio;
 
-        ruleParameters = _poolSettings.ruleParameters;
+        ruleParameters = params._poolSettings.ruleParameters;
 
-        _poolSettings.rule.initialisePoolRuleIntermediateValues(
+        params._poolSettings.rule.initialisePoolRuleIntermediateValues(
             address(this),
-            _initialMovingAverages,
-            _ruleIntermediateValues,
-            _initialWeights.length
+            params._initialMovingAverages,
+            params._initialIntermediateValues,
+            params._initialWeights.length
         );
 
-        updateWeightRunner.setRuleForPool(_poolSettings);
+        updateWeightRunner.setRuleForPool(params._poolSettings);
     }
 
     /// @inheritdoc IQuantAMMWeightedPool

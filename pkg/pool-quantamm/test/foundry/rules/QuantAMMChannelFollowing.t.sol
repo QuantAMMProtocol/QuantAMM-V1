@@ -876,6 +876,5 @@ contract ChannelFollowingUpdateRuleTest is Test, QuantAMMTestUtils {
         );
 
         rule.CalculateUnguardedWeights(prevWeights, oracleData, address(mockPool), parameters, lambdas, movingAverages);
-
     }
 }

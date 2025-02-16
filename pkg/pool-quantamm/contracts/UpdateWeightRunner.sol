@@ -73,6 +73,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     event SetApprovedActionsForPool(address indexed caller, address indexed pool, uint256 actions);
     event ETHUSDOracleSet(address ethUsdOracle);
     event PoolLastRunSet(address poolAddress, uint40 time);
+    event PoolRuleSetAdminOverride(address admin, address poolAddress, address ruleAddress);
 
     /// @notice main eth oracle that could be used to determine value of pools and assets.
     /// @dev this could be used for things like uplift only withdrawal fee hooks
@@ -224,6 +225,28 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         emit SetApprovedActionsForPool(msg.sender, _pool, _actions);
     }
 
+    /// @notice Set the rule for a pool, called by the pool creator
+    /// @param _poolSettings Settings for the pool
+    /// @param _pool Pool to set the rule for
+    function setRuleForPoolAdminInitialise(
+        IQuantAMMWeightedPool.PoolSettings memory _poolSettings,
+        address _pool
+    ) external {
+        require(msg.sender == quantammAdmin, "ONLYADMIN");
+        require(address(rules[_pool]) == address(0), "Rule already set");
+        require(_poolSettings.oracles.length > 0, "Empty oracles array");
+        require(poolOracles[_pool].length == 0, "pool rule already set");
+        //needed to prevent 2 step amend
+        require(_pool != address(0), "Invalid pool address");
+
+        //CODEHAWKS INFO /s/700
+        require(_poolSettings.updateInterval > 0, "Update interval must be greater than 0");
+
+        _setRuleForPool(_poolSettings, _pool);
+        
+        emit PoolRuleSetAdminOverride(msg.sender, _pool, address(_poolSettings.rule));
+    }
+
     /// @notice Set a rule for a pool, called by the pool
     /// @param _poolSettings Settings for the pool
     function setRuleForPool(IQuantAMMWeightedPool.PoolSettings memory _poolSettings) external {
@@ -233,7 +256,10 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
 
         //CODEHAWKS INFO /s/700
         require(_poolSettings.updateInterval > 0, "Update interval must be greater than 0");
+        _setRuleForPool(_poolSettings, msg.sender);
+    }
 
+    function _setRuleForPool(IQuantAMMWeightedPool.PoolSettings memory _poolSettings, address pool) internal {        
         for (uint i; i < _poolSettings.oracles.length; ++i) {
             require(_poolSettings.oracles[i].length > 0, "Empty oracles array");
             for (uint j; j < _poolSettings.oracles[i].length; ++j) {
@@ -247,10 +273,10 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         for (uint i; i < _poolSettings.oracles.length; ++i) {
             optimisedHappyPathOracles[i] = _poolSettings.oracles[i][0];
         }
-        poolOracles[msg.sender] = optimisedHappyPathOracles;
-        poolBackupOracles[msg.sender] = _poolSettings.oracles;
-        rules[msg.sender] = _poolSettings.rule;
-        poolRuleSettings[msg.sender] = PoolRuleSettings({
+        poolOracles[pool] = optimisedHappyPathOracles;
+        poolBackupOracles[pool] = _poolSettings.oracles;
+        rules[pool] = _poolSettings.rule;
+        poolRuleSettings[pool] = PoolRuleSettings({
             lambda: _poolSettings.lambda,
             epsilonMax: _poolSettings.epsilonMax,
             absoluteWeightGuardRail: _poolSettings.absoluteWeightGuardRail,

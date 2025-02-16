@@ -81,6 +81,7 @@ abstract contract ScalarQuantAMMBaseStorage {
                 _seventhInt >= MIN32 &&
                 _eighthInt <= MAX32 &&
                 _eighthInt >= MIN32,
+            //CODEHAWKS INFO /s/505 /s/706
             "Overflow/Underflow"
         );
 
@@ -255,6 +256,7 @@ abstract contract ScalarQuantAMMBaseStorage {
 
         if (targetArrayLength == 0) {
             unchecked {
+                //CODEHAWKS INFO /s/8
                 targetArrayLength = (nonStickySourceLength / 8) + 1;
                 targetArray = new int256[](targetArrayLength);
             }
@@ -267,6 +269,8 @@ abstract contract ScalarQuantAMMBaseStorage {
             for (uint i = nonStickySourceLength; i < _sourceArray.length; ) {
                 unchecked {
                     int256 elem = _sourceArray[i] / 1e9;
+
+                    //CODEHAWKS INFO /s/505 /s/706
                     require(elem <= MAX32 && elem >= MIN32, "Overflow/Underflow");
                     packed |= int256(uint256(elem << 224) >> 224) << offset;
                     offset -= 32;
@@ -457,6 +461,7 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                         targetIndex = 0;
                     }
                     if (targetRow < _numberOfAssets) {
+                        //CODEHAWKS INFO /s/922 remove double initialisation
                         if (targetIndex < _numberOfAssets) {
                             targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i]));
                             unchecked {
@@ -471,12 +476,14 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                     targetIndex = 0;
                 }
                 if (targetRow < _numberOfAssets) {
+                    //CODEHAWKS INFO /s/922 remove double initialisation
                     targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i] >> 128));
                     unchecked {
                         ++targetIndex;
                     }
 
                     if (targetIndex < _numberOfAssets) {
+                        //CODEHAWKS INFO /s/922 remove double initialisation
                         targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i]));
                         unchecked {
                             ++targetIndex;

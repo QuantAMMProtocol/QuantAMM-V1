@@ -49,6 +49,7 @@ updates and guard rails.
 /// @title UpdateWeightRunner singleton contract that is responsible for running all weight updates
 
 contract UpdateWeightRunner is IUpdateWeightRunner {
+    //CODEHAWKS INFO /s/336 remove Ownable2Step as it is not used anymore
     event OracleAdded(address indexed oracleAddress);
     event OracleRemved(address indexed oracleAddress);
     event SetWeightManual(
@@ -208,6 +209,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     /// @notice Removes an existing oracle from the approved oracles
     /// @param _oracleToRemove The oracle to remove
     function removeOracle(OracleWrapper _oracleToRemove) external {
+        //CODEHAWKS INFO /s/491 /s/492 requires ordering
         require(msg.sender == quantammAdmin, "ONLYADMIN");
         approvedOracles[address(_oracleToRemove)] = false;
         emit OracleRemved(address(_oracleToRemove));
@@ -228,6 +230,8 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         require(address(rules[msg.sender]) == address(0), "Rule already set");
         require(_poolSettings.oracles.length > 0, "Empty oracles array");
         require(poolOracles[msg.sender].length == 0, "pool rule already set");
+
+        //CODEHAWKS INFO /s/700
         require(_poolSettings.updateInterval > 0, "Update interval must be greater than 0");
 
         for (uint i; i < _poolSettings.oracles.length; ++i) {
@@ -256,7 +260,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         });
     }
 
-    /// @notice Run the update for the provided rule. Last update must be performed more than or equal to updateInterval seconds ago.
+    /// @notice Run the update for the provided rule. Last update must be performed more than or equal (CODEHAWKS INFO /2/228) to updateInterval seconds ago.
     function performUpdate(address _pool) public {
         //Main external access point to trigger an update
         address rule = address(rules[_pool]);
@@ -284,6 +288,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     /// @param _ethUsdOracle The new oracle address to use for ETH/USD
     function setETHUSDOracle(address _ethUsdOracle) public {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
+        //CODEHAWKS INFO /s/158
         require(_ethUsdOracle != address(0), "INVETHUSDORACLE");
         ethOracle = OracleWrapper(_ethUsdOracle);
         emit ETHUSDOracleSet(_ethUsdOracle);
@@ -404,6 +409,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         address _poolAddress,
         PoolRuleSettings memory _ruleSettings
     ) private {
+        //CODEHAWKS INFO /s/405
         uint256[] memory currentWeightsUnsigned = IWeightedPool(_poolAddress).getNormalizedWeights();
         int256[] memory currentWeights = new int256[](currentWeightsUnsigned.length);
 

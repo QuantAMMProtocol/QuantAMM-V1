@@ -109,6 +109,7 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 }
             }
         } else {
+            //CODEHAWKS INFO /s/361
             //vector logic separate to vector for efficiency
             for (locals.i = 0; locals.i < locals.kappaStore.length; ) {
                 locals.sumKappa += locals.kappaStore[locals.i];
@@ -170,7 +171,8 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                     ++i;
                 }
             }
-
+            
+            //CODEHAWKS INFO /s/568
             if(_parameters.length == 2 && _parameters[1].length == 1){            
                 if (!(_parameters[1][0] == 0 || _parameters[1][0] == PRBMathSD59x18.fromInt(1))) {
                     valid = 0;

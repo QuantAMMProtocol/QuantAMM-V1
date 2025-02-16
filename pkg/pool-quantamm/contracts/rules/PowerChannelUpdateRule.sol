@@ -131,7 +131,7 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             }
         } else {
             //vector parameter calculation, same as scalar but using the per constituent param inside the loops
-            
+            //CODEHAWKS INFO /s/361 
             for (locals.i = 0; locals.i < locals.kappa.length; ) {
                 locals.sumKappa += locals.kappa[locals.i];
                 unchecked {
@@ -203,7 +203,8 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                     ++i;
                 }
             }
-
+            
+            //CODEHAWKS INFO /s/568
             if(parameters.length == 3 && parameters[2].length == 1){            
                 if (!(parameters[2][0] == 0 || parameters[2][0] == PRBMathSD59x18.fromInt(1))) {
                     valid = false;

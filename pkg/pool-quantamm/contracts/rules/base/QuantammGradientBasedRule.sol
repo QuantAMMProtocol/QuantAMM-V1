@@ -113,6 +113,7 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
                         oneMinusLambda
                     );
 
+                //CODEHAWKS INFO /s/755
                 intermediateGradientStates[_poolParameters.pool][locals.storageArrayIndex] = _quantAMMPackTwo128(
                     int256(0),
                     locals.intermediateValue
@@ -198,6 +199,7 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
     function _setGradient(address poolAddress, int256[] memory _initialValues, uint _numberOfAssets) internal {
         uint storeLength = intermediateGradientStates[poolAddress].length;
 
+        //CODEHAWKS /s/444
         if (_initialValues.length == _numberOfAssets 
             && (storeLength == 0  
                 || (_initialValues.length % 2 == 0 && (_initialValues.length / 2) == storeLength)

@@ -3,6 +3,8 @@ pragma solidity >=0.8.24;
 
 /// @notice Generic wrapper around an arbitrary oracle that returns normalized values.
 abstract contract OracleWrapper {
+    //CODEHAWKS INFO /s/294 remove unused enum
+
     /// @notice Get the data of the underlying oracle, interpretation of data depends on oracle type
     /// @param data The underlying data (can be negative), normalized to 18 decimals
     /// @return data Retrieved oracle data

@@ -117,7 +117,7 @@ interface IUpdateWeightRunner {
     /// @param _poolSettings Settings for the pool
     function setRuleForPool(IQuantAMMWeightedPool.PoolSettings memory _poolSettings) external;
 
-    /// @notice Run the update for the provided rule. Last update must be performed more than or equal to updateInterval seconds ago.
+    /// @notice Run the update for the provided rule. Last update must be performed more than or equal (CODEHAWKS INFO /s/228) to updateInterval seconds ago.
     function performUpdate(address _pool) external;
 
     /// @notice Change the ETH/USD oracle

@@ -9,7 +9,7 @@ interface IUpdateRule {
     /// @param _parameters any parameters required by the rule apart from lambda
     /// @param _lambdaStore lambda values either 1 for all constituents or one per constituent
     /// @param _epsilonMax the maximum trade size possible for the pool
-    /// @param _absoluteWeightGuardRail the minimum weight possible for the pool
+    /// @param _absoluteWeightGuardRail the minimum weight possible for the pool CODEHAWKS INFO /s/611
     function CalculateNewWeights(
         int256[] calldata _prevWeights,
         int256[]  memory _data,
@@ -27,6 +27,7 @@ interface IUpdateRule {
     /// @param _numberOfAssets number of assets in the pool
     function initialisePoolRuleIntermediateValues(
         address _poolAddress,
+        //CODEHAWKS INFO /s/321 /s/516
         int256[] memory _newMovingAverages,
         int256[] memory _newInitialValues,
         uint _numberOfAssets

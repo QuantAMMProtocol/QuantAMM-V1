@@ -155,6 +155,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
                 getVault()
             );
         
+        //CODEHAWKS INFO /s/_586 /s/860 /s/962
         require(params.tokens.length == params.normalizedWeights.length, "Token and weight counts must match");
         
         pool = _create(poolArgs, params.salt);

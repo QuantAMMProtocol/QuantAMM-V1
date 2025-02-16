@@ -160,6 +160,7 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 }
             }
 
+            //CODEHAWKS INFO /s/568
             if(_parameters.length == 2 && _parameters[1].length == 1){            
                 if (!(_parameters[1][0] == 0 || _parameters[1][0] == PRBMathSD59x18.fromInt(1))) {
                     valid = 0;

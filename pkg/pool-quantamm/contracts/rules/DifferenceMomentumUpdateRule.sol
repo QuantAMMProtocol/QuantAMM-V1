@@ -86,6 +86,7 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             _poolParameters.numberOfAssets
         );
         shortMovingAverages[_poolParameters.pool] = _quantAMMPack128Array(newShortMovingAverages);
+        //CODEHAWKS INFO /s/325, /s/402, /s/540, /s/944 remove for loop
 
         locals.prevWeightLength = _prevWeights.length;
 
@@ -131,7 +132,7 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                     ++locals.i;
                 }
             }
-
+            //CODEHAWKS INFO /s/361
             locals.normalizationFactor = locals.normalizationFactor.div(locals.sumKappa);
             // To avoid intermediate overflows (because of normalization), we only downcast in the end to an uint6
             for (locals.i = 0; locals.i < _prevWeights.length; ) {
@@ -219,6 +220,7 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             }
         }
 
+        //CODEHAWKS INFO /s/664 edge case were all kappas sum to 0 cannot be used due to division by 0
         if (sumKappa == 0) {
             return false;
         }

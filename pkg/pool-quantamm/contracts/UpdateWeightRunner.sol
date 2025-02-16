@@ -339,15 +339,6 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         emit PoolLastRunSet(_poolAddress, _time);
     }
 
-    /// @notice Call oracle to retrieve new data
-    /// @param _oracle the target oracle
-    function _getOracleData(OracleWrapper _oracle) private view returns (OracleData memory oracleResult) {
-        if (!approvedOracles[address(_oracle)]) return oracleResult; // Return empty timestamp if oracle is no longer approved, result will be discarded
-        (int216 data, uint40 timestamp) = _oracle.getData();
-        oracleResult.data = data;
-        oracleResult.timestamp = timestamp;
-    }
-
     /// @notice Wrapper for if someone wants to get the oracle data the rule is using from an external source
     /// @param _pool Pool to get data for
     function getData(address _pool) public view virtual returns (int256[] memory outputData) {
@@ -369,7 +360,17 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         for (uint i; i < oracleLength; ) {
             // Asset is base asset
             OracleData memory oracleResult;
-            oracleResult = _getOracleData(OracleWrapper(optimisedOracles[i]));
+            
+            require(approvedOracles[address(optimisedOracles[i])], "Oracle not approved");
+
+            try OracleWrapper(optimisedOracles[i]).getData() returns (int216 data, uint40 timestamp) {
+                oracleResult.data = data;
+                oracleResult.timestamp = timestamp;
+            } catch {
+                oracleResult.data = 0;
+                oracleResult.timestamp = 0;
+            }
+
             if (oracleResult.timestamp > block.timestamp - oracleStalenessThreshold) {
                 outputData[i] = oracleResult.data;
             } else {
@@ -383,10 +384,17 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
                 }
                 
                 for (uint j = 1 /*0 already done via optimised poolOracles*/; j < numAssetOracles; ) {
-                    oracleResult = _getOracleData(
-                        // poolBackupOracles[_pool][asset][oracle]
-                        OracleWrapper(poolBackupOracles[_pool][i][j])
-                    );
+
+                    require(approvedOracles[address(poolBackupOracles[_pool][i][j])], "Oracle not approved");
+
+                    try OracleWrapper(poolBackupOracles[_pool][i][j]).getData() returns (int216 data, uint40 timestamp) {
+                        oracleResult.data = data;
+                        oracleResult.timestamp = timestamp;
+                    } catch {
+                        oracleResult.data = 0;
+                        oracleResult.timestamp = 0;
+                    }
+
                     if (oracleResult.timestamp > block.timestamp - oracleStalenessThreshold) {
                         // Oracle has fresh values
                         break;

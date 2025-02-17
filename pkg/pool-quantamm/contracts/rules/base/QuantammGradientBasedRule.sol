@@ -185,8 +185,12 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
                     );
 
                 locals.finalValues[numberOfAssetsMinusOne] = locals.mulFactor.mul(locals.intermediateValue);
-
-                intermediateGradientStates[_poolParameters.pool][locals.storageArrayIndex] = locals.intermediateValue;
+                
+                //CODEHAWKS INFO /s/755
+                intermediateGradientStates[_poolParameters.pool][locals.storageArrayIndex] = _quantAMMPackTwo128(
+                    int256(0),
+                    locals.intermediateValue
+                );
             }
         }
 

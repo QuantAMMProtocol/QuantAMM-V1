@@ -97,6 +97,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
                     name: params.name,
                     symbol: params.symbol,
                     numTokens: params.normalizedWeights.length,
+                    //CODEHAWKS INFO /s/26 /s/31 /s/190 /s/468
                     version: _poolVersion,
                     updateWeightRunner: _updateWeightRunner,
                     poolRegistry: params.poolRegistry,
@@ -142,6 +143,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
                     name: params.name,
                     symbol: params.symbol,
                     numTokens: params.normalizedWeights.length,
+                    //CODEHAWKS INFO /s/26 /s/31 /s/190 /s/468
                     version: _poolVersion,
                     updateWeightRunner: _updateWeightRunner,
                     poolRegistry: params.poolRegistry,

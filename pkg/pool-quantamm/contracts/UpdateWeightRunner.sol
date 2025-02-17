@@ -75,6 +75,9 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     event PoolLastRunSet(address poolAddress, uint40 time);
     event PoolRuleSetAdminOverride(address admin, address poolAddress, address ruleAddress);
 
+    ///@dev Emitted when the weights of the pool are updated
+    event WeightsUpdated(address indexed poolAddress, address updateOwner, int256[] weights, uint40 lastInterpolationTimePossible, uint40 lastUpdateTime);
+
     /// @notice main eth oracle that could be used to determine value of pools and assets.
     /// @dev this could be used for things like uplift only withdrawal fee hooks
     OracleWrapper public ethOracle;
@@ -556,6 +559,15 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
             targetWeightsAndBlockMultiplier,
             local.poolAddress,
             lastTimestampThatInterpolationWorks
+        );
+
+        //L-04 similar possibility with set weights as set rule for pool.
+        emit WeightsUpdated(
+            local.poolAddress,
+            msg.sender,
+            targetWeightsAndBlockMultiplier,
+            lastTimestampThatInterpolationWorks,
+            uint40(block.timestamp)
         );
     }
 

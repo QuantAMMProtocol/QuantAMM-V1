@@ -390,17 +390,10 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
         unchecked {
             for (uint i; i < _sourceMatrix.length; ) {
                 for (uint j; j < _sourceMatrix[i].length; ) {
-                    require(
-                        (_sourceMatrix[i][j] <= int256(type(int128).max)) &&
-                            (_sourceMatrix[i][j] >= int256(type(int128).min)),
-                        "Over/Under-flow"
-                    );
                     if (right == 1) {
                         right = 0;
                         //SSTORE done inline to avoid length SSTORE as length doesnt ever change
-                        _targetArray[targetArrayIndex] =
-                            (leftInt << 128) |
-                            int256(uint256(_sourceMatrix[i][j] << 128) >> 128);
+                        _targetArray[targetArrayIndex] = _quantAMMPackTwo128(leftInt, _sourceMatrix[i][j]);
                         ++targetArrayIndex;
                     } else {
                         leftInt = _sourceMatrix[i][j];
@@ -410,10 +403,9 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                 }
                 ++i;
             }
-            if (((_sourceMatrix.length * _sourceMatrix.length) % 2) != 0) {
-                _targetArray[targetArrayLength - 1] = int256(
-                    int128(_sourceMatrix[_sourceMatrix.length - 1][_sourceMatrix.length - 1])
-                );
+            if (((_sourceMatrix.length * _sourceMatrix.length) % 2) != 0) {                
+                //CODEHAWKS INFO /s/755
+                _targetArray[targetArrayLength - 1] = _quantAMMPackTwo128(0, _sourceMatrix[_sourceMatrix.length - 1][_sourceMatrix.length - 1]);
             }
         }
     }

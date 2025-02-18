@@ -30,6 +30,16 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         }
     }
 
+    function MatrixCheckSum(int256[][] memory sourceMatrix, int256[][] memory targetMatrix) internal view {
+        // Ensure both matrices are of the same length
+        assertEq(targetMatrix.length, sourceMatrix.length);
+
+        // Compare each element in the matrices
+        for (uint256 i = 0; i < sourceMatrix.length; i++) {
+            ArrayCheckSum(sourceMatrix[i], targetMatrix[i]);
+        }
+    }
+
     function testOverFlowCheckForPack32(int256 val, uint256 arrayLength) public {
         uint256 boundArrayLength = bound(arrayLength, 1, 16);
         int256 boundOverMax32 = bound(val, int256(type(int32).max) * 1e10, (int256(type(int32).max)) * 1e18);
@@ -300,11 +310,9 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         // Create a 2x2 test matrix
         int256[][] memory targetMatrix = createMatrix(2);
 
-        // Call the ExternalEncodeDecodeMatrix function from the contract
-        mockQuantAMMStorage.ExternalEncodeDecodeMatrix(targetMatrix);
-
         // Retrieve the decoded matrix and check
-        int256[][] memory redecoded = mockQuantAMMStorage.GetMatrixResult();
+        int256[][] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecodeMatrix(targetMatrix);
+
         checkMatrixResult(redecoded, targetMatrix);
     }
 
@@ -312,12 +320,8 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     function testSmallestOddMatrix() public {
         // Create a 3x3 test matrix
         int256[][] memory targetMatrix = createMatrix(3);
-
-        // Call the ExternalEncodeDecodeMatrix function from the contract
-        mockQuantAMMStorage.ExternalEncodeDecodeMatrix(targetMatrix);
-
         // Retrieve the decoded matrix and check
-        int256[][] memory redecoded = mockQuantAMMStorage.GetMatrixResult();
+        int256[][] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecodeMatrix(targetMatrix);
         checkMatrixResult(redecoded, targetMatrix);
     }
 
@@ -326,11 +330,9 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         // Create an 11x11 test matrix
         int256[][] memory targetMatrix = createMatrix(11);
 
-        // Call the ExternalEncodeDecodeMatrix function from the contract
-        mockQuantAMMStorage.ExternalEncodeDecodeMatrix(targetMatrix);
-
         // Retrieve the decoded matrix and check
-        int256[][] memory redecoded = mockQuantAMMStorage.GetMatrixResult();
+        int256[][] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecodeMatrix(targetMatrix);
+
         checkMatrixResult(redecoded, targetMatrix);
     }
 
@@ -339,11 +341,9 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         // Create a 12x12 test matrix
         int256[][] memory targetMatrix = createMatrix(12);
 
-        // Call the ExternalEncodeDecodeMatrix function from the contract
-        mockQuantAMMStorage.ExternalEncodeDecodeMatrix(targetMatrix);
-
         // Retrieve the decoded matrix and check
-        int256[][] memory redecoded = mockQuantAMMStorage.GetMatrixResult();
+        int256[][] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecodeMatrix(targetMatrix);
+
         checkMatrixResult(redecoded, targetMatrix);
     }
 
@@ -364,11 +364,9 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         targetMatrix[2][1] = 311111111111111111e18 + 26;
         targetMatrix[2][2] = 811111111111111111e18 + 19;
 
-        // Call the ExternalEncodeDecodeMatrix function from the contract
-        mockQuantAMMStorage.ExternalEncodeDecodeMatrix(targetMatrix);
-
         // Retrieve the decoded matrix and check
-        int256[][] memory redecoded = mockQuantAMMStorage.GetMatrixResult();
+        int256[][] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecodeMatrix(targetMatrix);
+        
         checkMatrixResult(redecoded, targetMatrix);
     }
 
@@ -471,7 +469,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         ArrayCheckSum(truncatedTargetValues, redecoded);
     }
 
-    function test_PackNegativeOne() public {
+    function test_PackNegativeOne() public view {
         int256 left = -1; // Valid int128 value
         int256 right = 0; // Simple control value
 
@@ -483,7 +481,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         assertEq(unpacked[1], right, "Right int128 unpacked incorrectly");
     }
 
-    function test_PackMaxInt128() public {
+    function test_PackMaxInt128() public view {
         int256 left = type(int128).max; // 2^127 - 1 (largest valid int128)
         int256 right = 0; // Simple control value
 
@@ -515,5 +513,31 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         int256[] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecode128Array(truncatedTargetValues, boundArrayLength);
 
         ArrayCheckSum(truncatedTargetValues, redecoded);
+    }
+
+    function testFuzz_128Matrix(Test128FuzzStruct memory values) public {
+        int256[] memory targetValues = new int256[](8);
+        targetValues[0] = bound(values.one, type(int128).min, type(int128).max);
+        targetValues[1] = bound(values.two, type(int128).min, type(int128).max);
+        targetValues[2] = bound(values.three, type(int128).min, type(int128).max);
+        targetValues[3] = bound(values.four, type(int128).min, type(int128).max);
+        targetValues[4] = bound(values.five, type(int128).min, type(int128).max);
+        targetValues[5] = bound(values.six, type(int128).min, type(int128).max);
+        targetValues[6] = bound(values.seven, type(int128).min, type(int128).max);
+        targetValues[7] = bound(values.eight, type(int128).min, type(int128).max);
+        uint boundArrayLength = bound(values.arrayLength, 2, 8);
+
+        int256[][] memory matrix = new int256[][](boundArrayLength);
+        for(uint i = 0; i < boundArrayLength; i++){
+            int256[] memory truncatedTargetValues = new int256[](boundArrayLength);
+            for (uint256 j = 0; j < boundArrayLength; j++) {
+                truncatedTargetValues[j] = targetValues[j];
+            }
+            matrix[i] = truncatedTargetValues;
+        }
+
+        int256[][] memory redecoded = mockQuantAMMStorage.ExternalEncodeDecodeMatrix(matrix);
+
+        MatrixCheckSum(matrix, redecoded);
     }
 }

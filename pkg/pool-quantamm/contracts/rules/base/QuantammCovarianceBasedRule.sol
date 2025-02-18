@@ -134,9 +134,13 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
         uint _numberOfAssets
     ) internal {
         uint storeLength = intermediateCovarianceStates[_poolAddress].length;
-
-        //CODEHAWKS L-12 remove storelength initial check 
-        if (_initialValues.length == _numberOfAssets) {
+        
+        uint256 totalValues = _initialValues.length * _initialValues.length;
+        bool evenInitialValues = totalValues % 2 == 0;
+        if (_initialValues.length == _numberOfAssets &&
+        (storeLength == 0 
+        || (evenInitialValues && totalValues / 2 == storeLength)
+        || (!evenInitialValues && (totalValues + 1) / 2 == storeLength))) {
             for (uint i; i < _numberOfAssets; ) {
                 require(_initialValues[i].length == _numberOfAssets, "Bad init covar row");
                 unchecked {

@@ -231,6 +231,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     /// @notice Set the rule for a pool, called by the pool creator
     /// @param _poolSettings Settings for the pool
     /// @param _pool Pool to set the rule for
+    /// @dev CODEHAWKS M-02
     function setRuleForPoolAdminInitialise(
         IQuantAMMWeightedPool.PoolSettings memory _poolSettings,
         address _pool

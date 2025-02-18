@@ -310,7 +310,11 @@ contract QuantAMMWeightedPool is
             tokenOutWeight = _getNormalizedWeight(request.indexOut, timeSinceLastUpdate, totalTokens);
         }
 
-        if (request.kind == SwapKind.EXACT_IN) {
+        if (request.kind == SwapKind.EXACT_IN) {            
+            if (request.amountGivenScaled18 > request.balancesScaled18[request.indexIn].mulDown(maxTradeSizeRatio)) {
+                revert maxTradeSizeRatioExceeded();
+            }
+
             uint256 amountOutScaled18 = WeightedMath.computeOutGivenExactIn(
                 request.balancesScaled18[request.indexIn],
                 tokenInWeight,
@@ -325,6 +329,11 @@ contract QuantAMMWeightedPool is
 
             return amountOutScaled18;
         } else {
+            // Cannot exceed maximum out ratio
+            if (request.amountGivenScaled18 > request.balancesScaled18[request.indexOut].mulDown(maxTradeSizeRatio)) {
+                revert maxTradeSizeRatioExceeded();
+            }
+
             uint256 amountInScaled18 = WeightedMath.computeInGivenExactOut(
                 request.balancesScaled18[request.indexIn],
                 tokenInWeight,
@@ -332,6 +341,11 @@ contract QuantAMMWeightedPool is
                 tokenOutWeight,
                 request.amountGivenScaled18
             );
+
+            //CODEHAWKS M-09 check amountInScaled18 
+            if (amountInScaled18 > request.balancesScaled18[request.indexIn].mulDown(maxTradeSizeRatio)) {
+                revert maxTradeSizeRatioExceeded();
+            }
 
             // Fees are added after scaling happens, to reduce the complexity of the rounding direction analysis.
             return amountInScaled18;

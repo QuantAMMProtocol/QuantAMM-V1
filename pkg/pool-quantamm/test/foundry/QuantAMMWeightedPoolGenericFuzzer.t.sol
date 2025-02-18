@@ -916,6 +916,19 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                         vm.warp(timestamp + params.delay);
                     }
 
+                    uint256[] memory poolWeights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
+
+                    uint256 expectedAmountIn = WeightedMath.computeInGivenExactOut(
+                        variables.balances[variables.firstWeight.index],
+                        poolWeights[variables.firstWeight.index],
+                        variables.balances[variables.secondWeight.index],
+                        poolWeights[variables.secondWeight.index],
+                        swapParams.exactOut
+                    );
+
+                    vm.assume(expectedAmountIn < variables.balances[variables.firstWeight.index].mulDown(_min(_MAX_IN_RATIO, uint256(params.poolParams.maxTradeSizeRatio))));
+
+
                     variables.swapParams = PoolSwapParams({
                         kind: SwapKind.EXACT_OUT,
                         amountGivenScaled18: swapParams.exactOut,
@@ -928,10 +941,8 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                     vm.prank(address(vault));
                     uint256 amountIn = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(variables.swapParams);
 
-                    uint256[] memory poolWeights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
-
                     // For ExactOut:
-                    uint256 expectedAmountIn = WeightedMath.computeInGivenExactOut(
+                    expectedAmountIn = WeightedMath.computeInGivenExactOut(
                         variables.balances[variables.firstWeight.index],
                         poolWeights[variables.firstWeight.index],
                         variables.balances[variables.secondWeight.index],

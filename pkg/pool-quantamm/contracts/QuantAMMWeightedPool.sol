@@ -82,6 +82,7 @@ contract QuantAMMWeightedPool is
     // Maximum values protect users by preventing permissioned actors from setting excessively high swap fees.
     uint256 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16; // 0.001%
     uint256 private constant _MAX_SWAP_FEE_PERCENTAGE = 10e16; // 10%
+    uint256 private constant _FIX_WINDOW = 3 * 365 * 24 * 60 * 60;
 
     uint256 private immutable _totalTokens;
 
@@ -96,6 +97,7 @@ contract QuantAMMWeightedPool is
 
     UpdateWeightRunner public updateWeightRunner;
 
+    uint256 public immutable deploymentTime;
     address internal immutable quantammAdmin;
 
     /// @notice the pool settings for getting weights and assets keyed by pool
@@ -192,6 +194,7 @@ contract QuantAMMWeightedPool is
         _totalTokens = params.numTokens;
         updateWeightRunner = UpdateWeightRunner(params.updateWeightRunner);
         quantammAdmin = updateWeightRunner.quantammAdmin();
+        deploymentTime = block.timestamp;
 
         //from update weight runner
         uint256 MASK_POOL_PERFORM_UPDATE = 1;
@@ -654,6 +657,10 @@ contract QuantAMMWeightedPool is
         data.updateInterval = updateInterval;
     }
 
+    function getWithinFixWindow() external override view returns (bool) {
+        return block.timestamp - deploymentTime < _FIX_WINDOW;
+    }
+
     /// @notice the main function to update target weights and multipliers from the update weight runner
     /// @param _weights the target weights and their block multipliers
     /// @param _poolAddress the target pool address
@@ -869,6 +876,12 @@ contract QuantAMMWeightedPool is
     /// @inheritdoc IQuantAMMWeightedPool
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
+
+        require(
+            block.timestamp - deploymentTime < _FIX_WINDOW,
+            "Cannot change update weight runner after 3 years of deployment"
+        );
+
         address oldAddress = address(updateWeightRunner);
         //CODEHAWKS INFO /s/20
         require(_updateWeightRunner != address(0), "INVADDRESS");

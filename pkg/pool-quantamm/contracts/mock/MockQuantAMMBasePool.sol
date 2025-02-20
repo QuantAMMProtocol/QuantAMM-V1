@@ -89,6 +89,9 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
 
     function getMaximumInvariantRatio() external view override returns (uint256) {}
 
+    bool fixEnabled = true;
+    function getWithinFixWindow() external view override returns (bool) {return fixEnabled;}
+
     function getPoolDetail(string memory category, string memory name) external view returns (string memory, string memory) {}
     
     function computeInvariant(

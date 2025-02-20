@@ -237,11 +237,13 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         address _pool
     ) external {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
+        require(_pool != address(0), "Invalid pool address");
+        require(IQuantAMMWeightedPool(_pool).getWithinFixWindow(), "Pool now immutable");
+        
         require(address(rules[_pool]) == address(0), "Rule already set");
         require(_poolSettings.oracles.length > 0, "Empty oracles array");
         require(poolOracles[_pool].length == 0, "pool rule already set");
         //needed to prevent 2 step amend
-        require(_pool != address(0), "Invalid pool address");
 
         //CODEHAWKS INFO /s/700
         require(_poolSettings.updateInterval > 0, "Update interval must be greater than 0");

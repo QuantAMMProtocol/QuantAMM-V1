@@ -129,6 +129,8 @@ interface IQuantAMMWeightedPool {
     ///@notice returns the normalized weights of the pool for the current block
     function getNormalizedWeights() external view returns (uint256[] memory);
     
+    ///@notice returns the fix window for the pool
+    function getWithinFixWindow() external view returns (bool);
     /**
      * @notice Get dynamic pool data relevant to swap/add/remove calculations.
      * @return data A struct containing all dynamic QuantAMM weighted pool parameters

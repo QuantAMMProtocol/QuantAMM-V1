@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import "../../rules/UpdateRule.sol";
 
-contract MockUpdateRule is UpdateRule {
+contract MockPrevAverageUpdateRule is UpdateRule {
     constructor(address _updateWeightRunner) UpdateRule(_updateWeightRunner) {}
 
     int256[] weights;
@@ -38,7 +38,7 @@ contract MockUpdateRule is UpdateRule {
     }
 
     function _requiresPrevMovingAverage() internal pure virtual override returns (uint16) {
-        return 0;
+        return 1;
     }
 
     function _setInitialIntermediateValues(
@@ -47,16 +47,5 @@ contract MockUpdateRule is UpdateRule {
         uint 
     ) internal virtual override {
         intermediateValues = _initialValues;
-    }
-}
-contract MockPrevMovingAverageUpdateRule is MockUpdateRule {
-    constructor(address _updateWeightRunner) MockUpdateRule(_updateWeightRunner) {}
-
-    function _requiresPrevMovingAverage() internal pure override returns (uint16) {
-        return 1;
-    }
-
-    function movingAveragesLength(address _pool) public view returns (uint) {
-        return movingAverages[_pool].length;
     }
 }

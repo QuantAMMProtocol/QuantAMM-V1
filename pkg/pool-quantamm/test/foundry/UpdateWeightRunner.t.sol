@@ -107,6 +107,37 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertEq(updateWeightRunner.getQuantAMMUpliftFeeTake(), boundFee);
     }
 
+    function testOwnerCanSetEthUsdOracle() public {
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+
+        chainlinkOracle = deployOracle(fixedValue, delay);
+        vm.startPrank(owner);
+        updateWeightRunner.setETHUSDOracle(address(OracleWrapper(chainlinkOracle)));
+        vm.stopPrank();
+        assertEq(address(updateWeightRunner.ethOracle()), address(chainlinkOracle));
+    }
+
+    function testNoneOwnerSetEthUsdOracle() public {
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+
+        chainlinkOracle = deployOracle(fixedValue, delay);
+        vm.startPrank(owner);
+        updateWeightRunner.setETHUSDOracle(address(OracleWrapper(chainlinkOracle)));
+        vm.stopPrank();
+        vm.startPrank(addr1);
+        vm.expectRevert("ONLYADMIN");
+        updateWeightRunner.setETHUSDOracle(address(OracleWrapper(chainlinkOracle)));
+    }
+
+    function testAddress0CannotBeSetAsEthUsdOracle() public {
+        vm.startPrank(owner);
+        vm.expectRevert("INVETHUSDORACLE");
+        updateWeightRunner.setETHUSDOracle(address(0));
+        vm.stopPrank();
+    }
+
     function testOwnerCannotAddUpliftFeeGreaterThan100(uint256 fee) public {
         uint256 oldFee = updateWeightRunner.getQuantAMMSwapFeeTake();
         uint256 boundFee = bound(fee, 1e18 + 1, type(uint256).max);
@@ -168,6 +199,16 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
         assertEq(updateWeightRunner.getPoolApprovedActions(address(mockPool)), 3);
     }
+
+    function tesUpdateWeightRunnerDupeSettingOfAction() public {
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 3);
+        vm.expectRevert("DUPEACTION");
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 3);
+        vm.stopPrank();
+        assertEq(updateWeightRunner.getPoolApprovedActions(address(mockPool)), 3);
+    }
+
 
     function testNonOwnabeCannotApprovePoolUses() public {
         vm.startPrank(owner);
@@ -247,7 +288,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
 
         int216 fixedValue = 1000;
-        chainlinkOracle = deployOracle(fixedValue, 3601);
+        chainlinkOracle = deployOracle(fixedValue, 0);
 
         vm.startPrank(owner);
         updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
@@ -255,9 +296,17 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         vm.startPrank(address(mockPool));
 
-        address[][] memory oracles = new address[][](1);
+        address[][] memory oracles = new address[][](2);
         oracles[0] = new address[](1);
         oracles[0][0] = address(chainlinkOracle);
+        oracles[1] = new address[](1);
+        oracles[1][0] = address(chainlinkOracle);
+
+        int256[] memory expectedData = new int256[](2);
+        expectedData[0] = int256(fixedValue);
+        expectedData[1] = int256(fixedValue);
+
+        mockRule.setExpectedDataValue(expectedData);
 
         uint64[] memory lambda = new uint64[](1);
         lambda[0] = 0.0000000005e18;
@@ -298,6 +347,732 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertEq(updateWeightRunner.getPoolRuleSettings(address(mockPool)).timingSettings.lastPoolUpdateRun, timeNow);
 
         assertTrue(mockRule.CalculateNewWeightsCalled());
+    }
+
+
+    function testCalculateNewWeightsAfterUpdateWeightRunnerChange() public {
+        int256[] memory initialWeights = new int256[](4);
+        initialWeights[0] = 0.0000000005e18;
+        initialWeights[1] = 0.0000000005e18;
+        initialWeights[2] = 0;
+        initialWeights[3] = 0;
+
+        mockPool.setInitialWeights(initialWeights);
+        mockPool.setPoolRegistry(9);
+
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 9);
+        vm.stopPrank();
+
+        int216 fixedValue = 1000;
+        chainlinkOracle = deployOracle(fixedValue, 0);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(address(mockPool));
+        address[][] memory oracles = new address[][](2);
+        oracles[0] = new address[](1);
+        oracles[0][0] = address(chainlinkOracle);
+        oracles[1] = new address[](1);
+        oracles[1][0] = address(chainlinkOracle);
+
+        int256[] memory expectedData = new int256[](2);
+        expectedData[0] = int256(fixedValue);
+        expectedData[1] = int256(fixedValue);
+
+        mockRule.setExpectedDataValue(expectedData);
+
+        uint64[] memory lambda = new uint64[](1);
+        lambda[0] = 0.0000000005e18;
+        updateWeightRunner.setRuleForPool(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: IUpdateRule(mockRule),
+                oracles: oracles,
+                updateInterval: 1,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), 1);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 10000000);
+        mockRule.CalculateNewWeights(
+            initialWeights,
+            new int256[](0),
+            address(mockPool),
+            new int256[][](0),
+            new uint64[](0),
+            0.2e18,
+            0.2e18
+        );
+        updateWeightRunner.performUpdate(address(mockPool));
+
+        uint40 timeNow = uint40(block.timestamp);
+        assertEq(updateWeightRunner.getPoolRuleSettings(address(mockPool)).timingSettings.lastPoolUpdateRun, timeNow);
+        assertTrue(mockRule.CalculateNewWeightsCalled());
+
+        // Update the UpdateWeightRunner contract
+        vm.startPrank(owner);
+        MockUpdateWeightRunner newUpdateWeightRunner = new MockUpdateWeightRunner(owner, addr2, false);
+        
+        mockPool.setUpdateWeightRunnerAddress(address(newUpdateWeightRunner));
+        
+        newUpdateWeightRunner.setApprovedActionsForPool(address(mockPool), 9);
+        newUpdateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        newUpdateWeightRunner.setRuleForPoolAdminInitialise(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: IUpdateRule(mockRule),
+                oracles: oracles,
+                updateInterval: 1,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            }), address(mockPool)
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        newUpdateWeightRunner.InitialisePoolLastRunTime(address(mockPool), 1);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 10000000);
+        mockRule.CalculateNewWeights(
+            initialWeights,
+            new int256[](0),
+            address(mockPool),
+            new int256[][](0),
+            new uint64[](0),
+            0.2e18,
+            0.2e18
+        );
+        newUpdateWeightRunner.performUpdate(address(mockPool));
+
+        timeNow = uint40(block.timestamp);
+        assertEq(newUpdateWeightRunner.getPoolRuleSettings(address(mockPool)).timingSettings.lastPoolUpdateRun, timeNow);
+        assertTrue(mockRule.CalculateNewWeightsCalled());
+    }
+    
+    function testUpdatesSuccessfullyAfterUpdateIntervalAfterUpdateWeightRunnerChange() public {
+        int256[] memory initialWeights = new int256[](4);
+        initialWeights[0] = 0.0000000005e18;
+        initialWeights[1] = 0.0000000005e18;
+        initialWeights[2] = 0;
+        initialWeights[3] = 0;
+
+        // Set initial weights
+        mockPool.setInitialWeights(initialWeights);
+        mockPool.setPoolRegistry(9);
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 9);
+        vm.stopPrank();
+
+        int216 fixedValue = 1000;
+        chainlinkOracle = deployOracle(fixedValue, 0);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(address(mockPool));
+
+        address[][] memory oracles = new address[][](2);
+        oracles[0] = new address[](1);
+        oracles[0][0] = address(chainlinkOracle);
+        oracles[1] = new address[](1);
+        oracles[1][0] = address(chainlinkOracle);
+
+        int256[] memory expectedData = new int256[](2);
+        expectedData[0] = int256(fixedValue);
+        expectedData[1] = int256(fixedValue);
+
+        mockRule.setExpectedDataValue(expectedData);
+
+        uint64[] memory lambda = new uint64[](1);
+        lambda[0] = 0.0000000005e18;
+        updateWeightRunner.setRuleForPool(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: IUpdateRule(mockRule),
+                oracles: oracles,
+                updateInterval: 1,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), 1);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 10000000);
+        mockRule.CalculateNewWeights(
+            initialWeights,
+            new int256[](0),
+            address(mockPool),
+            new int256[][](0),
+            new uint64[](0),
+            0.2e18,
+            0.2e18
+        );
+        updateWeightRunner.performUpdate(address(mockPool));
+
+        uint40 timeNow = uint40(block.timestamp);
+
+        assertEq(updateWeightRunner.getPoolRuleSettings(address(mockPool)).timingSettings.lastPoolUpdateRun, timeNow);
+
+        assertTrue(mockRule.CalculateNewWeightsCalled());
+
+        // Reset the mock
+        mockRule.SetCalculateNewWeightsCalled(false);
+        assertFalse(mockRule.CalculateNewWeightsCalled());
+
+        // Update the UpdateWeightRunner contract
+        vm.startPrank(owner);
+        MockUpdateWeightRunner newUpdateWeightRunner = new MockUpdateWeightRunner(owner, addr2, false);
+        
+        mockPool.setUpdateWeightRunnerAddress(address(newUpdateWeightRunner));
+        
+        newUpdateWeightRunner.setApprovedActionsForPool(address(mockPool), 9);
+        newUpdateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        newUpdateWeightRunner.setRuleForPoolAdminInitialise(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: IUpdateRule(mockRule),
+                oracles: oracles,
+                updateInterval: 1,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            }), address(mockPool)
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        newUpdateWeightRunner.InitialisePoolLastRunTime(address(mockPool), 1);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 10000000);
+        mockRule.CalculateNewWeights(
+            initialWeights,
+            new int256[](0),
+            address(mockPool),
+            new int256[][](0),
+            new uint64[](0),
+            0.2e18,
+            0.2e18
+        );
+        newUpdateWeightRunner.performUpdate(address(mockPool));
+
+        timeNow = uint40(block.timestamp);
+
+        assertEq(newUpdateWeightRunner.getPoolRuleSettings(address(mockPool)).timingSettings.lastPoolUpdateRun, timeNow);
+        assertTrue(mockRule.CalculateNewWeightsCalled());
+
+        vm.warp(block.timestamp + 10000000);
+        mockRule.CalculateNewWeights(
+            initialWeights,
+            new int256[](0),
+            address(mockPool),
+            new int256[][](0),
+            new uint64[](0),
+            0.2e18,
+            0.2e18
+        );
+        newUpdateWeightRunner.performUpdate(address(mockPool));
+
+        timeNow = uint40(block.timestamp);
+        assertEq(newUpdateWeightRunner.getPoolRuleSettings(address(mockPool)).timingSettings.lastPoolUpdateRun, timeNow);
+        assertTrue(mockRule.CalculateNewWeightsCalled());
+    }
+
+    function testSetRuleForPoolAdminInitialise() public {
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = deployOracle(fixedValue, delay);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        IQuantAMMWeightedPool.PoolSettings memory poolSettings = IQuantAMMWeightedPool.PoolSettings({
+            assets: new IERC20[](0),
+            rule: mockRule,
+            oracles: new address[][](1),
+            updateInterval: 1,
+            lambda: new uint64[](1),
+            epsilonMax: 0.2e18,
+            absoluteWeightGuardRail: 0.2e18,
+            maxTradeSizeRatio: 0.2e18,
+            ruleParameters: new int256[][](0),
+            poolManager: addr2
+        });
+        poolSettings.oracles[0] = new address[](1);
+        poolSettings.oracles[0][0] = address(chainlinkOracle);
+
+        updateWeightRunner.setRuleForPoolAdminInitialise(poolSettings, address(mockPool));
+        vm.stopPrank();
+
+        assertEq(address(updateWeightRunner.rules(address(mockPool))), address(mockRule));
+        assertEq(updateWeightRunner.getOptimisedPoolOracle(address(mockPool)).length, 1);
+        assertEq(updateWeightRunner.getOptimisedPoolOracle(address(mockPool))[0], address(chainlinkOracle));
+    }
+
+    function testSetRuleForPoolAdminInitialiseOnlyAdmin() public {
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = deployOracle(fixedValue, delay);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(addr1);
+        IQuantAMMWeightedPool.PoolSettings memory poolSettings = IQuantAMMWeightedPool.PoolSettings({
+            assets: new IERC20[](0),
+            rule: mockRule,
+            oracles: new address[][](1),
+            updateInterval: 1,
+            lambda: new uint64[](1),
+            epsilonMax: 0.2e18,
+            absoluteWeightGuardRail: 0.2e18,
+            maxTradeSizeRatio: 0.2e18,
+            ruleParameters: new int256[][](0),
+            poolManager: addr2
+        });
+        poolSettings.oracles[0] = new address[](1);
+        poolSettings.oracles[0][0] = address(chainlinkOracle);
+
+        vm.expectRevert("ONLYADMIN");
+        updateWeightRunner.setRuleForPoolAdminInitialise(poolSettings, address(mockPool));
+        vm.stopPrank();
+    }
+
+    function testSetRuleForPoolAdminInitialiseRuleAlreadySet() public {
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = deployOracle(fixedValue, delay);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        IQuantAMMWeightedPool.PoolSettings memory poolSettings = IQuantAMMWeightedPool.PoolSettings({
+            assets: new IERC20[](0),
+            rule: mockRule,
+            oracles: new address[][](1),
+            updateInterval: 1,
+            lambda: new uint64[](1),
+            epsilonMax: 0.2e18,
+            absoluteWeightGuardRail: 0.2e18,
+            maxTradeSizeRatio: 0.2e18,
+            ruleParameters: new int256[][](0),
+            poolManager: addr2
+        });
+        poolSettings.oracles[0] = new address[](1);
+        poolSettings.oracles[0][0] = address(chainlinkOracle);
+
+        updateWeightRunner.setRuleForPoolAdminInitialise(poolSettings, address(mockPool));
+        vm.expectRevert("Rule already set");
+        updateWeightRunner.setRuleForPoolAdminInitialise(poolSettings, address(mockPool));
+        vm.stopPrank();
+    }
+
+    function testSetRuleForPoolAdminInitialiseEmptyOraclesArray() public {
+        vm.startPrank(owner);
+        IQuantAMMWeightedPool.PoolSettings memory poolSettings = IQuantAMMWeightedPool.PoolSettings({
+            assets: new IERC20[](0),
+            rule: mockRule,
+            oracles: new address[][](0),
+            updateInterval: 1,
+            lambda: new uint64[](1),
+            epsilonMax: 0.2e18,
+            absoluteWeightGuardRail: 0.2e18,
+            maxTradeSizeRatio: 0.2e18,
+            ruleParameters: new int256[][](0),
+            poolManager: addr2
+        });
+
+        vm.expectRevert("Empty oracles array");
+        updateWeightRunner.setRuleForPoolAdminInitialise(poolSettings, address(mockPool));
+        vm.stopPrank();
+    }
+
+    function testSetRuleForPoolAdminInitialisePoolRuleAlreadySet() public {
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = deployOracle(fixedValue, delay);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        IQuantAMMWeightedPool.PoolSettings memory poolSettings = IQuantAMMWeightedPool.PoolSettings({
+            assets: new IERC20[](0),
+            rule: mockRule,
+            oracles: new address[][](1),
+            updateInterval: 1,
+            lambda: new uint64[](1),
+            epsilonMax: 0.2e18,
+            absoluteWeightGuardRail: 0.2e18,
+            maxTradeSizeRatio: 0.2e18,
+            ruleParameters: new int256[][](0),
+            poolManager: addr2
+        });
+        poolSettings.oracles[0] = new address[](1);
+        poolSettings.oracles[0][0] = address(chainlinkOracle);
+
+        updateWeightRunner.setRuleForPoolAdminInitialise(poolSettings, address(mockPool));
+        vm.expectRevert("Rule already set");
+        updateWeightRunner.setRuleForPoolAdminInitialise(poolSettings, address(mockPool));
+        vm.stopPrank();
+    }
+
+    function testSetRuleForPoolAdminInitialiseInvalidPoolAddress() public {
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = deployOracle(fixedValue, delay);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        IQuantAMMWeightedPool.PoolSettings memory poolSettings = IQuantAMMWeightedPool.PoolSettings({
+            assets: new IERC20[](0),
+            rule: mockRule,
+            oracles: new address[][](1),
+            updateInterval: 1,
+            lambda: new uint64[](1),
+            epsilonMax: 0.2e18,
+            absoluteWeightGuardRail: 0.2e18,
+            maxTradeSizeRatio: 0.2e18,
+            ruleParameters: new int256[][](0),
+            poolManager: addr2
+        });
+        poolSettings.oracles[0] = new address[](1);
+        poolSettings.oracles[0][0] = address(chainlinkOracle);
+
+        vm.expectRevert("Invalid pool address");
+        updateWeightRunner.setRuleForPoolAdminInitialise(poolSettings, address(0));
+        vm.stopPrank();
+    }
+
+    function testSetRuleForPoolAdminInitialiseUpdateIntervalGreaterThanZero() public {
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = deployOracle(fixedValue, delay);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        IQuantAMMWeightedPool.PoolSettings memory poolSettings = IQuantAMMWeightedPool.PoolSettings({
+            assets: new IERC20[](0),
+            rule: mockRule,
+            oracles: new address[][](1),
+            updateInterval: 0,
+            lambda: new uint64[](1),
+            epsilonMax: 0.2e18,
+            absoluteWeightGuardRail: 0.2e18,
+            maxTradeSizeRatio: 0.2e18,
+            ruleParameters: new int256[][](0),
+            poolManager: addr2
+        });
+        poolSettings.oracles[0] = new address[](1);
+        poolSettings.oracles[0][0] = address(chainlinkOracle);
+
+        vm.expectRevert("Update interval must be greater than 0");
+        updateWeightRunner.setRuleForPoolAdminInitialise(poolSettings, address(mockPool));
+        vm.stopPrank();
+    }
+
+    function testFuzz_getDataBackupOracles_ThrowOnUpdate(
+        int256 numberOfBackups,
+        int256 positionOfNonStaleData,
+        int256 unboundNumAssets
+    ) public {
+        uint256 numAssets = uint256(bound(unboundNumAssets, 2, 8));
+
+        int256[] memory initialWeights = new int256[](numAssets * 2);
+        for (uint i = 0; i < numAssets; i++) {
+            initialWeights[i] = 0.0000000005e18;
+            initialWeights[i + numAssets] = 0;
+        }
+        uint256 boundBackup = uint256(bound(numberOfBackups, 0, 5));
+        uint256 boundPosition = uint256(bound(positionOfNonStaleData, 0, int256(boundBackup)));
+
+        mockPool.setInitialWeights(initialWeights);
+        mockPool.setPoolRegistry(9);
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 9);
+        vm.stopPrank();
+
+        MockChainlinkOracle[] memory validOracles = new MockChainlinkOracle[](numAssets);
+        int216 fixedValue = 1000;
+        for (uint i = 0; i < numAssets; i++) {
+            validOracles[i] = deployOracle(fixedValue + int216(int256(i)), 0);
+        }
+
+        int216 fixedValue2 = 5000;
+        MockChainlinkOracle staleChainlinkOracle = deployOracle(fixedValue2, 1000);
+        staleChainlinkOracle.setThrowOnUpdate(true);
+
+        vm.startPrank(owner);
+        for (uint i = 0; i < validOracles.length; i++) {
+            updateWeightRunner.addOracle(OracleWrapper(validOracles[i]));
+        }
+        updateWeightRunner.addOracle(OracleWrapper(staleChainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(address(mockPool));
+        address[][] memory oracles = new address[][](numAssets);
+        for (uint i = 0; i < numAssets; i++) {
+            oracles[i] = new address[](boundBackup + 1);
+            for (uint j = 0; j < oracles[i].length; j++) {
+                if (j == boundPosition) {
+                    oracles[i][j] = address(validOracles[i]);
+                } else {
+                    oracles[i][j] = address(staleChainlinkOracle);
+                }
+            }
+        }
+
+        int256[] memory expectedData = new int256[](numAssets);
+        for (uint i = 0; i < numAssets; i++) {
+            expectedData[i] = int256(fixedValue + int216(int256(i)));
+        }
+        mockRule.setExpectedDataValue(expectedData);
+
+        uint64[] memory lambda = new uint64[](1);
+        lambda[0] = 0.0000000005e18;
+        updateWeightRunner.setRuleForPool(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: IUpdateRule(mockRule),
+                oracles: oracles,
+                updateInterval: 1,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), 1);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 10000000);
+        mockRule.CalculateNewWeights(
+            initialWeights,
+            new int256[](0),
+            address(mockPool),
+            new int256[][](0),
+            new uint64[](0),
+            0.2e18,
+            0.2e18
+        );
+        updateWeightRunner.performUpdate(address(mockPool));
+
+        uint40 timeNow = uint40(block.timestamp);
+        assertEq(updateWeightRunner.getPoolRuleSettings(address(mockPool)).timingSettings.lastPoolUpdateRun, timeNow);
+        assertTrue(mockRule.CalculateNewWeightsCalled());
+    }
+
+    function testFuzz_getDataBackupOracles(int256 numberOfBackups, int256 positionOfNonStaleData, int256 unboundNumAssets) public {
+        uint256 numAssets = uint256(bound(unboundNumAssets,2,8));
+
+        int256[] memory initialWeights = new int256[](numAssets * 2);
+
+        for(uint i; i < numAssets; i++){
+            initialWeights[i] = 0.0000000005e18;
+            initialWeights[i + numAssets] = 0;
+        }
+        uint256 boundBackup = uint256(bound(numberOfBackups, 0, 5));
+        uint256 boundPosition = uint256(bound(positionOfNonStaleData, 0, int256(boundBackup)));
+
+        // Set initial weights
+        mockPool.setInitialWeights(initialWeights);
+        mockPool.setPoolRegistry(9);
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 9);
+        vm.stopPrank();
+
+        MockChainlinkOracle[] memory validOracles = new MockChainlinkOracle[](numAssets);
+        int216 fixedValue = 1000;
+        for(uint i = 0; i < numAssets; i++){
+            validOracles[i] = deployOracle(fixedValue + int216(int256(i)), 0);
+        }
+
+        int216 fixedValue2 = 5000;
+        MockChainlinkOracle staleChainlinkOracle = deployOracle(fixedValue2, 1000);
+
+        vm.startPrank(owner);
+        
+        for(uint i = 0; i < validOracles.length; i++){
+            updateWeightRunner.addOracle(OracleWrapper(validOracles[i]));
+        }
+
+        updateWeightRunner.addOracle(OracleWrapper(staleChainlinkOracle));
+
+        vm.stopPrank();
+
+        vm.startPrank(address(mockPool));
+
+        address[][] memory oracles = new address[][](numAssets);
+        for(uint i = 0; i < numAssets; i++){
+            oracles[i] = new address[](boundBackup + 1);
+            for(uint j = 0; j < oracles[i].length; j++){
+                if(j == boundPosition){
+                    oracles[i][j] = address(validOracles[i]);
+                } else {
+                    oracles[i][j] = address(staleChainlinkOracle);
+                }
+            }
+        }
+
+        int256[] memory expectedData = new int256[](numAssets);
+        for(uint i = 0; i < numAssets; i++){
+            expectedData[i] = int256(fixedValue + int216(int256(i)));
+        }
+        
+        mockRule.setExpectedDataValue(expectedData);
+        
+        uint64[] memory lambda = new uint64[](1);
+        lambda[0] = 0.0000000005e18;
+        updateWeightRunner.setRuleForPool(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: IUpdateRule(mockRule),
+                oracles: oracles,
+                updateInterval: 1,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), 1);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 10000000);
+        mockRule.CalculateNewWeights(
+            initialWeights,
+            new int256[](0),
+            address(mockPool),
+            new int256[][](0),
+            new uint64[](0),
+            0.2e18,
+            0.2e18
+        );
+        updateWeightRunner.performUpdate(address(mockPool));
+
+        uint40 timeNow = uint40(block.timestamp);
+
+        assertEq(updateWeightRunner.getPoolRuleSettings(address(mockPool)).timingSettings.lastPoolUpdateRun, timeNow);
+
+        assertTrue(mockRule.CalculateNewWeightsCalled());
+    }
+
+    function testNoBackupOracleStalePriceThow() public {
+        int256[] memory initialWeights = new int256[](4);
+        initialWeights[0] = 0.0000000005e18;
+        initialWeights[1] = 0.0000000005e18;
+        initialWeights[2] = 0;
+        initialWeights[3] = 0;
+
+        // Set initial weights
+        mockPool.setInitialWeights(initialWeights);
+        mockPool.setPoolRegistry(9);
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 9);
+        vm.stopPrank();
+
+        int216 fixedValue = 1000;
+        chainlinkOracle = deployOracle(fixedValue, 3000);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(address(mockPool));
+
+        address[][] memory oracles = new address[][](2);
+        oracles[0] = new address[](1);
+        oracles[0][0] = address(chainlinkOracle);
+        oracles[1] = new address[](1);
+        oracles[1][0] = address(chainlinkOracle);
+
+        uint64[] memory lambda = new uint64[](1);
+        lambda[0] = 0.0000000005e18;
+        updateWeightRunner.setRuleForPool(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: IUpdateRule(mockRule),
+                oracles: oracles,
+                updateInterval: 1,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), 1);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 10000000);
+        mockRule.CalculateNewWeights(
+            initialWeights,
+            new int256[](0),
+            address(mockPool),
+            new int256[][](0),
+            new uint64[](0),
+            0.2e18,
+            0.2e18
+        );
+        
+        vm.expectRevert("No fresh oracle values available");
+        updateWeightRunner.performUpdate(address(mockPool));
     }
 
     function testMultipleConsecutiveUpdatesSuccessful() public {
@@ -1093,15 +1868,15 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
 
         vm.startPrank(owner);
-        vm.expectRevert("Negative weight not allowed");
+        vm.expectRevert("Below min allowed weight");
         updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
     }
 
     function testSetWeightsManuallyBetween0And1Allowed_Fuzz(int256 firstWeight, int256 secondWeight) public {
         int256[] memory weights = new int256[](4);
-        weights[0] = bound(firstWeight, 0.000000001e18, 0.999999999e18);
-        weights[1] = bound(secondWeight, 0.000000001e18, 0.999999999e18);
+        weights[0] = bound(firstWeight, 0.01e18, 0.99e18);
+        weights[1] = bound(secondWeight, 0.01e18, 0.99e18);
         weights[2] = 0;
         weights[3] = 0;
         mockPool.setPoolRegistry(16);
@@ -1126,14 +1901,14 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
 
         vm.startPrank(owner);
-        vm.expectRevert("Negative weight not allowed");
+        vm.expectRevert("Below min allowed weight");
         updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
     }
 
-    function testSetWeightsManuallyGreaterThanOneFails_Fuzz(int256 moreThanOneWeight) public {
+    function testSetWeightsManuallyGreaterThan99PctFails_Fuzz(int256 moreThanOneWeight) public {
         int256[] memory weights = new int256[](4);
-        weights[0] = bound(moreThanOneWeight, 1e18, type(int256).max);
+        weights[0] = bound(moreThanOneWeight, 0.99e18 + 1, type(int256).max);
         weights[1] = 0.0000000005e18;
         weights[2] = 0;
         weights[3] = 0;
@@ -1143,14 +1918,14 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
 
         vm.startPrank(owner);
-        vm.expectRevert("greater than 1 weight not allowed");
+        vm.expectRevert("Above max allowed weight");
         updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
     }
 
     function testSetWeightsManuallyGreaterThanOne2ndWeightFails_Fuzz(int256 moreThanOneWeight) public {
         int256[] memory weights = new int256[](4);
-        weights[0] = 0.0000000005e18;
+        weights[0] = 0.01e18;
         weights[1] = bound(moreThanOneWeight, 1e18, type(int256).max);
         weights[2] = 0;
         weights[3] = 0;
@@ -1160,15 +1935,15 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         vm.stopPrank();
 
         vm.startPrank(owner);
-        vm.expectRevert("greater than 1 weight not allowed");
+        vm.expectRevert("Above max allowed weight");
         updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
     }
 
     function testSetWeightsManuallyAdmin() public {
         int256[] memory weights = new int256[](4);
-        weights[0] = 0.0000000005e18;
-        weights[1] = 0.0000000005e18;
+        weights[0] = 0.01e18;
+        weights[1] = 0.01e18;
         weights[2] = 0;
         weights[3] = 0;
         mockPool.setPoolRegistry(16);
@@ -1178,13 +1953,12 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
         vm.startPrank(owner);
 
-        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 16);
         updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
 
         vm.stopPrank();
         uint256[] memory poolWeights = new uint256[](2);
-        poolWeights[0] = 0.0000000005e18;
-        poolWeights[1] = 0.0000000005e18;
+        poolWeights[0] = 0.01e18;
+        poolWeights[1] = 0.01e18;
         assertEq(IWeightedPool(address(mockPool)).getNormalizedWeights(), poolWeights);
     }
 
@@ -1209,10 +1983,10 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
 
     function testSetWeightsManuallyPoolOwner() public {
         int256[] memory weights = new int256[](4);
-        weights[0] = 0.0000000005e18;
-        weights[1] = 0.0000000005e18;
-        weights[2] = 0;
-        weights[3] = 0;
+        weights[0] = 0.01e18;
+        weights[1] = 0.01e18;
+        weights[2] = 0.01e18;
+        weights[3] = 0.01e18;
         mockPool.setPoolRegistry(8);
 
         vm.startPrank(owner);
@@ -1259,8 +2033,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
         uint256[] memory poolWeights = new uint256[](2);
-        poolWeights[0] = 0.0000000005e18;
-        poolWeights[1] = 0.0000000005e18;
+        poolWeights[0] = 0.01e18;
+        poolWeights[1] = 0.01e18;
         assertEq(IWeightedPool(address(mockPool)).getNormalizedWeights(), poolWeights);
     }
 
@@ -1317,7 +2091,10 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
         vm.stopPrank();
 
-        mockPool.setPoolRegistry(32);
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 32);
+        vm.stopPrank();
+        
 
         int256[] memory poolWeights = new int256[](2);
         poolWeights[0] = 0.6e18;

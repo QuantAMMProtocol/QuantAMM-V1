@@ -73,6 +73,12 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         assertFalse(result);
     }
 
+    function test0InitialisedParametersShouldNotBeAccepted() public view {
+        int256[][] memory parameters = new int256[][](0);
+        bool result = rule.validParameters(parameters);
+        assertFalse(result);
+    }
+
     function testEmptyParametersShouldNotBeAccepted() public view {
         int256[][] memory parameters = new int256[][](1);
         parameters[0] = new int256[](1);
@@ -133,6 +139,61 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
         parameters[0][1] = PRBMathSD59x18.fromInt(0);
         bool result = rule.validParameters(parameters);
         assertFalse(result);
+    }
+
+    function testFuzz_TestPositiveNumberUseRawPriceFalseShouldBeAccepted(int256 param) public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18()));
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0;
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
+    function testFuzz_TestPositiveNumberUseRawPriceTrueShouldBeAccepted(int256 param) public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](1);
+        parameters[0][0] = PRBMathSD59x18.fromInt(bound(param, 1, maxScaledFixedPoint18()));
+        parameters[1] = new int256[](1);
+        parameters[1][0] = PRBMathSD59x18.fromInt(1);
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
+    function testVectorParamUseRawFalsePriceAccepted() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(42);
+        parameters[0][1] = PRBMathSD59x18.fromInt(42);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = 0;
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
+    function testVectorParamUseRawPriceTrueAccepted() public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(42);
+        parameters[0][1] = PRBMathSD59x18.fromInt(42);
+        parameters[1] = new int256[](1);
+        parameters[1][0] = PRBMathSD59x18.fromInt(1);
+        bool result = rule.validParameters(parameters);
+        assertTrue(result);
+    }
+
+    function testVectorParamsBadUseRawPriceRejected(int256 badUseRawPrice) public view {
+        int256[][] memory parameters = new int256[][](2);
+        parameters[0] = new int256[](2);
+        parameters[0][0] = PRBMathSD59x18.fromInt(42);
+        parameters[0][1] = PRBMathSD59x18.fromInt(42);
+        parameters[1] = new int256[](1);
+        if(badUseRawPrice != 0 && badUseRawPrice != PRBMathSD59x18.fromInt(1)){
+            parameters[1][0] = badUseRawPrice;
+            bool result = rule.validParameters(parameters);
+            assertFalse(result);
+        }
     }
 
     function testVectorParamTestPositiveNumberShouldBeAccepted() public view {
@@ -594,6 +655,86 @@ contract AntiMomentumRuleTest is Test, QuantAMMTestUtils {
             prevWeights,
             data,
             expectedResults
+        );
+    }
+
+    struct FuzzRuleParams {
+        int256 numAssets;
+        bool vectorParams;
+        int256 lambda;
+        int256 kappa;
+        int256 prevWeight;
+        int256 prevMovingAverage;
+        int256 prevAlpha;
+        int256 data;
+        bool useRawPriceDefined;
+        bool useRawPrice;
+    }
+
+    function testFuzz_reasonableRanges(FuzzRuleParams memory params) public {
+        // Define local variables for the parameters
+        uint boundNumAssets = uint(bound(params.numAssets, 2, 8));
+        uint boundNumParameters = params.vectorParams ? boundNumAssets : 1;
+
+        int256[][] memory parameters = new int256[][](params.useRawPriceDefined ? 2 : 1);
+        parameters[0] = new int256[](boundNumParameters);
+        
+        for(uint i = 0; i < boundNumParameters; i++){
+            parameters[0][i] = PRBMathSD59x18.fromInt(bound(params.kappa, 1, 500));
+        }
+        if(params.useRawPriceDefined){
+            parameters[1] = new int256[](1);
+            int256 useRawPriceInt = params.useRawPrice ? PRBMathSD59x18.fromInt(1) : PRBMathSD59x18.fromInt(0);
+            parameters[1][0] = PRBMathSD59x18.fromInt(useRawPriceInt);
+        }
+
+        int256[] memory previousAlphas = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            previousAlphas[i] = PRBMathSD59x18.fromInt(bound(params.prevAlpha, -1000000000000, 1000000000000));
+        }
+
+        int256[] memory prevMovingAverages = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            prevMovingAverages[i] = PRBMathSD59x18.fromInt(bound(params.prevMovingAverage, 1, 1000000000000));
+        }
+
+        int256[] memory movingAverages = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            movingAverages[i] = PRBMathSD59x18.fromInt(bound(params.prevMovingAverage, 1, 1000000000000));
+        }
+
+        int128[] memory lambdas = new int128[](boundNumParameters);
+        for(uint i = 0; i < boundNumParameters; i++){
+            lambdas[i] = int128(int256(bound(params.lambda, 0.5e18, 0.99999e18)));
+        }
+
+        int256[] memory prevWeights = new int256[](boundNumAssets);
+        for (uint i = 0; i < boundNumAssets; i++) {
+            prevWeights[i] = PRBMathSD59x18.fromInt(bound(params.prevWeight, 0.01e18, 0.99e18));
+        }
+        int256 totalWeight = 0;
+        for (uint i = 0; i < boundNumAssets; i++) {
+            totalWeight += prevWeights[i];
+        }
+        for (uint i = 0; i < boundNumAssets; i++) {
+            prevWeights[i] = (prevWeights[i] * 1e18) / totalWeight;
+        }
+
+        int256[] memory oracleData = new int256[](boundNumAssets);
+        for(uint i = 0; i < boundNumAssets; i++){
+            oracleData[i] = PRBMathSD59x18.fromInt(bound(params.data, 1, 1000000000000));
+        }       
+
+        // Now pass the variables into the runAndVerifyInitialUpdate function
+        assertRunCompletes(
+            boundNumAssets, // numAssets
+            parameters,
+            previousAlphas,
+            prevMovingAverages,
+            movingAverages,
+            lambdas,
+            prevWeights,
+            oracleData
         );
     }
 }

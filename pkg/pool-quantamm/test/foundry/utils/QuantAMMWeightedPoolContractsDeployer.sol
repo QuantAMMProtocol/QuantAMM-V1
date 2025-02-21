@@ -110,7 +110,18 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
 
         return tokenConfig;
     }
-    function _createPoolParams(address[] memory tokens, IRateProvider[] memory rateProviders) internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
+
+    function _getOracles(uint numAssets) internal view returns (address[][] memory) {
+        address[][] memory oracles = new address[][](numAssets);
+        for (uint i = 0; i < numAssets; i++) {
+            oracles[i] = new address[](1);
+            oracles[i][0] = address(chainlinkOracle);
+        }        
+        
+        return oracles;
+    }
+
+    function _createPoolParams(address[] memory tokens, IRateProvider[] memory rateProviders) internal returns (QuantAMMWeightedPoolFactory.CreationNewPoolParams memory retParams) {
         PoolRoleAccounts memory roleAccounts;
 
         uint64[] memory lambdas = new uint64[](1);
@@ -120,9 +131,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         parameters[0] = new int256[](1);
         parameters[0][0] = 0.2e18;
 
-        address[][] memory oracles = new address[][](1);
-        oracles[0] = new address[](1);
-        oracles[0][0] = address(chainlinkOracle);
+        address[][] memory oracles = _getOracles(tokens.length);
 
         uint256[] memory normalizedWeights = new uint256[](tokens.length);
         normalizedWeights[0] = uint256(0.5e18);
@@ -145,7 +154,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
 
         tokenConfig = sortTokenConfig(tokenConfig);
         
-        retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
+        retParams = QuantAMMWeightedPoolFactory.CreationNewPoolParams(
             "Pool With Donation",
             "PwD",
             tokenConfig,
@@ -190,7 +199,8 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
             "Factory v1",
             "Pool v1"
         ));
-        QuantAMMWeightedPoolFactory.NewPoolParams memory poolCreateSettings = _createPoolParams(tokens, rateProviders);
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory poolCreateSettings = _createPoolParams(tokens, rateProviders);
+        
         (newPoolAddress, poolArgsRet) =  QuantAMMWeightedPoolFactory(deployerFactory).create(poolCreateSettings);
        
         vm.label(newPoolAddress, label);

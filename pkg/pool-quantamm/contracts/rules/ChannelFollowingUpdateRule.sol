@@ -246,7 +246,6 @@ contract ChannelFollowingUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             for (locals.i = 0; locals.i < locals.prevWeightLength; ) {
                 int256 weightUpdate = locals.kappa[locals.i].mul(locals.signal[locals.i] - locals.normalizationFactor);
                 newWeightsConverted[locals.i] = _prevWeights[locals.i] + weightUpdate;
-                require(newWeightsConverted[locals.i] >= 0, "Invalid weight");
 
                 unchecked {
                     ++locals.i;

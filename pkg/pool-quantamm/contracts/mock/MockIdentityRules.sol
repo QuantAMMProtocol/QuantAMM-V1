@@ -16,6 +16,8 @@ contract MockIdentityRule is IUpdateRule {
 
     bool queryVariances;
 
+    int256[] expectedDataValue;
+
     bool public CalculateNewWeightsCalled;
 
     int256[] public movingAverages;
@@ -40,7 +42,7 @@ contract MockIdentityRule is IUpdateRule {
 
     function CalculateNewWeights(
         int256[] calldata prevWeights,
-        int256[] calldata /*data*/,
+        int256[] calldata data,
         address /*pool*/,
         int256[][] calldata /*_parameters*/,
         uint64[] calldata /*lambdaStore*/,
@@ -48,6 +50,13 @@ contract MockIdentityRule is IUpdateRule {
         uint64 /* absoluteWeightGuardRail*/
     ) external override returns (int256[] memory /*updatedWeights*/) {
         CalculateNewWeightsCalled = true;
+
+        if(expectedDataValue.length > 0 && expectedDataValue.length == data.length) {
+            for(uint i = 0; i < data.length; i++) {
+                require(data[i] == expectedDataValue[i], "Data value does not match expected value");
+            }
+        }
+
         if(weights.length == 0) {
             return new int256[](prevWeights.length);
         }
@@ -92,5 +101,9 @@ contract MockIdentityRule is IUpdateRule {
 
     function setWeights(int256[] memory newCalculatedWeights) public {
         weights = newCalculatedWeights;
+    }
+
+    function setExpectedDataValue(int256[] memory _expectedDataValue) public {
+        expectedDataValue = _expectedDataValue;
     }
 }

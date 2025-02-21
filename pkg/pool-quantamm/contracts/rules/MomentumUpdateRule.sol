@@ -109,23 +109,24 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 }
             }
         } else {
+            //CODEHAWKS INFO /s/361
             //vector logic separate to vector for efficiency
-            int256 sumKappa;
             for (locals.i = 0; locals.i < locals.kappaStore.length; ) {
-                sumKappa += locals.kappaStore[locals.i];
+                locals.sumKappa += locals.kappaStore[locals.i];
                 unchecked {
                     ++locals.i;
                 }
             }
 
-            locals.normalizationFactor = locals.normalizationFactor.div(sumKappa);
+            locals.normalizationFactor = locals.normalizationFactor.div(locals.sumKappa);
 
             // To avoid intermediate overflows (because of normalization), we only downcast in the end to an uint6
             for (locals.i = 0; locals.i < _prevWeights.length; ) {
                 locals.res =
                     int256(_prevWeights[locals.i]) +
                     locals.kappaStore[locals.i].mul(locals.newWeights[locals.i] - locals.normalizationFactor);
-                require(locals.res >= 0, "Invalid weight");
+                
+                //CODEHAWKS M-05 remove preguard +ve weight requirement same for scalar 
                 newWeightsConverted[locals.i] = locals.res;
                 unchecked {
                     ++locals.i;
@@ -168,6 +169,13 @@ contract MomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 }
                 unchecked {
                     ++i;
+                }
+            }
+            
+            //CODEHAWKS INFO /s/568
+            if(_parameters.length == 2 && _parameters[1].length == 1){            
+                if (!(_parameters[1][0] == 0 || _parameters[1][0] == PRBMathSD59x18.fromInt(1))) {
+                    valid = 0;
                 }
             }
             return valid == 1;

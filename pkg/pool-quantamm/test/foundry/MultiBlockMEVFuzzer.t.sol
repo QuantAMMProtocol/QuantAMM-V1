@@ -236,9 +236,9 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
 
     function _createPoolParams(
         PoolFuzzParams memory params
-    ) internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory) {
+    ) internal returns (QuantAMMWeightedPoolFactory.CreationNewPoolParams memory) {
         // Create base params first
-        QuantAMMWeightedPoolFactory.NewPoolParams memory baseParams = _createBaseParams(
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory baseParams = _createBaseParams(
             params.numTokens,
             params.maxSwapfee
         );
@@ -252,14 +252,14 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
     function _createBaseParams(
         uint256 numTokens,
         uint64 maxSwapFee
-    ) internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory) {
+    ) internal returns (QuantAMMWeightedPoolFactory.CreationNewPoolParams memory) {
         PoolRoleAccounts memory roleAccounts;
         tokens = _getTokens(numTokens);
 
         (uint256[] memory initialWeightsUint, int256[] memory initialWeights) = _createInitialWeights(numTokens);
 
         return
-            QuantAMMWeightedPoolFactory.NewPoolParams({
+            QuantAMMWeightedPoolFactory.CreationNewPoolParams({
                 name: "PoolZ",
                 symbol: "PwZ",
                 tokens: vault.buildTokenConfig(tokens),
@@ -274,7 +274,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
                 _poolSettings: IQuantAMMWeightedPool.PoolSettings({
                     assets: new IERC20[](0),
                     rule: IUpdateRule(address(0)),
-                    oracles: new address[][](0),
+                    oracles: _getOracles(numTokens),
                     updateInterval: 0,
                     lambda: new uint64[](0),
                     epsilonMax: 0,
@@ -286,7 +286,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
                 _initialMovingAverages: initialWeights,
                 _initialIntermediateValues: initialWeights,
                 _oracleStalenessThreshold: 3600,
-                poolRegistry: 0,
+                poolRegistry: 16,
                 poolDetails: new string[][](0)
             });
     }
@@ -324,9 +324,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
         uint64[] memory lambdas = new uint64[](1);
         lambdas[0] = _LAMBDA;
 
-        address[][] memory oracles = new address[][](1);
-        oracles[0] = new address[](1);
-        oracles[0][0] = address(chainlinkOracle);
+        address[][] memory oracles = _getOracles(params.numTokens);
 
         return
             IQuantAMMWeightedPool.PoolSettings({
@@ -519,7 +517,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
         FuzzParamsSingleSameToken memory params,
         uint256[] memory initialBalances
     ) private returns (address, uint256) {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory newParams = _createPoolParams(params.poolParams);
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory newParams = _createPoolParams(params.poolParams);
         (address ammPool, ) = quantAMMWeightedPoolFactory.create(newParams);
 
         // Ensure LP has enough tokens and that router has approval to transfer those tokens

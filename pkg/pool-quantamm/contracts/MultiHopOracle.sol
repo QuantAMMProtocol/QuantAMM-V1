@@ -17,7 +17,11 @@ contract MultiHopOracle is OracleWrapper {
     HopConfig[] public oracles;
 
     constructor(HopConfig[] memory _oracles) {
+        //CODEHAWKS INFO /s/716
+        require(_oracles.length > 0, "NOORACLES");
         for (uint i = 0; i < _oracles.length; i++) {
+            //CODEHAWKS INFO /s/716
+            require(address(_oracles[i].oracle) != address(0), "INVORACLE");
             oracles.push(_oracles[i]);
         }
     }

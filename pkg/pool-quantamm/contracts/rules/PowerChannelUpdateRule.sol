@@ -131,22 +131,23 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             }
         } else {
             //vector parameter calculation, same as scalar but using the per constituent param inside the loops
-            int256 sumKappa;
+            //CODEHAWKS INFO /s/361 
             for (locals.i = 0; locals.i < locals.kappa.length; ) {
-                sumKappa += locals.kappa[locals.i];
+                locals.sumKappa += locals.kappa[locals.i];
                 unchecked {
                     ++locals.i;
                 }
             }
 
-            locals.normalizationFactor = locals.normalizationFactor.div(sumKappa);
+            locals.normalizationFactor = locals.normalizationFactor.div(locals.sumKappa);
 
             for (locals.i = 0; locals.i < _prevWeights.length; ) {
                 //κ · ( sign(1/p(t)*∂p(t)/∂t) * |1/p(t)*∂p(t)/∂t|^q − ℓp(t)
                 locals.res =
                     int256(_prevWeights[locals.i]) +
                     locals.kappa[locals.i].mul(locals.newWeights[locals.i] - locals.normalizationFactor);
-                require(locals.res >= 0, "Invalid weight");
+                    
+                //CODEHAWKS M-05 remove preguard +ve weight requirement same for scalar 
                 newWeightsConverted[locals.i] = locals.res;
                 unchecked {
                     ++locals.i;
@@ -202,8 +203,17 @@ contract PowerChannelUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                     ++i;
                 }
             }
+            
+            //CODEHAWKS INFO /s/568
+            if(parameters.length == 3 && parameters[2].length == 1){            
+                if (!(parameters[2][0] == 0 || parameters[2][0] == PRBMathSD59x18.fromInt(1))) {
+                    valid = false;
+                }
+            }
+
             return valid;   
         }
+
         return false;
     }
 }

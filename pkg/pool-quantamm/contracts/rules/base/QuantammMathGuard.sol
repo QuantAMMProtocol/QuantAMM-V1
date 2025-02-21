@@ -15,7 +15,7 @@ abstract contract QuantAMMMathGuard {
     /// @param _weights Raw weights to be guarded and normalized
     /// @param _prevWeights Previous weights to be used for normalization
     /// @param _epsilonMax  Maximum allowed change in weights per update step (epsilon) in the QuantAMM whitepaper
-    /// @param _absoluteWeightGuardRail Maximum allowed weight in the QuantAMM whitepaper
+    /// @param _absoluteWeightGuardRail Minimum allowed weight in the QuantAMM whitepaper
     function _guardQuantAMMWeights(
         int256[] memory _weights,
         int256[] calldata _prevWeights,
@@ -56,6 +56,10 @@ abstract contract QuantAMMMathGuard {
                     _weights[i] = absoluteMax;
                     sumOtherWeights += absoluteMax;
                 }
+                else{
+                    //CODEHAWKS M-14
+                    sumOtherWeights += _weights[i];
+                }
             }
             if (sumOtherWeights != 0) {
                 int256 proportionalRemainder = sumRemainerWeight.div(sumOtherWeights);
@@ -92,21 +96,57 @@ abstract contract QuantAMMMathGuard {
                 }
             }
             int256 newWeightsSum;
+            uint maxWeightIndex;
+            int256 maxWeight;
+            uint secondMaxWeightIndex;
+            int256 secondMaxWeight;
             if (maxAbsChange > _epsilonMax) {
                 int256 rescaleFactor = _epsilonMax.div(maxAbsChange);
                 for (uint i; i < _newWeights.length; ++i) {
                     int256 newDelta = (_newWeights[i] - _prevWeights[i]).mul(rescaleFactor);
                     _newWeights[i] = _prevWeights[i] + newDelta;
                     newWeightsSum += _newWeights[i];
+                    if (_newWeights[i] > maxWeight) {
+                        secondMaxWeight = maxWeight;
+                        secondMaxWeightIndex = maxWeightIndex;
+                        maxWeight = _newWeights[i];
+                        maxWeightIndex = i;
+                    } else if (_newWeights[i] > secondMaxWeight) {
+                        secondMaxWeight = _newWeights[i];
+                        secondMaxWeightIndex = i;
+                    }
                 }
             } else {
                 for (uint i; i < _newWeights.length; ++i) {
                     newWeightsSum += _newWeights[i];
+                    if (_newWeights[i] > maxWeight) {
+                        secondMaxWeight = maxWeight;
+                        secondMaxWeightIndex = maxWeightIndex;
+                        maxWeight = _newWeights[i];
+                        maxWeightIndex = i;
+                    } else if (_newWeights[i] > secondMaxWeight) {
+                        secondMaxWeight = _newWeights[i];
+                        secondMaxWeightIndex = i;
+                    }
                 }
             }
+
             // There might a very small (1e-18) rounding error, add this to the first element.
-            // In some edge cases, this might break a guard rail, but only by 1e-18, which is modelled to be acceptable.
-            _newWeights[0] = _newWeights[0] + (ONE - newWeightsSum);
+            // Given how the block multiplier guard stops when the multiplier is not 0, and 
+            // a first weight hits the guard rail, if applied solely to the max weight, the 
+            // updates will stop at T0.
+            // we have to make sure that where the rounding error is added to will not be on 
+            // a weight that is already at the max weight. if the rounding error is negative
+            // it can be added to the max weight, if it is positive add to the second as only 
+            // one weight can be at max, guarenteeing the second is not at abs max weight
+            //CODEHAWKS M-17
+            if(newWeightsSum != ONE){
+                if(newWeightsSum > ONE){
+                    _newWeights[maxWeightIndex] = _newWeights[maxWeightIndex] - (newWeightsSum - ONE);
+                }else{
+                    _newWeights[secondMaxWeightIndex] = _newWeights[secondMaxWeightIndex] + (ONE - newWeightsSum);
+                }
+            }
         }
         return _newWeights;
     }

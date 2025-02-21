@@ -581,7 +581,9 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         //some level of protocol oversight required here that no rule is approved where this function is not called inapproriately
         require(msg.sender == address(rules[params.poolAddress]), "ONLYRULECANSETWEIGHTS");
 
-        uint256 poolRegistryEntry = QuantAMMWeightedPool(params.poolAddress).poolRegistry();
+        //CODEHAWKS M-02 redeployment of update weight runners means really it is a better 
+        //design to have pool creator trusted managed pools as a separate factory and weight runner
+        uint256 poolRegistryEntry =  approvedPoolActions[params.poolAddress];
         require(poolRegistryEntry & MASK_POOL_RULE_DIRECT_SET_WEIGHT > 0, "FUNCTIONNOTAPPROVEDFORPOOL");
 
         //why do we still need to calculate the multiplier and why not just set the weights like in the manual override?
@@ -602,7 +604,9 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         uint40 _lastInterpolationTimePossible,
         uint _numberOfAssets
     ) external {
-        uint256 poolRegistryEntry = QuantAMMWeightedPool(_poolAddress).poolRegistry();
+        //CODEHAWKS M-02 redeployment of update weight runners means really it is a better 
+        //design to have pool creator trusted managed pools as a separate factory and weight runner
+        uint256 poolRegistryEntry = approvedPoolActions[_poolAddress];
         if (poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0) {
             require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
         } else if (poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0) {

@@ -10,6 +10,12 @@ contract MockQuantAMMStorage is ScalarRuleQuantAMMStorage, ScalarQuantAMMBaseSto
         result = _quantAMMPackTwo128(leftInt, rightInt);
     }
 
+    function ExternalDecode(int256 sourceInt) external pure returns (int256[] memory result) {
+        int256[] memory sourceArray = new int256[](1);
+        sourceArray[0] = sourceInt;
+        return _quantAMMUnpack128Array(sourceArray, 2);
+    }
+
     function ExternalEncode(int64 leftInt, int128 rightInt) external pure returns (int256 result) {
         result = _quantAMMPackTwo128(leftInt, rightInt);
     }
@@ -41,7 +47,7 @@ contract MockQuantAMMStorage is ScalarRuleQuantAMMStorage, ScalarQuantAMMBaseSto
         result = result2;
     }
 
-    function ExternalEncodeDecodeMatrix(int256[][] memory sourceMatrix) external {
+    function ExternalEncodeDecodeMatrix(int256[][] memory sourceMatrix) external returns (int256[][] memory result) {
         uint storageLength;
         if ((sourceMatrix.length * sourceMatrix.length) % 2 == 0) {
             storageLength = (sourceMatrix.length * sourceMatrix.length) / 2;
@@ -51,7 +57,7 @@ contract MockQuantAMMStorage is ScalarRuleQuantAMMStorage, ScalarQuantAMMBaseSto
         }
         mockQuantAMMMatrix = new int256[](storageLength);
         _quantAMMPack128Matrix(sourceMatrix, mockQuantAMMMatrix);
-        matrixResult = _quantAMMUnpack128Matrix(mockQuantAMMMatrix, sourceMatrix.length);
+        return _quantAMMUnpack128Matrix(mockQuantAMMMatrix, sourceMatrix.length);
     }
 
     function GetMatrixResult() external view returns (int256[][] memory) {

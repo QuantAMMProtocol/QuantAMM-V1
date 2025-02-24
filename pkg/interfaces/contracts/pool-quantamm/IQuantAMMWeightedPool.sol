@@ -47,7 +47,7 @@ interface IQuantAMMWeightedPool {
         * @param ruleParameters The parameters for the rule, validated in each rule separately during set rule
         * @param lambda Decay parameter for exponentially-weighted moving average (0 < λ < 1)
         * @param epsilonMax Maximum allowed delta for a weight update, stored as SD59x18 number
-        * @param absoluteWeightGuardRail Maximum allowed absolute weight allowed.
+        * @param absoluteWeightGuardRail Minimum absolute weight allowed. CODEHAWKS INFO /s/611
         * @param maxTradeSizeRatio maximum trade size allowed as a fraction of the pool
         * @param updateInterval Minimum amount of seconds between two updates
      */
@@ -129,6 +129,8 @@ interface IQuantAMMWeightedPool {
     ///@notice returns the normalized weights of the pool for the current block
     function getNormalizedWeights() external view returns (uint256[] memory);
     
+    ///@notice returns the fix window for the pool
+    function getWithinFixWindow() external view returns (bool);
     /**
      * @notice Get dynamic pool data relevant to swap/add/remove calculations.
      * @return data A struct containing all dynamic QuantAMM weighted pool parameters

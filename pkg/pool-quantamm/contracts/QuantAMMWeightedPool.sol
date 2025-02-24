@@ -28,7 +28,7 @@ import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/Fixe
 import { WeightedMath } from "@balancer-labs/v3-solidity-utils/contracts/math/WeightedMath.sol";
 import { InputHelpers } from "@balancer-labs/v3-solidity-utils/contracts/helpers/InputHelpers.sol";
 import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Version.sol";
-import { ScalarQuantAMMBaseStorage } from "./QuantAMMStorage.sol";
+//CODEHAWKS INFO /s/703 remove dupe import
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IUpdateRule } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol"; // Ensure this path is correct
 import { IQuantAMMWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
@@ -36,6 +36,7 @@ import { ScalarQuantAMMBaseStorage } from "./QuantAMMStorage.sol";
 import { UpdateWeightRunner } from "./UpdateWeightRunner.sol";
 import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { QuantAMMWeightedPoolFactory } from "./QuantAMMWeightedPoolFactory.sol";
 
 /**
  * @notice QuantAMM Base Weighted pool. One per pool.
@@ -81,6 +82,7 @@ contract QuantAMMWeightedPool is
     // Maximum values protect users by preventing permissioned actors from setting excessively high swap fees.
     uint256 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16; // 0.001%
     uint256 private constant _MAX_SWAP_FEE_PERCENTAGE = 10e16; // 10%
+    uint256 private constant _FIX_WINDOW = 3 * 365 * 24 * 60 * 60;
 
     uint256 private immutable _totalTokens;
 
@@ -93,8 +95,9 @@ contract QuantAMMWeightedPool is
     //packed: [weight5,weight6,weight7,weight8,multiplier5,multiplier6,multiplier7,multiplier8]
     int256 internal _normalizedSecondFourWeights;
 
-    UpdateWeightRunner internal updateWeightRunner;
+    UpdateWeightRunner public updateWeightRunner;
 
+    uint256 public immutable deploymentTime;
     address internal immutable quantammAdmin;
 
     /// @notice the pool settings for getting weights and assets keyed by pool
@@ -119,10 +122,22 @@ contract QuantAMMWeightedPool is
     }
 
     ///@dev Emitted when the weights of the pool are updated
-    event WeightsUpdated(address indexed poolAddress, int256[] weights);
+    event WeightsUpdated(address indexed poolAddress, int256[] weights, uint40 lastInterpolationTimePossible, uint40 lastUpdateTime);
 
     ///@dev Emitted when the update weight runner is updated
     event UpdateWeightRunnerAddressUpdated(address indexed oldAddress, address indexed newAddress);
+
+    event PoolRuleSet(
+        address rule,
+        address[][] poolOracles,
+        uint64[] lambda,
+        int256[][] ruleParameters,
+        uint64 epsilonMax,
+        uint64 absoluteWeightGuardRail,
+        uint40 updateInterval,
+        address poolManager,
+        address creatorAddress
+    );
 
     /// @dev Indicates that one of the pool tokens' weight is below the minimum allowed.
     error MinWeight();
@@ -154,7 +169,7 @@ contract QuantAMMWeightedPool is
     ///@dev Maximum allowed delta for a weight update, stored as SD59x18 number
     uint64 public epsilonMax; // Maximum allowed delta for a weight update, stored as SD59x18 number
 
-    ///@dev Maximum allowed absolute weight allowed.
+    ///@dev Minimum absolute weight allowed. CODEHAWKS INFO /s/611
     uint64 public absoluteWeightGuardRail;
 
     ///@dev maximum trade size allowed as a fraction of the pool
@@ -179,6 +194,25 @@ contract QuantAMMWeightedPool is
         _totalTokens = params.numTokens;
         updateWeightRunner = UpdateWeightRunner(params.updateWeightRunner);
         quantammAdmin = updateWeightRunner.quantammAdmin();
+        deploymentTime = block.timestamp;
+
+        //from update weight runner
+        uint256 MASK_POOL_PERFORM_UPDATE = 1;
+        uint256 MASK_POOL_GET_DATA = 2;
+        uint256 MASK_POOL_OWNER_UPDATES = 8;
+        uint256 MASK_POOL_QUANTAMM_ADMIN_UPDATES = 16;
+        uint256 MASK_POOL_RULE_DIRECT_SET_WEIGHT = 32;
+
+        //CODEHAWKS INFO /s/314
+        require(
+            (params.poolRegistry & MASK_POOL_PERFORM_UPDATE > 0) ||
+            (params.poolRegistry & MASK_POOL_GET_DATA > 0) ||
+            (params.poolRegistry & MASK_POOL_OWNER_UPDATES > 0) ||
+            (params.poolRegistry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0) ||
+            (params.poolRegistry & MASK_POOL_RULE_DIRECT_SET_WEIGHT > 0),
+            "Invalid pool registry"
+        );
+
         poolRegistry = params.poolRegistry;
 
         require(params.poolDetails.length <= 50, "Limit exceeds array length");
@@ -196,18 +230,21 @@ contract QuantAMMWeightedPool is
         uint256 invariantRatio
     ) external view returns (uint256 newBalance) {
         uint40 multiplierTime = uint40(block.timestamp);
-        uint40 lastInterpolationTime = poolSettings.quantAMMBaseInterpolationDetails.lastPossibleInterpolationTime;
+        //CODEHAWKS INFO /s/234
+        QuantAMMBaseInterpolationVariables memory variables = poolSettings.quantAMMBaseInterpolationDetails;
 
-        if (block.timestamp >= lastInterpolationTime) {
+        if (block.timestamp >= variables.lastPossibleInterpolationTime) {
             //we have gone beyond the first variable hitting the guard rail. We cannot interpolate any further and an update is needed
-            multiplierTime = lastInterpolationTime;
+            multiplierTime = variables.lastPossibleInterpolationTime;
         }
 
-        unchecked {
-            uint256 timeSinceLastUpdate = uint256(
-                multiplierTime - poolSettings.quantAMMBaseInterpolationDetails.lastUpdateIntervalTime
-            );
+        //CODEHAWKS INFO /s/4
+        //Lifted outside of unchecked in case of race condition of combined bad user setting last update in the future and chain downtime
+        uint256 timeSinceLastUpdate = uint256(
+            multiplierTime - variables.lastUpdateIntervalTime
+        );
 
+        unchecked {
             return
                 WeightedMath.computeBalanceOutGivenInvariant(
                     balancesLiveScaled18[tokenInIndex],
@@ -276,7 +313,7 @@ contract QuantAMMWeightedPool is
             tokenOutWeight = _getNormalizedWeight(request.indexOut, timeSinceLastUpdate, totalTokens);
         }
 
-        if (request.kind == SwapKind.EXACT_IN) {
+        if (request.kind == SwapKind.EXACT_IN) {            
             if (request.amountGivenScaled18 > request.balancesScaled18[request.indexIn].mulDown(maxTradeSizeRatio)) {
                 revert maxTradeSizeRatioExceeded();
             }
@@ -288,6 +325,10 @@ contract QuantAMMWeightedPool is
                 tokenOutWeight,
                 request.amountGivenScaled18
             );
+            //CODEHAWKS M-09 check amountOUTScaled18 
+            if (amountOutScaled18 > request.balancesScaled18[request.indexOut].mulDown(maxTradeSizeRatio)) {
+                revert maxTradeSizeRatioExceeded();
+            }
 
             return amountOutScaled18;
         } else {
@@ -303,6 +344,11 @@ contract QuantAMMWeightedPool is
                 tokenOutWeight,
                 request.amountGivenScaled18
             );
+
+            //CODEHAWKS M-09 check amountInScaled18 
+            if (amountInScaled18 > request.balancesScaled18[request.indexIn].mulDown(maxTradeSizeRatio)) {
+                revert maxTradeSizeRatioExceeded();
+            }
 
             // Fees are added after scaling happens, to reduce the complexity of the rounding direction analysis.
             return amountInScaled18;
@@ -535,7 +581,8 @@ contract QuantAMMWeightedPool is
             return uint256(weight) + FixedPoint.mulDown(uint256(multiplierScaled18), timeSinceLastUpdate);
         } else {
             //CYFRIN H02
-            return uint256(weight) - FixedPoint.mulUp(uint256(-multiplierScaled18), timeSinceLastUpdate);
+            //CODEHAWKS /s/866,542
+            return uint256(weight) - FixedPoint.mulDown(uint256(-multiplierScaled18), timeSinceLastUpdate);
         }
     }
 
@@ -610,6 +657,10 @@ contract QuantAMMWeightedPool is
         data.updateInterval = updateInterval;
     }
 
+    function getWithinFixWindow() external override view returns (bool) {
+        return block.timestamp - deploymentTime < _FIX_WINDOW;
+    }
+
     /// @notice the main function to update target weights and multipliers from the update weight runner
     /// @param _weights the target weights and their block multipliers
     /// @param _poolAddress the target pool address
@@ -636,7 +687,7 @@ contract QuantAMMWeightedPool is
             lastUpdateIntervalTime: uint40(block.timestamp)
         });
 
-        emit WeightsUpdated(_poolAddress, _weights);
+        emit WeightsUpdated(_poolAddress, _weights, _lastInterpolationTimePossible, uint40(block.timestamp));
     }
 
     /// @notice the initialising function during registration of the pool with the vault to set the initial weights
@@ -682,38 +733,50 @@ contract QuantAMMWeightedPool is
             lastUpdateIntervalTime: uint40(block.timestamp)
         });
 
-        emit WeightsUpdated(address(this), _weights);
+        //CODEHAWKS L-05 emit weights and multiplier
+        emit WeightsUpdated(address(this), _weightsAndBlockMultiplier, uint40(block.timestamp), uint40(block.timestamp));
     }
 
     /// @notice Initialize the pool
-    /// @param _initialWeights Initial weights to set
-    /// @param _poolSettings Settings for the pool
-    /// @param _initialMovingAverages Initial moving averages to set
-    /// @param _initialIntermediateValues Initial intermediate values to set for a given rule
-    /// @param _oracleStalenessThreshold Maximum amount of seconds that can pass between two oracle updates
+    /// @param initialiseParams parameters defined by the factory
     function initialize(
-        int256[] memory _initialWeights,
-        PoolSettings memory _poolSettings,
-        int256[] memory _initialMovingAverages,
-        int256[] memory _initialIntermediateValues,
-        uint _oracleStalenessThreshold
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory initialiseParams
     ) public initializer {
-        require(_poolSettings.assets.length > 0 && _poolSettings.assets.length == _initialWeights.length, "INVASSWEIG"); //Invalid assets / weights array
+        //CODEHAWKS INFO /s/696
+        require(initialiseParams._poolSettings.assets.length > 0 
+        && initialiseParams._poolSettings.assets.length == initialiseParams._initialWeights.length 
+        && initialiseParams._initialWeights.length == _totalTokens, "INVASSWEIG"); //Invalid assets / weights array
 
-        assets = _poolSettings.assets;
-        poolSettings.assets = new address[](_poolSettings.assets.length);
-        for (uint i; i < _poolSettings.assets.length; ) {
-            poolSettings.assets[i] = address(_poolSettings.assets[i]);
+        assets = initialiseParams._poolSettings.assets;
+        poolSettings.assets = new address[](initialiseParams._poolSettings.assets.length);
+        for (uint i; i < initialiseParams._poolSettings.assets.length; ) {
+            poolSettings.assets[i] = address(initialiseParams._poolSettings.assets[i]);
             unchecked {
                 ++i;
             }
         }
+        //CODEHAWKS INFO /s/157
+        require(initialiseParams._oracleStalenessThreshold > 0, "INVORCSTAL"); //Invalid oracle staleness threshold
+        
+        oracleStalenessThreshold = initialiseParams._oracleStalenessThreshold;
+        updateInterval = initialiseParams._poolSettings.updateInterval;
+        _setRule(initialiseParams);
 
-        oracleStalenessThreshold = _oracleStalenessThreshold;
-        updateInterval = _poolSettings.updateInterval;
-        _setRule(_initialWeights, _initialIntermediateValues, _initialMovingAverages, _poolSettings);
+        _setInitialWeights(initialiseParams._initialWeights);
 
-        _setInitialWeights(_initialWeights);
+        //CODEHAWKS L-09 emit during creation rather than setruleforpool with creator address also
+        // emit event for easier tracking of rule changes
+        emit PoolRuleSet(
+            address(initialiseParams._poolSettings.rule),
+            initialiseParams._poolSettings.oracles,
+            initialiseParams._poolSettings.lambda,
+            initialiseParams._poolSettings.ruleParameters,
+            initialiseParams._poolSettings.epsilonMax,
+            initialiseParams._poolSettings.absoluteWeightGuardRail,
+            initialiseParams._poolSettings.updateInterval,
+            initialiseParams._poolSettings.poolManager,
+            msg.sender //this should be the factory and only factory sent creations should be listened to.
+        );
     }
 
     /// @notice Split the weights and multipliers into two arrays
@@ -749,28 +812,22 @@ contract QuantAMMWeightedPool is
     }
 
     /// @notice Set the rule for this pool
-    /// @param _initialWeights Initial weights to set
-    /// @param _ruleIntermediateValues Intermediate values for the rule
-    /// @param _initialMovingAverages Initial moving averages to set
-    /// @param _poolSettings Settings for the pool
+    /// @param params parameters defined by the factory creation process
     function _setRule(
-        int256[] memory _initialWeights,
-        int256[] memory _ruleIntermediateValues,
-        int256[] memory _initialMovingAverages,
-        IQuantAMMWeightedPool.PoolSettings memory _poolSettings
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params
     ) internal {
-        require(address(_poolSettings.rule) != address(0), "Invalid rule");
+        require(address(params._poolSettings.rule) != address(0), "Invalid rule");
 
-        for (uint i; i < _poolSettings.lambda.length; ++i) {
-            int256 currentLambda = int256(uint256(_poolSettings.lambda[i]));
+        for (uint i; i < params._poolSettings.lambda.length; ++i) {
+            int256 currentLambda = int256(uint256(params._poolSettings.lambda[i]));
             require(currentLambda > PRBMathSD59x18.fromInt(0) && currentLambda < PRBMathSD59x18.fromInt(1), "INVLAM"); //Invalid lambda value
         }
 
         require(
-            _poolSettings.lambda.length == 1 || _poolSettings.lambda.length == _initialWeights.length,
+            params._poolSettings.lambda.length == 1 || params._poolSettings.lambda.length == params._initialWeights.length,
             "Either scalar or vector"
         );
-        int256 currentEpsilonMax = int256(uint256(_poolSettings.epsilonMax));
+        int256 currentEpsilonMax = int256(uint256(params._poolSettings.epsilonMax));
         require(
             currentEpsilonMax > PRBMathSD59x18.fromInt(0) && currentEpsilonMax <= PRBMathSD59x18.fromInt(1),
             "INV_EPMX"
@@ -779,33 +836,36 @@ contract QuantAMMWeightedPool is
         //applied both as a max (1 - x) and a min, so it cant be more than 0.49 or less than 0.01
         //all pool logic assumes that absolute guard rail is already stored as an 18dp int256
         require(
-            int256(uint256(_poolSettings.absoluteWeightGuardRail)) <
-                PRBMathSD59x18.fromInt(1) / int256(uint256((_initialWeights.length))) &&
-                int256(uint256(_poolSettings.absoluteWeightGuardRail)) >= 0.01e18,
+            int256(uint256(params._poolSettings.absoluteWeightGuardRail)) <
+                PRBMathSD59x18.fromInt(1) / int256(uint256((params._initialWeights.length))) &&
+                int256(uint256(params._poolSettings.absoluteWeightGuardRail)) >= 0.01e18,
             "INV_ABSWGT"
         ); //Invalid absoluteWeightGuardRail value
 
-        require(_poolSettings.oracles.length > 0, "NOPROVORC"); //No oracle indices provided
-        require(_poolSettings.rule.validParameters(_poolSettings.ruleParameters), "INVRLEPRM"); //Invalid rule parameters
+        require(params._poolSettings.oracles.length > 0, "NOPROVORC"); //No oracle indices provided"
+
+        //CODEHAWKS INFO /s/154
+        require(params._poolSettings.oracles.length == params._initialWeights.length, "OLNWEIG"); //Oracle length not equal to weights length
+        require(params._poolSettings.rule.validParameters(params._poolSettings.ruleParameters), "INVRLEPRM"); //Invalid rule parameters
 
         //0 is hodl, 1 is trade whole pool which invariant doesnt let you do anyway
-        require(_poolSettings.maxTradeSizeRatio > 0 && _poolSettings.maxTradeSizeRatio <= 0.3e18, "INVMAXTRADE"); //Invalid max trade size
+        require(params._poolSettings.maxTradeSizeRatio > 0 && params._poolSettings.maxTradeSizeRatio <= 0.3e18, "INVMAXTRADE"); //Invalid max trade size
 
-        lambda = _poolSettings.lambda;
-        epsilonMax = _poolSettings.epsilonMax;
-        absoluteWeightGuardRail = _poolSettings.absoluteWeightGuardRail;
-        maxTradeSizeRatio = _poolSettings.maxTradeSizeRatio;
+        lambda = params._poolSettings.lambda;
+        epsilonMax = params._poolSettings.epsilonMax;
+        absoluteWeightGuardRail = params._poolSettings.absoluteWeightGuardRail;
+        maxTradeSizeRatio = params._poolSettings.maxTradeSizeRatio;
 
-        ruleParameters = _poolSettings.ruleParameters;
+        ruleParameters = params._poolSettings.ruleParameters;
 
-        _poolSettings.rule.initialisePoolRuleIntermediateValues(
+        params._poolSettings.rule.initialisePoolRuleIntermediateValues(
             address(this),
-            _initialMovingAverages,
-            _ruleIntermediateValues,
-            _initialWeights.length
+            params._initialMovingAverages,
+            params._initialIntermediateValues,
+            params._initialWeights.length
         );
 
-        updateWeightRunner.setRuleForPool(_poolSettings);
+        updateWeightRunner.setRuleForPool(params._poolSettings);
     }
 
     /// @inheritdoc IQuantAMMWeightedPool
@@ -816,8 +876,21 @@ contract QuantAMMWeightedPool is
     /// @inheritdoc IQuantAMMWeightedPool
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
+
+        require(
+            block.timestamp - deploymentTime < _FIX_WINDOW,
+            "Cannot change update weight runner after 3 years of deployment"
+        );
+
+        address oldAddress = address(updateWeightRunner);
+        //CODEHAWKS INFO /s/20
+        require(_updateWeightRunner != address(0), "INVADDRESS");
+        //CODEHAWKS INFO /s/21
+        require(_updateWeightRunner != address(updateWeightRunner), "SAMEADDRESS");
+
         updateWeightRunner = UpdateWeightRunner(_updateWeightRunner);
-        emit UpdateWeightRunnerAddressUpdated(address(updateWeightRunner), _updateWeightRunner);
+        //CODEHAWKS L-04
+        emit UpdateWeightRunnerAddressUpdated(oldAddress, _updateWeightRunner);
     }
 
     function getRate() public pure override returns (uint256) {

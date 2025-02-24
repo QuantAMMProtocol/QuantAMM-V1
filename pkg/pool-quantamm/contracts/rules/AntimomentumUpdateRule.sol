@@ -117,7 +117,8 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 // w(t − 1) + κ ·(ℓp(t) − 1/p(t) · ∂p(t)/∂t)
                 int256 res = int256(_prevWeights[locals.i]) +
                     int256(locals.kappa[locals.i]).mul(locals.normalizationFactor - locals.newWeights[locals.i]);
-                require(res >= 0, "Invalid weight");
+
+                //CODEHAWKS M-05 remove preguard +ve weight requirement same for scalar 
                 newWeightsConverted[locals.i] = res;
                 unchecked {
                     ++locals.i;
@@ -158,8 +159,17 @@ contract AntiMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                     ++i;
                 }
             }
+
+            //CODEHAWKS INFO /s/568
+            if(_parameters.length == 2 && _parameters[1].length == 1){            
+                if (!(_parameters[1][0] == 0 || _parameters[1][0] == PRBMathSD59x18.fromInt(1))) {
+                    valid = 0;
+                }
+            }
+
             return valid == 1;
         }
+        
         return false;
     }
 }

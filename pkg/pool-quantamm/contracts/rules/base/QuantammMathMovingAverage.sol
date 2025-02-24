@@ -33,7 +33,8 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
             for (uint i; i < _numberOfAssets; ) {
                 // p̅(t) = p̅(t - 1) + (1 - λ)(p(t) - p̅(t - 1)) - see whitepaper
                 int256 movingAverageI = _prevMovingAverage[i];
-                newMovingAverage[i] = movingAverageI + oneMinusLambda.mul(_newData[i] - movingAverageI);
+                //CODEHAWKS INFO /s/200 reordering to avoid precision loss
+                newMovingAverage[i] = (movingAverageI.mul(convertedLambda) + _newData[i].mul(oneMinusLambda)).div(ONE);
                 unchecked {
                     ++i;
                 }
@@ -46,7 +47,8 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
                 }
                 int256 movingAverageI = _prevMovingAverage[i];
                 // p̅(t) = p̅(t - 1) + (1 - λ)(p(t) - p̅(t - 1))
-                newMovingAverage[i] = movingAverageI + oneMinusLambda.mul(_newData[i] - movingAverageI);
+                //CODEHAWKS INFO /s/200 reordering to avoid precision loss
+                newMovingAverage[i] = (movingAverageI.mul(convertedLambda) + _newData[i].mul(oneMinusLambda)).div(ONE);
                 unchecked {
                     ++i;
                 }
@@ -64,9 +66,9 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
         int256[] memory _initialMovingAverages,
         uint _numberOfAssets
     ) internal {
-        uint movingAverageLength = movingAverages[_poolAddress].length;
-
-        if (movingAverageLength == 0 || _initialMovingAverages.length == _numberOfAssets) {
+        //CODEHAWKS H-04 no longer storing prev, also /s/767
+        if (_initialMovingAverages.length == _numberOfAssets)  
+        {
             //should be during create pool
             movingAverages[_poolAddress] = _quantAMMPack128Array(_initialMovingAverages);
         } else {

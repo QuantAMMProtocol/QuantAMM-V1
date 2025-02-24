@@ -30,7 +30,6 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
     /// @param intermediateState intermediate state during a covariance matrix calculation
     struct QuantAMMCovariance {
         uint256 n;
-        uint256 nSquared;
         int256[][] intermediateCovarianceState;
         int256[][] newState;
         int256[] u;
@@ -50,13 +49,13 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
     ) internal returns (int256[][] memory) {
         QuantAMMCovariance memory locals;
         locals.n = _poolParameters.numberOfAssets; // Dimension of square matrix
-        locals.nSquared = locals.n * locals.n;
         int256[][] memory intermediateCovarianceState = _quantAMMUnpack128Matrix(
             intermediateCovarianceStates[_poolParameters.pool],
             locals.n
         );
 
-        int256[][] memory newState = new int256[][](locals.nSquared);
+        //CODEHAWKS L-08
+        int256[][] memory newState = new int256[][](locals.n);
 
         locals.u = new int256[](locals.n); // (p(t) - p̅(t - 1))
         locals.v = new int256[](locals.n); // (p(t) - p̅(t))
@@ -135,7 +134,13 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
         uint _numberOfAssets
     ) internal {
         uint storeLength = intermediateCovarianceStates[_poolAddress].length;
-        if ((storeLength == 0 && _initialValues.length == _numberOfAssets) || _initialValues.length == storeLength) {
+        
+        uint256 totalValues = _initialValues.length * _initialValues.length;
+        bool evenInitialValues = totalValues % 2 == 0;
+        if (_initialValues.length == _numberOfAssets &&
+        (storeLength == 0 
+        || (evenInitialValues && totalValues / 2 == storeLength)
+        || (!evenInitialValues && (totalValues + 1) / 2 == storeLength))) {
             for (uint i; i < _numberOfAssets; ) {
                 require(_initialValues[i].length == _numberOfAssets, "Bad init covar row");
                 unchecked {

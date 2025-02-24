@@ -14,7 +14,7 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         parameterDescriptions = new string[](3);
         parameterDescriptions[
             0
-        ] = "Kappa: Kappa dictates the aggressiveness of the rule's response to a signal change (here, price gradient)";
+        ] = "Kappa: Kappa dictates the aggressiveness of the rule's response to a signal change (here, (EWMA_short - EWMA_long) / EWMA_long)";
         parameterDescriptions[
             1
         ] = "Lambda Short: This Lambda dictates price smoothing for the short-memory moving average";
@@ -86,12 +86,7 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             _poolParameters.numberOfAssets
         );
         shortMovingAverages[_poolParameters.pool] = _quantAMMPack128Array(newShortMovingAverages);
-
-        for (uint i; i < newShortMovingAverages.length; ) {
-            unchecked {
-                ++i;
-            }
-        }
+        //CODEHAWKS INFO /s/325, /s/402, /s/540, /s/944 remove for loop
 
         locals.prevWeightLength = _prevWeights.length;
 
@@ -131,21 +126,21 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
             }
         } else {
             //vector logic separate to vector for efficiency
-            int256 sumKappa;
             for (locals.i = 0; locals.i < locals.kappaStore.length; ) {
-                sumKappa += locals.kappaStore[locals.i];
+                locals.sumKappa += locals.kappaStore[locals.i];
                 unchecked {
                     ++locals.i;
                 }
             }
-
-            locals.normalizationFactor = locals.normalizationFactor.div(sumKappa);
+            //CODEHAWKS INFO /s/361
+            locals.normalizationFactor = locals.normalizationFactor.div(locals.sumKappa);
             // To avoid intermediate overflows (because of normalization), we only downcast in the end to an uint6
             for (locals.i = 0; locals.i < _prevWeights.length; ) {
                 locals.res =
                     int256(_prevWeights[locals.i]) +
                     locals.kappaStore[locals.i].mul(locals.newWeights[locals.i] - locals.normalizationFactor);
-                require(locals.res >= 0, "Invalid weight");
+                
+                //CODEHAWKS M-05 remove preguard +ve weight requirement same for scalar 
                 newWeightsConverted[locals.i] = locals.res;
                 unchecked {
                     ++locals.i;
@@ -155,7 +150,7 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         return newWeightsConverted;
     }
 
-    /// @notice Set the initial intermediate values for the pool, in this case the gradient
+    /// @notice Set the initial intermediate values for the pool, in this case the moving averages
     /// @param _poolAddress the target pool address
     /// @param _initialValues the initial values of the pool
     /// @param _numberOfAssets the number of assets in the pool
@@ -208,6 +203,9 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
         }
         int256[] memory kappa = _parameters[0];
         uint16 valid = uint16(kappa.length) > 0 ? 1 : 0;
+        
+        int256 sumKappa = 0;
+
         for (uint i; i < kappa.length; ) {
             if (kappa[i] == 0) {
                 unchecked {
@@ -215,10 +213,18 @@ contract DifferenceMomentumUpdateRule is QuantAMMGradientBasedRule, UpdateRule {
                 }
                 break;
             }
+            sumKappa += kappa[i];
+
             unchecked {
                 ++i;
             }
         }
+
+        //CODEHAWKS INFO /s/664 edge case were all kappas sum to 0 cannot be used due to division by 0
+        if (sumKappa == 0) {
+            return false;
+        }
+        
         return valid == 1;
     }
 }

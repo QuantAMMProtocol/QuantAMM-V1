@@ -1,4 +1,4 @@
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
 
@@ -65,8 +65,8 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
     uint256 private constant _MIN_INVARIANT_RATIO = 70e16; // 70%
 
     //@audit taken from WeightedMath.sol for Swap limits
-    uint256 internal constant _MAX_IN_RATIO = 30e16; // 30%
-    uint256 internal constant _MAX_OUT_RATIO = 30e16; // 30%
+    uint256 internal constant _MAX_IN_RATIO = 0.2e18; // 20%
+    uint256 internal constant _MAX_OUT_RATIO = 0.2e18; // 20%
 
     struct TestParam {
         //@audit convention for struct is camel case starting with capital letter
@@ -131,7 +131,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         TestParam firstWeight;
         TestParam secondWeight;
         TestParam otherWeights;
-        QuantAMMWeightedPoolFactory.NewPoolParams params;
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams params;
         PoolSwapParams swapParams;
         IQuantAMMWeightedPool.QuantAMMWeightedPoolDynamicData dynamicData;
         IQuantAMMWeightedPool.QuantAMMWeightedPoolImmutableData immutableData;
@@ -208,9 +208,9 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         uint256 numTokens,
         PoolFuzzParams memory poolParams,
         RuleFuzzParams memory ruleParams
-    ) internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory) {
+    ) internal returns (QuantAMMWeightedPoolFactory.CreationNewPoolParams memory) {
         // Create base params first
-        QuantAMMWeightedPoolFactory.NewPoolParams memory baseParams = _createBaseParams(
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory baseParams = _createBaseParams(
             numTokens,
             poolParams.maxSwapfee
         );
@@ -224,14 +224,14 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
     function _createBaseParams(
         uint256 numTokens,
         uint64 maxSwapFee
-    ) internal view returns (QuantAMMWeightedPoolFactory.NewPoolParams memory) {
+    ) internal view returns (QuantAMMWeightedPoolFactory.CreationNewPoolParams memory) {
         PoolRoleAccounts memory roleAccounts;
         IERC20[] memory poolTokens = _getTokens(numTokens);
 
         (uint256[] memory initialWeightsUint, int256[] memory initialWeights) = _createInitialWeights(numTokens);
 
         return
-            QuantAMMWeightedPoolFactory.NewPoolParams({
+            QuantAMMWeightedPoolFactory.CreationNewPoolParams({
                 name: "Pool With Donation",
                 symbol: "PwD",
                 tokens: vault.buildTokenConfig(poolTokens),
@@ -244,21 +244,21 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                 salt: keccak256(abi.encodePacked(uint256(1))),
                 _initialWeights: initialWeights,
                 _poolSettings: IQuantAMMWeightedPool.PoolSettings({
-                    assets: new IERC20[](0),
+                    assets: _getTokens(numTokens),
                     rule: IUpdateRule(address(0)),
-                    oracles: new address[][](0),
-                    updateInterval: 0,
+                    oracles: _getOracles(numTokens),
+                    updateInterval: 1,
                     lambda: new uint64[](0),
                     epsilonMax: 0,
                     absoluteWeightGuardRail: 0,
-                    maxTradeSizeRatio: 0,
+                    maxTradeSizeRatio: 0.1e18,
                     ruleParameters: new int256[][](0),
                     poolManager: address(0)
                 }),
                 _initialMovingAverages: initialWeights,
                 _initialIntermediateValues: initialWeights,
                 _oracleStalenessThreshold: 3600,
-                poolRegistry: 0,
+                poolRegistry: 16,
                 poolDetails: new string[][](0)
             });
     }
@@ -294,9 +294,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         uint64[] memory lambdas = new uint64[](1);
         lambdas[0] = poolParams.lambda;
 
-        address[][] memory oracles = new address[][](1);
-        oracles[0] = new address[](1);
-        oracles[0][0] = address(chainlinkOracle);
+        address[][] memory oracles = _getOracles(numTokens);
 
         return
             IQuantAMMWeightedPool.PoolSettings({
@@ -842,6 +840,21 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                         vm.warp(timestamp + params.delay);
                     }
 
+                    // get the pool weights
+                    uint256[] memory poolWeights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
+
+
+                    // For ExactIn:
+                    uint256 expectedAmountOut = WeightedMath.computeOutGivenExactIn(
+                        variables.balances[variables.firstWeight.index],
+                        poolWeights[variables.firstWeight.index],
+                        variables.balances[variables.secondWeight.index],
+                        poolWeights[variables.secondWeight.index],
+                        swapParams.exactIn
+                    );
+
+                    vm.assume(expectedAmountOut < variables.balances[variables.secondWeight.index].mulDown(_min(_MAX_IN_RATIO, uint256(params.poolParams.maxTradeSizeRatio))));
+
                     variables.swapParams = PoolSwapParams({
                         kind: SwapKind.EXACT_IN,
                         amountGivenScaled18: swapParams.exactIn,
@@ -854,18 +867,6 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
 
                     vm.prank(address(vault));
                     uint256 amountOut = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(variables.swapParams);
-
-                    // get the pool weights
-                    uint256[] memory poolWeights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
-
-                    // For ExactIn:
-                    uint256 expectedAmountOut = WeightedMath.computeOutGivenExactIn(
-                        variables.balances[variables.firstWeight.index],
-                        poolWeights[variables.firstWeight.index],
-                        variables.balances[variables.secondWeight.index],
-                        poolWeights[variables.secondWeight.index],
-                        swapParams.exactIn
-                    );
 
                     assertApproxEqRel(amountOut, expectedAmountOut, 1e12); // Allow very small relative error
                 }
@@ -915,6 +916,19 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                         vm.warp(timestamp + params.delay);
                     }
 
+                    uint256[] memory poolWeights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
+
+                    uint256 expectedAmountIn = WeightedMath.computeInGivenExactOut(
+                        variables.balances[variables.firstWeight.index],
+                        poolWeights[variables.firstWeight.index],
+                        variables.balances[variables.secondWeight.index],
+                        poolWeights[variables.secondWeight.index],
+                        swapParams.exactOut
+                    );
+
+                    vm.assume(expectedAmountIn < variables.balances[variables.firstWeight.index].mulDown(_min(_MAX_IN_RATIO, uint256(params.poolParams.maxTradeSizeRatio))));
+
+
                     variables.swapParams = PoolSwapParams({
                         kind: SwapKind.EXACT_OUT,
                         amountGivenScaled18: swapParams.exactOut,
@@ -927,10 +941,8 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                     vm.prank(address(vault));
                     uint256 amountIn = QuantAMMWeightedPool(quantAMMWeightedPool).onSwap(variables.swapParams);
 
-                    uint256[] memory poolWeights = QuantAMMWeightedPool(quantAMMWeightedPool).getNormalizedWeights();
-
                     // For ExactOut:
-                    uint256 expectedAmountIn = WeightedMath.computeInGivenExactOut(
+                    expectedAmountIn = WeightedMath.computeInGivenExactOut(
                         variables.balances[variables.firstWeight.index],
                         poolWeights[variables.firstWeight.index],
                         variables.balances[variables.secondWeight.index],

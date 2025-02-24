@@ -15,7 +15,7 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
     int256 private constant TENPOWEIGHTEEN = (10 ** 18);
 
     bool private immutable _protectedAccess;
-    
+
     // Key is the pool address and stores the intermediate variance state in a packed array of 128 bit integers
     mapping(address => int256[]) internal intermediateVarianceStates;
 
@@ -78,6 +78,7 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
             for (uint i; i < locals.nMinusOne; ) {
                 // Intermediate states are calculated in pairs to then SSTORE as we go along saving gas from a redundant SSTORE of length if we did the whole array
                 // calculating and storing in the same loop also saves loop costs
+
                 locals.intermediateState =
                     locals.convertedLambda.mul(locals.intermediateVarianceState[i]) +
                     (_newData[i] - _poolParameters.movingAverage[locals.n + i])
@@ -127,6 +128,13 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
                     .intermediateVarianceState[locals.nMinusOne];
             }
         } else {
+            //CODEHAWKS H-01
+            if (locals.notDivisibleByTwo) {
+                unchecked {
+                    --locals.nMinusOne;
+                }
+            }
+
             //vector parameter calculation is the same but we have to keep track of and access the right vector parameter
             for (uint i; i < locals.nMinusOne; ) {
                 unchecked {
@@ -172,6 +180,7 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
             if (locals.notDivisibleByTwo) {
                 unchecked {
                     ++locals.nMinusOne;
+
                     locals.convertedLambda = int256(_poolParameters.lambda[locals.nMinusOne]);
                     locals.oneMinusLambda = ONE - locals.convertedLambda;
                 }
@@ -183,8 +192,13 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
 
                 locals.intermediateVarianceState[locals.nMinusOne] = locals.intermediateState;
                 locals.finalState[locals.nMinusOne] = locals.oneMinusLambda.mul(locals.intermediateState);
-                intermediateVarianceStates[_poolParameters.pool][locals.storageIndex] = locals
-                    .intermediateVarianceState[locals.nMinusOne];
+                
+                //CODEHAWKS INFO /s/755
+                intermediateVarianceStates[_poolParameters.pool][locals.storageIndex] = _quantAMMPackTwo128(
+                    int256(0),
+                    locals
+                    .intermediateVarianceState[locals.nMinusOne]
+                );
             }
         }
 
@@ -200,8 +214,13 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
         uint _numberOfAssets
     ) internal {
         uint storeLength = intermediateVarianceStates[_poolAddress].length;
+        bool evenInitialValues = _initialValues.length % 2 == 0;
 
-        if ((storeLength == 0 && _initialValues.length == _numberOfAssets) || _initialValues.length == storeLength) {
+        //CODEHAWKS M-18
+        if ((_initialValues.length == _numberOfAssets) && 
+        (storeLength == 0 
+        || evenInitialValues && _initialValues.length / 2 == storeLength
+        || !evenInitialValues && (_initialValues.length + 1) / 2 == storeLength)) {
             //should be during create pool
             intermediateVarianceStates[_poolAddress] = _quantAMMPack128Array(_initialValues);
         } else {

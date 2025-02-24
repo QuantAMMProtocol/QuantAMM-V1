@@ -15,6 +15,7 @@ import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Vers
 
 import { IQuantAMMWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 import { QuantAMMWeightedPool } from "./QuantAMMWeightedPool.sol";
+import { IHooks } from "@balancer-labs/v3-interfaces/contracts/vault/IHooks.sol";
 
 /**
  * @param name The name of the pool
@@ -37,7 +38,10 @@ import { QuantAMMWeightedPool } from "./QuantAMMWeightedPool.sol";
 contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
     // solhint-disable not-rely-on-time
 
-    struct NewPoolParams {
+    /// @notice Unsafe or bad configuration for routers and liquidity management
+    error ImcompatibleRouterConfiguration();
+
+    struct CreationNewPoolParams {
         string name;
         string symbol;
         TokenConfig[] tokens;
@@ -82,22 +86,29 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
         return _poolVersion;
     }
 
-    function createWithoutArgs(NewPoolParams memory params) external returns (address pool) {
+    function createWithoutArgs(CreationNewPoolParams memory params) external returns (address pool) {
         if (params.roleAccounts.poolCreator != address(0)) {
             revert StandardPoolWithCreator();
         }
 
+        if(params.poolHooksContract != address(0) 
+            && IHooks(params.poolHooksContract).getHookFlags().enableHookAdjustedAmounts != params.disableUnbalancedLiquidity){
+            revert ImcompatibleRouterConfiguration();
+        }
+        
         LiquidityManagement memory liquidityManagement = getDefaultLiquidityManagement();
         liquidityManagement.enableDonation = params.enableDonation;
         // disableUnbalancedLiquidity must be set to true if a hook has the flag enableHookAdjustedAmounts = true.
         liquidityManagement.disableUnbalancedLiquidity = params.disableUnbalancedLiquidity;
+        require(params.tokens.length == params.normalizedWeights.length, "Token and weight counts must match");
         
         pool = _create(abi.encode(
                 QuantAMMWeightedPool.NewPoolParams({
                     name: params.name,
                     symbol: params.symbol,
                     numTokens: params.normalizedWeights.length,
-                    version: "version",
+                    //CODEHAWKS INFO /s/26 /s/31 /s/190 /s/468
+                    version: _poolVersion,
                     updateWeightRunner: _updateWeightRunner,
                     poolRegistry: params.poolRegistry,
                     poolDetails: params.poolDetails
@@ -105,13 +116,7 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
                 getVault()
             ), params.salt);
 
-        QuantAMMWeightedPool(pool).initialize(
-            params._initialWeights,
-            params._poolSettings,
-            params._initialMovingAverages,
-            params._initialIntermediateValues,
-            params._oracleStalenessThreshold
-        );
+        QuantAMMWeightedPool(pool).initialize(params);
 
         _registerPoolWithVault(
             pool,
@@ -128,37 +133,36 @@ contract QuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Version {
      * @notice Deploys a new `WeightedPool`.
      * @dev Tokens must be sorted for pool registration.
      */
-    function create(NewPoolParams memory params) external returns (address pool, bytes memory poolArgs) {
+    function create(CreationNewPoolParams memory params) external returns (address pool, bytes memory poolArgs) {
         if (params.roleAccounts.poolCreator != address(0)) {
             revert StandardPoolWithCreator();
         }
-
+        
         LiquidityManagement memory liquidityManagement = getDefaultLiquidityManagement();
         liquidityManagement.enableDonation = params.enableDonation;
         // disableUnbalancedLiquidity must be set to true if a hook has the flag enableHookAdjustedAmounts = true.
         liquidityManagement.disableUnbalancedLiquidity = params.disableUnbalancedLiquidity;
+
         poolArgs = abi.encode(
                 QuantAMMWeightedPool.NewPoolParams({
                     name: params.name,
                     symbol: params.symbol,
                     numTokens: params.normalizedWeights.length,
-                    version: "version",
+                    //CODEHAWKS INFO /s/26 /s/31 /s/190 /s/468
+                    version: _poolVersion,
                     updateWeightRunner: _updateWeightRunner,
                     poolRegistry: params.poolRegistry,
                     poolDetails: params.poolDetails
                 }),
                 getVault()
             );
-
+        
+        //CODEHAWKS INFO /s/_586 /s/860 /s/962
+        require(params.tokens.length == params.normalizedWeights.length, "Token and weight counts must match");
+        
         pool = _create(poolArgs, params.salt);
 
-        QuantAMMWeightedPool(pool).initialize(
-            params._initialWeights,
-            params._poolSettings,
-            params._initialMovingAverages,
-            params._initialIntermediateValues,
-            params._oracleStalenessThreshold
-        );
+        QuantAMMWeightedPool(pool).initialize(params);
 
         _registerPoolWithVault(
             pool,

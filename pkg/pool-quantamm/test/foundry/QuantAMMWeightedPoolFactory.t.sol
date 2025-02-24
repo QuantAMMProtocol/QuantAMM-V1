@@ -22,6 +22,8 @@ import { OracleWrapper } from "@balancer-labs/v3-interfaces/contracts/pool-quant
 import { MockUpdateWeightRunner } from "../../contracts/mock/MockUpdateWeightRunner.sol";
 import { MockMomentumRule } from "../../contracts/mock/mockRules/MockMomentumRule.sol";
 import { MockChainlinkOracle } from "../../contracts/mock/MockChainlinkOracles.sol";
+import { PoolRoleAccounts, TokenConfig, TokenType } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
+import { IRateProvider } from "@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IRateProvider.sol";
 
 import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
 
@@ -72,8 +74,41 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         assertEq(pauseWindowDuration, 365 days);
     }
 
+    function testInvalidPoolRegistry(uint) public {
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
+        params.poolRegistry = 0; // Invalid pool registry
+
+        vm.expectRevert();
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
+    function testValidBitmapCombinations() public {
+        uint256 MASK_POOL_PERFORM_UPDATE = 1;
+        uint256 MASK_POOL_GET_DATA = 2;
+        uint256 MASK_POOL_OWNER_UPDATES = 8;
+        uint256 MASK_POOL_QUANTAMM_ADMIN_UPDATES = 16;
+        uint256 MASK_POOL_RULE_DIRECT_SET_WEIGHT = 32;
+
+        uint256[] memory validBitmaps = new uint256[](5);
+        validBitmaps[0] = MASK_POOL_PERFORM_UPDATE;
+        validBitmaps[1] = MASK_POOL_GET_DATA;
+        validBitmaps[2] = MASK_POOL_OWNER_UPDATES;
+        validBitmaps[3] = MASK_POOL_QUANTAMM_ADMIN_UPDATES;
+        validBitmaps[4] = MASK_POOL_RULE_DIRECT_SET_WEIGHT;
+
+        for (uint256 i = 0; i < validBitmaps.length; i++) {
+            for (uint256 j = i; j < validBitmaps.length; j++) {
+                uint256 combinedMask = validBitmaps[i] | validBitmaps[j];
+                QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
+                params.poolRegistry = combinedMask;
+                quantAMMWeightedPoolFactory.create(params);
+            }
+        }
+    }
+
+
     function testEmptyOracleArrayFirst() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         params._poolSettings.oracles = new address[][](0);
 
@@ -81,88 +116,174 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testEmptyOracleArrayMixed() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+    function testMismatchOracleWeightsArray() public {
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
-        params._poolSettings.oracles = new address[][](1);
+        params._poolSettings.oracles = new address[][](3);
         params._poolSettings.oracles[0] = new address[](0);
+        params._poolSettings.oracles[1] = new address[](0);
+        params._poolSettings.oracles[2] = new address[](0);
+
+        vm.expectRevert("OLNWEIG");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
+    function testEmptyOracleArrayMixed() public {
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
+
+        params._poolSettings.oracles = new address[][](2);
+        params._poolSettings.oracles[0] = new address[](0);
+        params._poolSettings.oracles[1] = new address[](0);
 
         vm.expectRevert("Empty oracles array");
         quantAMMWeightedPoolFactory.create(params);
     }
 
-    function testUnapprovedOracleArray() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+    function test0UpdateInterval() public {
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
+
+        params._poolSettings.updateInterval = 0;
+
+        vm.expectRevert("Update interval must be greater than 0");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
+    function testUnapprovedOracleBackupArray() public {
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
 
         int216 fixedValue = 1000;
         uint delay = 3600;
-        chainlinkOracle = _deployOracle(fixedValue, delay);
-        params._poolSettings.oracles = new address[][](1);
-        params._poolSettings.oracles[0] = new address[](1);
+        MockChainlinkOracle unapprovedOracle = _deployOracle(fixedValue, delay);
+        params._poolSettings.oracles = new address[][](2);
+        params._poolSettings.oracles[0] = new address[](2);
         params._poolSettings.oracles[0][0] = address(chainlinkOracle);
+        params._poolSettings.oracles[0][1] = address(unapprovedOracle);
+        params._poolSettings.oracles[1] = new address[](1);
+        params._poolSettings.oracles[1][0] = address(chainlinkOracle);
 
         vm.expectRevert("Not approved oracled used");
         quantAMMWeightedPoolFactory.create(params);
     }
 
+    function testUnapprovedOracleArray() public {
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
+
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = _deployOracle(fixedValue, delay);
+        params._poolSettings.oracles = new address[][](2);
+        params._poolSettings.oracles[0] = new address[](2);
+        params._poolSettings.oracles[0][0] = address(chainlinkOracle);
+        params._poolSettings.oracles[1] = new address[](1);
+        params._poolSettings.oracles[1][0] = address(chainlinkOracle);
+
+        vm.expectRevert("Not approved oracled used");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
+
     function testInvalidRule() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.rule = IUpdateRule(address(0));
         vm.expectRevert("Invalid rule");
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testInvalidRuleValidation() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.ruleParameters = new int256[][](0);
         vm.expectRevert("INVRLEPRM");
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testEpsilonMaxInvalidAbove() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.epsilonMax = 1e18 + 1;
         vm.expectRevert("INV_EPMX");
         quantAMMWeightedPoolFactory.create(params);
     }
 
+    function testStaleness0Invalid() public {
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
+        params._oracleStalenessThreshold = 0;
+        vm.expectRevert("INVORCSTAL");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
     function testEpsilonMaxInvalidBelow() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.epsilonMax = 0e18;
         vm.expectRevert("INV_EPMX");
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testEpsilonMaxValid() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.epsilonMax = 0.5e18;
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testLambdaInvalidEmpty() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](0);
         vm.expectRevert("Either scalar or vector");
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testLambdaInvalidEmpty2D() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](1);
         vm.expectRevert("INVLAM");
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testLambdaInvalidAbove() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](1);
         params._poolSettings.lambda[0] = 1e18 + 1;
         vm.expectRevert("INVLAM");
         quantAMMWeightedPoolFactory.create(params);
     }
 
+    function testDifferentWeightLengths() public {
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
+        
+        params.normalizedWeights = new uint256[](3);
+        params.normalizedWeights[0] = uint256(0.5e18);
+        params.normalizedWeights[1] = uint256(0.25e18);
+        params.normalizedWeights[2] = uint256(0.25e18);
+
+        vm.expectRevert("Token and weight counts must match");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
+    function testDifferentAssetLengths() public {
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
+        
+        IERC20[] memory altTokens = [address(weth), address(dai), address(usdc)].toMemoryArray().asIERC20();
+        
+        params._poolSettings.assets = altTokens;
+        vm.expectRevert("INVASSWEIG");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
+    function testDifferentTokenLengths() public {
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
+        
+        IERC20[] memory altTokens = [address(weth)].toMemoryArray().asIERC20();
+        
+        TokenConfig[] memory tokens = new TokenConfig[](3);
+        tokens[0] = params.tokens[0];
+        tokens[1] = vault.buildTokenConfig(altTokens)[0];
+        tokens[2] = params.tokens[1];
+
+        params.tokens = tokens;
+        vm.expectRevert("Token and weight counts must match");
+        quantAMMWeightedPoolFactory.create(params);
+    }
+
     function testLambdaInvalidBelow() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](1);
         params._poolSettings.lambda[0] = 0e18;
         vm.expectRevert("INVLAM");
@@ -170,14 +291,14 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
     }
 
     function testLambdaValid() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](1);
         params._poolSettings.lambda[0] = 0.5e18;
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testLambdaValid2D() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.lambda = new uint64[](2);
         params._poolSettings.lambda[0] = 0.5e18;
         params._poolSettings.lambda[1] = 0.5e18;
@@ -185,47 +306,47 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
     }
 
     function testAbsoluteToleranceInvalidAbove() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.absoluteWeightGuardRail = 0.5e18 + 1;
         vm.expectRevert("INV_ABSWGT");
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testAbsoluteToleranceInvalidBelow() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.absoluteWeightGuardRail = 0e18;
         vm.expectRevert("INV_ABSWGT");
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testAbsoluteToleranceValid() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.absoluteWeightGuardRail = 0.2e18;
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testMaxTradeSizeInvalidAbove() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.maxTradeSizeRatio = 0.3e18 + 1;
         vm.expectRevert("INVMAXTRADE");
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testMaxTradeSizeInvalidBelow() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.maxTradeSizeRatio = 0e18;
         vm.expectRevert("INVMAXTRADE");
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testMaxTradeSizeValid() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._poolSettings.maxTradeSizeRatio = 0.2e18;
         quantAMMWeightedPoolFactory.create(params);
     }
 
     function testInvalidWeightSum() public {
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._initialWeights[0] = 0.6e18;
         vm.expectRevert(QuantAMMWeightedPool.NormalizedWeightInvariant.selector);
         quantAMMWeightedPoolFactory.create(params);
@@ -268,7 +389,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         assertEq(vars.vault.usdcAfter - vars.vault.usdcBefore, amountToDonate, "Vault USDC balance is wrong");
     }
 
-    function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.NewPoolParams memory retParams) {
+    function _createPoolParams() internal returns (QuantAMMWeightedPoolFactory.CreationNewPoolParams memory retParams) {
         PoolRoleAccounts memory roleAccounts;
         IERC20[] memory tokens = [address(dai), address(usdc)].toMemoryArray().asIERC20();
         MockMomentumRule momentumRule = new MockMomentumRule(owner);
@@ -290,11 +411,9 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
         parameters[0] = new int256[](1);
         parameters[0][0] = 0.2e18;
 
-        address[][] memory oracles = new address[][](1);
-        oracles[0] = new address[](1);
-        oracles[0][0] = address(chainlinkOracle);
+        address[][] memory oracles = _getOracles(initialWeights.length);
 
-        retParams = QuantAMMWeightedPoolFactory.NewPoolParams(
+        retParams = QuantAMMWeightedPoolFactory.CreationNewPoolParams(
             "Pool With Donation",
             "PwD",
             vault.buildTokenConfig(tokens),
@@ -321,14 +440,14 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
             initialWeights,
             initialWeights,
             3600,
-            0,
+            16,
             new string[][](0)
         );
     }
 
     function _deployAndInitializeQuantAMMWeightedPool(bool supportsDonation) private returns (address) {
         IERC20[] memory tokens = [address(dai), address(usdc)].toMemoryArray().asIERC20();
-        QuantAMMWeightedPoolFactory.NewPoolParams memory params = _createPoolParams();
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params.enableDonation = supportsDonation;
         params.name = supportsDonation ? "Pool With Donation" : "Pool Without Donation";
         params.symbol = supportsDonation ? "PwD" : "PwoD";

@@ -81,7 +81,8 @@ abstract contract ScalarQuantAMMBaseStorage {
                 _seventhInt >= MIN32 &&
                 _eighthInt <= MAX32 &&
                 _eighthInt >= MIN32,
-            "Overflow"
+            //CODEHAWKS INFO /s/505 /s/706
+            "Overflow/Underflow"
         );
 
         int256 firstPacked = int256(uint256(_firstInt << 224) >> 224) << 224;
@@ -255,12 +256,8 @@ abstract contract ScalarQuantAMMBaseStorage {
 
         if (targetArrayLength == 0) {
             unchecked {
-                if (_sourceArray.length <= 8) {
-                    targetArrayLength = 1;
-                } else {
-                    targetArrayLength = (nonStickySourceLength / 8) + 1;
-                }
-
+                //CODEHAWKS INFO /s/8
+                targetArrayLength = (nonStickySourceLength / 8) + 1;
                 targetArray = new int256[](targetArrayLength);
             }
         }
@@ -272,7 +269,9 @@ abstract contract ScalarQuantAMMBaseStorage {
             for (uint i = nonStickySourceLength; i < _sourceArray.length; ) {
                 unchecked {
                     int256 elem = _sourceArray[i] / 1e9;
-                    require(elem <= MAX32 && elem >= MIN32, "Overflow");
+
+                    //CODEHAWKS INFO /s/505 /s/706
+                    require(elem <= MAX32 && elem >= MIN32, "Overflow/Underflow");
                     packed |= int256(uint256(elem << 224) >> 224) << offset;
                     offset -= 32;
                     ++i;
@@ -391,17 +390,10 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
         unchecked {
             for (uint i; i < _sourceMatrix.length; ) {
                 for (uint j; j < _sourceMatrix[i].length; ) {
-                    require(
-                        (_sourceMatrix[i][j] <= int256(type(int128).max)) &&
-                            (_sourceMatrix[i][j] >= int256(type(int128).min)),
-                        "Over/Under-flow"
-                    );
                     if (right == 1) {
                         right = 0;
                         //SSTORE done inline to avoid length SSTORE as length doesnt ever change
-                        _targetArray[targetArrayIndex] =
-                            (leftInt << 128) |
-                            int256(uint256(_sourceMatrix[i][j] << 128) >> 128);
+                        _targetArray[targetArrayIndex] = _quantAMMPackTwo128(leftInt, _sourceMatrix[i][j]);
                         ++targetArrayIndex;
                     } else {
                         leftInt = _sourceMatrix[i][j];
@@ -411,10 +403,9 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                 }
                 ++i;
             }
-            if (((_sourceMatrix.length * _sourceMatrix.length) % 2) != 0) {
-                _targetArray[targetArrayLength - 1] = int256(
-                    int128(_sourceMatrix[_sourceMatrix.length - 1][_sourceMatrix.length - 1])
-                );
+            if (((_sourceMatrix.length * _sourceMatrix.length) % 2) != 0) {                
+                //CODEHAWKS INFO /s/755
+                _targetArray[targetArrayLength - 1] = _quantAMMPackTwo128(0, _sourceMatrix[_sourceMatrix.length - 1][_sourceMatrix.length - 1]);
             }
         }
     }
@@ -462,7 +453,7 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                         targetIndex = 0;
                     }
                     if (targetRow < _numberOfAssets) {
-                        targetArray[targetRow] = new int256[](_numberOfAssets);
+                        //CODEHAWKS INFO /s/922 remove double initialisation
                         if (targetIndex < _numberOfAssets) {
                             targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i]));
                             unchecked {
@@ -477,13 +468,14 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                     targetIndex = 0;
                 }
                 if (targetRow < _numberOfAssets) {
-                    targetArray[targetRow] = new int256[](_numberOfAssets);
+                    //CODEHAWKS INFO /s/922 remove double initialisation
                     targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i] >> 128));
                     unchecked {
                         ++targetIndex;
                     }
 
                     if (targetIndex < _numberOfAssets) {
+                        //CODEHAWKS INFO /s/922 remove double initialisation
                         targetArray[targetRow][targetIndex] = int256(int128(_sourceArray[i]));
                         unchecked {
                             ++targetIndex;
@@ -492,9 +484,6 @@ abstract contract VectorRuleQuantAMMStorage is QuantAMMStorage {
                         unchecked {
                             ++targetRow;
                             targetIndex = 0;
-                        }
-                        if (targetRow < _numberOfAssets) {
-                            targetArray[targetRow] = new int256[](_numberOfAssets);
                         }
                     }
                 }

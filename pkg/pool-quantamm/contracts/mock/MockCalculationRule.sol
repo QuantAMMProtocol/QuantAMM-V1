@@ -91,8 +91,16 @@ contract MockCalculationRule is
         _setGradient(poolAddress, _initialValues, _numberOfAssets);
     }
 
+    function getInitialGradient(address poolAddress, uint256 numAssets) external view returns (int256[] memory) {
+        return _quantAMMUnpack128Array(intermediateGradientStates[poolAddress], numAssets);
+    }
+
     function setInitialVariance(address poolAddress, int256[] memory _initialValues, uint _numberOfAssets) external {
         _setIntermediateVariance(poolAddress, _initialValues, _numberOfAssets);
+    }
+
+    function getIntermediateVariance(address poolAddress, uint _numberOfAssets) external view returns (int256[] memory) {
+        return _quantAMMUnpack128Array(intermediateVarianceStates[poolAddress], _numberOfAssets);
     }
 
     function setInitialCovariance(
@@ -101,6 +109,10 @@ contract MockCalculationRule is
         uint _numberOfAssets
     ) external {
         _setIntermediateCovariance(poolAddress, _initialValues, _numberOfAssets);
+    }
+
+    function getIntermediateCovariance(address poolAddress, uint _numberOfAssets) external view returns (int256[][] memory) {
+        return _quantAMMUnpack128Matrix(intermediateCovarianceStates[poolAddress], _numberOfAssets);
     }
 
     function CalculateNewWeights(

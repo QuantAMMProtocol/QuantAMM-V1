@@ -664,24 +664,45 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                     console.log("expected delay", expectedDelay);
 
                     for (uint k = 0; k < params.numTokens; k++) {
+                        console.log("k", k);
+
                         int256[] memory targetWeightAndMultiplier = variables.dynamicData.firstFourWeightsAndMultipliers;
+                        
                         if (k >= 4) {
                             targetWeightAndMultiplier = variables.dynamicData.secondFourWeightsAndMultipliers;
+                        }
+                        for(uint l = 0; l < targetWeightAndMultiplier.length; l++){
+                            console.log("l", l);
+                            console.logString(string.concat("target weight and multiplier: ", vm.toString(targetWeightAndMultiplier[l])));
                         }
                         TestParam memory expectedTestParam = k == variables.firstWeight.index
                             ? variables.firstWeight
                             : k == variables.secondWeight.index
                             ? variables.secondWeight
                             : variables.otherWeights;
+                        uint multiplierOffset = params.numTokens;
+                        uint weightOffset = k;
+                        if(params.numTokens > 4){
+                            if(k < 4){
+                                multiplierOffset = 4;
+                            }
+                            else{
+                                weightOffset = k - 4;
+                                multiplierOffset = params.numTokens - 4;
+                            }
+                        }
 
-                            assertEq(
-                                targetWeightAndMultiplier[k],
-                                expectedTestParam.weight
-                            );
-                            assertEq(
-                                targetWeightAndMultiplier[k + params.numTokens],
-                                expectedTestParam.multiplier
-                            );
+                        console.log("weight offset", weightOffset);
+                        console.log("multiplier offset", multiplierOffset);
+
+                        assertEq(
+                            targetWeightAndMultiplier[weightOffset],
+                            expectedTestParam.weight
+                        );
+                        assertEq(
+                            targetWeightAndMultiplier[weightOffset + multiplierOffset],
+                            expectedTestParam.multiplier
+                        );
                     }
 
                     assertEq(variables.dynamicData.lastUpdateTime, uint40(timestamp));

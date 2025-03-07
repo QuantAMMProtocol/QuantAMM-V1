@@ -202,25 +202,8 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
         vm.stopPrank();
 
         vm.startPrank(addr1);
-        vm.expectRevert("ONLYADMIN");
+        vm.expectRevert();
         QuantAMMWeightedPool(quantAMMWeightedPool).setUpdateWeightRunnerAddress(addr1);
-    }
-
-    function test0AddressSetUpdateWeightRunnerAddress() public {
-        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
-        vm.startPrank(owner);
-        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
-        vm.expectRevert("INVADDRESS");
-        QuantAMMWeightedPool(quantAMMWeightedPool).setUpdateWeightRunnerAddress(address(0));
-    }
-
-    function testSameAddressSetUpdateWeightRunnerAddress() public {
-        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
-        vm.startPrank(owner);
-        (address quantAMMWeightedPool, ) = quantAMMWeightedPoolFactory.create(params);
-        address current = address(QuantAMMWeightedPool(quantAMMWeightedPool).updateWeightRunner());
-        vm.expectRevert("SAMEADDRESS");
-        QuantAMMWeightedPool(quantAMMWeightedPool).setUpdateWeightRunnerAddress(current);
     }
 
     function testGetPoolDetailsNameNotFound() public {

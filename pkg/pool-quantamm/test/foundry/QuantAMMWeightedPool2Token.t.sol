@@ -145,8 +145,8 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         (string memory retType, string memory name) = IQuantAMMWeightedPool(quantAMMWeightedPool).getPoolDetail("some category", "some name");
 
-        assertEq(retType, "error");
-        assertEq(name, "detail not found");
+        assertEq(retType, "");
+        assertEq(name, "");
     }
 
     function testGetPoolDetailSuccess() public {
@@ -181,8 +181,8 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         (string memory retType, string memory name) = IQuantAMMWeightedPool(quantAMMWeightedPool).getPoolDetail("some category", "some name");
 
-        assertEq(retType, "error");
-        assertEq(name, "detail not found");
+        assertEq(retType, "");
+        assertEq(name, "");
     }
     
 
@@ -237,8 +237,8 @@ contract QuantAMMWeightedPool2TokenTest is QuantAMMWeightedPoolContractsDeployer
 
         (string memory retType, string memory name) = IQuantAMMWeightedPool(quantAMMWeightedPool).getPoolDetail("some category", "some name");
 
-        assertEq(retType, "error");
-        assertEq(name, "detail not found");
+        assertEq(retType, "");
+        assertEq(name, "");
     }
 
     function testSetWeightNBlocksAfter() public {

@@ -348,7 +348,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
     function testInvalidWeightSum() public {
         QuantAMMWeightedPoolFactory.CreationNewPoolParams memory params = _createPoolParams();
         params._initialWeights[0] = 0.6e18;
-        vm.expectRevert(QuantAMMWeightedPool.NormalizedWeightInvariant.selector);
+        vm.expectRevert(QuantAMMWeightedPoolFactory.NormalizedWeightInvariant.selector);
         quantAMMWeightedPoolFactory.create(params);
     }
 

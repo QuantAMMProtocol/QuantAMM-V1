@@ -664,39 +664,29 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                     console.log("expected delay", expectedDelay);
 
                     for (uint k = 0; k < params.numTokens; k++) {
-                        if (k == variables.firstWeight.index) {
-                            assertEq(
-                                variables.dynamicData.weightsAtLastUpdateInterval[variables.firstWeight.index],
-                                variables.firstWeight.weight
-                            );
-                            assertEq(
-                                variables.dynamicData.weightBlockMultipliers[variables.firstWeight.index],
-                                variables.firstWeight.multiplier
-                            );
-                        } else if (k == variables.secondWeight.index) {
-                            assertEq(
-                                variables.dynamicData.weightsAtLastUpdateInterval[variables.secondWeight.index],
-                                variables.secondWeight.weight
-                            );
-                            assertEq(
-                                variables.dynamicData.weightBlockMultipliers[variables.secondWeight.index],
-                                variables.secondWeight.multiplier
-                            );
-                        } else {
-                            assertEq(
-                                variables.dynamicData.weightsAtLastUpdateInterval[k],
-                                variables.otherWeights.weight
-                            );
-                            assertEq(
-                                variables.dynamicData.weightBlockMultipliers[k],
-                                variables.otherWeights.multiplier
-                            );
+                        int256[] memory targetWeightAndMultiplier = variables.dynamicData.firstFourWeightsAndMultipliers;
+                        if (k >= 4) {
+                            targetWeightAndMultiplier = variables.dynamicData.secondFourWeightsAndMultipliers;
                         }
+                        TestParam memory expectedTestParam = k == variables.firstWeight.index
+                            ? variables.firstWeight
+                            : k == variables.secondWeight.index
+                            ? variables.secondWeight
+                            : variables.otherWeights;
+
+                            assertEq(
+                                targetWeightAndMultiplier[k],
+                                expectedTestParam.weight
+                            );
+                            assertEq(
+                                targetWeightAndMultiplier[k + params.numTokens],
+                                expectedTestParam.multiplier
+                            );
                     }
 
-                    assertEq(variables.dynamicData.lastUpdateIntervalTime, uint40(timestamp));
+                    assertEq(variables.dynamicData.lastUpdateTime, uint40(timestamp));
                     assertEq(
-                        variables.dynamicData.lastInterpolationTimePossible,
+                        variables.dynamicData.lastInteropTime,
                         uint40(timestamp + params.interpolationTime)
                     );
                 }

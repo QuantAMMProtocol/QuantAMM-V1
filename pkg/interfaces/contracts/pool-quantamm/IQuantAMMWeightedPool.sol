@@ -109,11 +109,9 @@ interface IQuantAMMWeightedPool {
 
     /// @notice function called to set weights and weight block multipliers
     /// @param _weights the weights to set that sum to 1
-    /// @param _poolAddress the address of the pool to set the weights for
     /// @param _lastInterpolationTimePossible the last time that the weights can be updated given the block multiplier before one weight hits the guardrail
     function setWeights(
-        int256[] calldata _weights,
-        address _poolAddress,
+        int256[][] calldata _weights,
         uint40 _lastInterpolationTimePossible
     ) external;
     

@@ -121,7 +121,7 @@ contract QuantAMMWeightedPool is
     }
 
     ///@dev Emitted when the weights of the pool are updated
-    event WeightsUpdated(address indexed poolAddress, int256[] weights, uint40 lastInterpolationTimePossible, uint40 lastUpdateTime);
+    event WeightsUpdated(address indexed poolAddress, int256[][] weights, uint40 lastInterpolationTimePossible, uint40 lastUpdateTime);
 
     ///@dev Emitted when the update weight runner is updated
     event UpdateWeightRunnerAddressUpdated(address indexed oldAddress, address indexed newAddress);
@@ -449,87 +449,21 @@ contract QuantAMMWeightedPool is
             );
 
             int256[] memory firstFourWeights = quantAMMUnpack32(_normalizedFirstFourWeights);
-            uint256 tokenIndex = totalTokens;
-            if (totalTokens > 4) {
-                tokenIndex = 4;
-            }
+            int256[] memory secondFourWeights = totalTokens > 4 ? quantAMMUnpack32(_normalizedSecondFourWeights) : new int256[](0);
 
-            //not using _calculateCurrentBlockWeight as hardcoded you avoid 1 calc gas
-            normalizedWeights[0] = calculateBlockNormalisedWeight(
-                firstFourWeights[0],
-                firstFourWeights[tokenIndex],
-                timeSinceLastUpdate
-            );
-            normalizedWeights[1] = calculateBlockNormalisedWeight(
-                firstFourWeights[1],
-                firstFourWeights[tokenIndex + 1],
-                timeSinceLastUpdate
-            );
-
-            if (totalTokens > 2) {
-                normalizedWeights[2] = calculateBlockNormalisedWeight(
-                    firstFourWeights[2],
-                    firstFourWeights[tokenIndex + 2],
-                    timeSinceLastUpdate
-                );
-            } else {
-                return normalizedWeights;
+            for (uint256 i = 0; i < totalTokens; i++) {
+                int256[] memory weights = i < 4 ? firstFourWeights : secondFourWeights;
+                uint256 indexOffset = i < 4 ? (totalTokens > 4 ? 4 : totalTokens) : (totalTokens - 4);
+                
+                if (indexOffset + (i % 4) < weights.length) {
+                    normalizedWeights[i] = calculateBlockNormalisedWeight(
+                        weights[i % 4],
+                        weights[indexOffset + (i % 4)],
+                        timeSinceLastUpdate
+                    );
+                }
             }
-            if (totalTokens > 3) {
-                normalizedWeights[3] = calculateBlockNormalisedWeight(
-                    firstFourWeights[3],
-                    firstFourWeights[tokenIndex + 3],
-                    timeSinceLastUpdate
-                );
-            } else {
-                return normalizedWeights;
-            }
-
-            //avoid unneccessary SLOAD
-            if (totalTokens == 4) {
-                return normalizedWeights;
-            }
-
-            int256[] memory secondFourWeights = quantAMMUnpack32(_normalizedSecondFourWeights);
-            uint256 moreThan4Tokens = totalTokens - 4;
-
-            if (totalTokens > 4) {
-                normalizedWeights[4] = calculateBlockNormalisedWeight(
-                    secondFourWeights[0],
-                    secondFourWeights[moreThan4Tokens],
-                    timeSinceLastUpdate
-                );
-            } else {
-                return normalizedWeights;
-            }
-            if (totalTokens > 5) {
-                normalizedWeights[5] = calculateBlockNormalisedWeight(
-                    secondFourWeights[1],
-                    secondFourWeights[moreThan4Tokens + 1],
-                    timeSinceLastUpdate
-                );
-            } else {
-                return normalizedWeights;
-            }
-            if (totalTokens > 6) {
-                normalizedWeights[6] = calculateBlockNormalisedWeight(
-                    secondFourWeights[2],
-                    secondFourWeights[moreThan4Tokens + 2],
-                    timeSinceLastUpdate
-                );
-            } else {
-                return normalizedWeights;
-            }
-            if (totalTokens > 7) {
-                normalizedWeights[7] = calculateBlockNormalisedWeight(
-                    secondFourWeights[3],
-                    secondFourWeights[moreThan4Tokens + 3],
-                    timeSinceLastUpdate
-                );
-            } else {
-                return normalizedWeights;
-            }
-
+            
             return normalizedWeights;
         }
     }
@@ -617,22 +551,17 @@ contract QuantAMMWeightedPool is
 
     /// @notice the main function to update target weights and multipliers from the update weight runner
     /// @param _weights the target weights and their block multipliers
-    /// @param _address the target pool address
     /// @param _lastInteropTime the last time the weights can be interpolated
     function setWeights(
-        int256[] calldata _weights,
-        address _address,
+        int256[][] calldata _weights,
         uint40 _lastInteropTime
     ) external override {
         require(msg.sender == address(updateWeightRunner), "XUR");
         require(_weights.length == _totalTokens * 2, "WD"); //weight length different
 
-        if (_weights.length > 8) {
-            int256[][] memory splitWeights = _splitWeightAndMultipliers(_weights);
-            _normalizedFirstFourWeights = quantAMMPack32Array(splitWeights[0])[0];
-            _normalizedSecondFourWeights = quantAMMPack32Array(splitWeights[1])[0];
-        } else {
-            _normalizedFirstFourWeights = quantAMMPack32Array(_weights)[0];
+        _normalizedFirstFourWeights = quantAMMPack32Array(_weights[0])[0];
+        if (_weights.length > 1) {
+            _normalizedSecondFourWeights = quantAMMPack32Array(_weights[1])[0];
         }
 
         //struct allows one SSTORE
@@ -640,33 +569,36 @@ contract QuantAMMWeightedPool is
             lastInteropTime: _lastInteropTime,
             lastUpdateTime: uint40(block.timestamp)
         });
-
-        emit WeightsUpdated(_address, _weights, _lastInteropTime, uint40(block.timestamp));
     }
 
     /// @notice the initialising function during registration of the pool with the vault to set the initial weights
-    /// @param _weights the target weights
-    function _setInitialWeights(int256[] memory _weights) internal {
+    /// @param _initweights the target weights
+    function _setInitialWeights(int256[] memory _initweights) internal {
+        int256[][] memory _weights = new int256[][](2);
+        _weights[0] = _initweights;
         require(_normalizedFirstFourWeights == 0, "init");
-
-        int256[] memory _weightsAndBlockMultiplier = new int256[](_weights.length * 2);
-        for (uint i; i < _weights.length; ) {
-            _weightsAndBlockMultiplier[i] = _weights[i];
-            //Initially register pool with no movement, first update will come and set block multiplier.
-            _weightsAndBlockMultiplier[i + _weights.length] = int256(0);
-            unchecked {
-                ++i;
+        int256[] memory firstFourWeights = new int256[](8);
+        int256[] memory secondFourWeights = new int256[](8);
+        uint initialOffset = _initweights.length < 4 ? _initweights.length : 4;
+        uint secondOffset = _initweights.length < 4 ? 0 : initialOffset - 4;
+        uint secondWeightOffset = 0;
+        for (uint256 i = 0; i < _initweights.length; i++) {
+            if (i < 4) {
+                firstFourWeights[i] = _initweights[i];
+                firstFourWeights[i + initialOffset] = 0; // Initial block multiplier is 0
+            } else {
+                secondFourWeights[secondWeightOffset] = _initweights[i];
+                secondFourWeights[secondWeightOffset + secondOffset] = 0; // Initial block multiplier is 0
+                secondWeightOffset++;
             }
         }
 
-        if (_weightsAndBlockMultiplier.length > 8) {
-            int256[][] memory splitWeights = _splitWeightAndMultipliers(_weightsAndBlockMultiplier);
-            _normalizedFirstFourWeights = quantAMMPack32Array(splitWeights[0])[0];
-            _normalizedSecondFourWeights = quantAMMPack32Array(splitWeights[1])[0];
-        } else {
-            _normalizedFirstFourWeights = quantAMMPack32Array(_weightsAndBlockMultiplier)[0];
+        _normalizedFirstFourWeights = quantAMMPack32Array(firstFourWeights)[0];
+        
+        if (_initweights.length > 4) {
+            _normalizedSecondFourWeights = quantAMMPack32Array(secondFourWeights)[0];
         }
-
+        
         //struct allows one SSTORE
         poolSettings.interopDetails = InteropDetails({
             lastInteropTime: uint40(block.timestamp), //given muliplier is 0 on start
@@ -674,7 +606,7 @@ contract QuantAMMWeightedPool is
         });
 
         //CODEHAWKS L-05 emit weights and multiplier
-        emit WeightsUpdated(address(this), _weightsAndBlockMultiplier, uint40(block.timestamp), uint40(block.timestamp));
+        emit WeightsUpdated(address(this), _weights, uint40(block.timestamp), uint40(block.timestamp));
     }
 
     /// @notice Initialize the pool
@@ -701,38 +633,6 @@ contract QuantAMMWeightedPool is
             params._poolSettings.poolManager,
             msg.sender //this should be the factory and only factory sent creations should be listened to.
         );
-    }
-
-    /// @notice Split the weights and multipliers into two arrays
-    /// @param weights The weights and multipliers to split
-    /// @dev Update weight runner gives all weights in a single array shaped like [w1,w2,w3,w4,w5,w6,w7,w8,m1,m2,m3,m4,m5,m6,m7,m8], we need it to be [w1,w2,w3,w4,m1,m2,m3,m4,w5,w6,w7,w8,m5,m6,m7,m8]
-    function _splitWeightAndMultipliers(
-        int256[] memory weights
-    ) internal pure returns (int256[][] memory splitWeights) {
-        uint256 tokenLength = weights.length / 2;
-        splitWeights = new int256[][](2);
-        splitWeights[0] = new int256[](8);
-        for (uint i; i < 4; ) {
-            splitWeights[0][i] = weights[i];
-            splitWeights[0][i + 4] = weights[i + tokenLength];
-
-            unchecked {
-                i++;
-            }
-        }
-
-        splitWeights[1] = new int256[](8);
-
-        uint256 moreThan4Tokens = tokenLength - 4;
-        for (uint i = 0; i < moreThan4Tokens; ) {
-            uint256 i4 = i + 4;
-            splitWeights[1][i] = weights[i4];
-            splitWeights[1][i + moreThan4Tokens] = weights[i4 + tokenLength];
-
-            unchecked {
-                i++;
-            }
-        }
     }
 
     /// @notice Set the rule for this pool

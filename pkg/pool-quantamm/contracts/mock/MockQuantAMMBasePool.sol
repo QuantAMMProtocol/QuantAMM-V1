@@ -72,13 +72,13 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
     }
     
     function setWeights(
-        int256[] calldata _weights,
-        address _poolAddress,
+        int256[][] calldata _weights,
         uint40 _lastInterpolationTimePossible
     ) external override {
-        weights = _weights;
+        //TODO
+        int256[] memory _weightsTwo = new int256[](_weights.length * 2);
+        weights = _weightsTwo;
         lastInterpolationTimePossible = _lastInterpolationTimePossible;
-        poolAddress = _poolAddress;
     }
 
     function getMinimumSwapFeePercentage() external view override returns (uint256) {}
@@ -116,8 +116,23 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
         return normalizedWeights;
     }
 
-    function setInitialWeights(int256[] calldata _weights) external {
-        weights = _weights;
+    function setInitialWeights(int256[] calldata _initweights) external {
+        int256[] memory firstFourWeights = new int256[](8);
+        int256[] memory secondFourWeights = new int256[](8);
+        uint initialOffset = _initweights.length < 4 ? _initweights.length : 4;
+        uint secondOffset = _initweights.length < 4 ? 0 : initialOffset - 4;
+        uint secondWeightOffset = 0;
+        for (uint256 i = 0; i < _initweights.length; i++) {
+            if (i < 4) {
+                firstFourWeights[i] = _initweights[i];
+                firstFourWeights[i + initialOffset] = 0; // Initial block multiplier is 0
+            } else {
+                secondFourWeights[secondWeightOffset] = _initweights[i];
+                secondFourWeights[secondWeightOffset + secondOffset] = 0; // Initial block multiplier is 0
+                secondWeightOffset++;
+            }
+        }
+        
     }
 
     function setRuleForPool(PoolSettings calldata _settings) external {

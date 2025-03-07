@@ -556,11 +556,10 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
                 int40(currentLastInterpolationPossible + int40(uint40(block.timestamp)))
             );
         }
-
+        int256[][] memory splitWeightsAndMultipliers = _splitWeightAndMultipliers(targetWeightsAndBlockMultiplier);
         //the main point of interaction between the update weight runner and the quantammAdmin is here
         IQuantAMMWeightedPool(local.poolAddress).setWeights(
-            targetWeightsAndBlockMultiplier,
-            local.poolAddress,
+            splitWeightsAndMultipliers,
             lastTimestampThatInterpolationWorks
         );
 
@@ -626,8 +625,8 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
                 require(_weights[i] <= 0.99e18, "Above max allowed weight");
             }
         }
-
-        IQuantAMMWeightedPool(_poolAddress).setWeights(_weights, _poolAddress, _lastInterpolationTimePossible);
+        int256[][] memory splitWeightsAndMultipliers = _splitWeightAndMultipliers(_weights);
+        IQuantAMMWeightedPool(_poolAddress).setWeights(splitWeightsAndMultipliers, _lastInterpolationTimePossible);
 
         emit SetWeightManual(msg.sender, _poolAddress, _weights, _lastInterpolationTimePossible, uint40(block.timestamp));
     }
@@ -666,5 +665,37 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
             _newParameters,
             _numberOfAssets
         );
+    }
+
+    /// @notice Split the weights and multipliers into two arrays
+    /// @param weights The weights and multipliers to split
+    /// @dev Update weight runner gives all weights in a single array shaped like [w1,w2,w3,w4,w5,w6,w7,w8,m1,m2,m3,m4,m5,m6,m7,m8], we need it to be [w1,w2,w3,w4,m1,m2,m3,m4,w5,w6,w7,w8,m5,m6,m7,m8]
+    function _splitWeightAndMultipliers(
+        int256[] memory weights
+    ) internal pure returns (int256[][] memory splitWeights) {
+        uint256 tokenLength = weights.length / 2;
+        splitWeights = new int256[][](2);
+        splitWeights[0] = new int256[](8);
+        for (uint i; i < 4; ) {
+            splitWeights[0][i] = weights[i];
+            splitWeights[0][i + 4] = weights[i + tokenLength];
+
+            unchecked {
+                i++;
+            }
+        }
+
+        splitWeights[1] = new int256[](8);
+
+        uint256 moreThan4Tokens = tokenLength - 4;
+        for (uint i = 0; i < moreThan4Tokens; ) {
+            uint256 i4 = i + 4;
+            splitWeights[1][i] = weights[i4];
+            splitWeights[1][i + moreThan4Tokens] = weights[i4 + tokenLength];
+
+            unchecked {
+                i++;
+            }
+        }
     }
 }

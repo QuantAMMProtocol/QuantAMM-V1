@@ -82,7 +82,7 @@ contract CreatePoolBroadcast is Script {
         console.log("starting params");
         retParams = QuantAMMWeightedPoolFactory.CreationNewPoolParams(
         //string name;
-            "test quantamm pool",
+            "test quantamm pool 2",
         //string symbol;
             "test",
         //TokenConfig[] tokens;
@@ -164,7 +164,8 @@ contract CreatePoolBroadcast is Script {
         
         console.log("Creating pool");
         // Instance of the factory contract
-        QuantAMMWeightedPoolFactory factory = QuantAMMWeightedPoolFactory(0x09191Ca061108c03D41b9a154e20C6f188291404);
+        // hardhat compiled factory - 0x23920dFC349c55F535D1020dcaBFEf4E80b9680b
+        QuantAMMWeightedPoolFactory factory = QuantAMMWeightedPoolFactory(0x23920dFC349c55F535D1020dcaBFEf4E80b9680b);
 
         console.log("Creating params");
         // Define the parameters for the new pool

@@ -26,7 +26,7 @@ export default {
           evmVersion: 'cancun',
           optimizer: {
             enabled: true,
-            runs: 500,
+            runs: 850,
             details: {
               yulDetails: {
                 optimizerSteps,
@@ -42,7 +42,7 @@ export default {
           evmVersion: 'cancun',
           optimizer: {
             enabled: true,
-            runs: 500,
+            runs: 850,
             details: {
               yulDetails: {
                 optimizerSteps,

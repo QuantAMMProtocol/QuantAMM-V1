@@ -1,0 +1,9 @@
+forge verify-contract --constructor-args 0x000000000000000000000000dbeb3bf2533b4a529df4de222f8a061791e38f8b     --etherscan-api-key []     --chain 1
+1155111     0xb3f69CD223252F29f47F8AdF9059b9ACBA3EBD6D     contracts/rules/AntimomentumUpdateRule.sol:AntimomentumUpdateRule
+Start verifying contract `0xb3f69CD223252F29f47F8AdF9059b9ACBA3EBD6D` deployed on sepolia
+
+Submitting verification for [contracts/rules/AntimomentumUpdateRule.sol:AntimomentumUpdateRule] 0xb3f69CD223252F29f47F8AdF9059b9ACBA3EBD6D.
+Submitted contract for verification:
+        Response: `OK`
+        GUID: `rmcimnmy6gdgs17rlvfsehnfdyqbhv82jwvedgcbfrpkxsilda`
+        URL: https://sepolia.etherscan.io/address/0xb3f69cd223252f29f47f8adf9059b9acba3ebd6d

@@ -655,7 +655,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
         IQuantAMMWeightedPool.QuantAMMWeightedPoolDynamicData memory poolData = IQuantAMMWeightedPool(ammPool)
             .getQuantAMMWeightedPoolDynamicData();
 
-        assertEq(poolData.lastUpdateIntervalTime, timestamp, "Last update interval time mismatch");
+        assertEq(poolData.lastUpdateTime, timestamp, "Last update interval time mismatch");
     }
 
     function _handleAliceWithdrawal(

@@ -33,10 +33,10 @@ interface IQuantAMMWeightedPool {
         bool isPoolInitialized;
         bool isPoolPaused;
         bool isPoolInRecoveryMode;
-        int256[] weightsAtLastUpdateInterval;
-        int256[] weightBlockMultipliers;
-        uint40 lastUpdateIntervalTime;
-        uint40 lastInterpolationTimePossible;
+        int256[] firstFourWeightsAndMultipliers;
+        int256[] secondFourWeightsAndMultipliers;
+        uint40 lastUpdateTime;
+        uint40 lastInteropTime;
     }
     
     /**
@@ -64,11 +64,11 @@ interface IQuantAMMWeightedPool {
     }
 
     ///@notice the time variables used for interpolation
-    ///@param lastUpdateIntervalTime the last time the pool was updated, this is the time of the weights prior to multiplier being added to it.abi
+    ///@param lastUpdateTime the last time the pool was updated, this is the time of the weights prior to multiplier being added to it.abi
     ///@param lastPossibleInterpolationTime the last time that the weights can be updated given the block multiplier before one weight hits the guardrail
-    struct QuantAMMBaseInterpolationVariables {
-        uint40 lastUpdateIntervalTime;
-        uint40 lastPossibleInterpolationTime;
+    struct InteropDetails {
+        uint40 lastUpdateTime;
+        uint40 lastInteropTime;
     }
 
     ///@notice the data needed to get the weights of the pool
@@ -76,12 +76,11 @@ interface IQuantAMMWeightedPool {
     ///@param assets the assets of the pool
 
     ///@notice the data needed to get the weights of the pool
-    ///@param quantAMMBaseInterpolationDetails the time variables used for interpolation
+    ///@param interopDetails the time variables used for interpolation
     ///@param assets the assets of the pool
     ///@dev this would be more populated for v2 of the pool but the structure is kept for other areas
     struct QuantAMMBaseGetWeightData {
-        QuantAMMBaseInterpolationVariables quantAMMBaseInterpolationDetails;
-        address[] assets;
+        InteropDetails interopDetails;
     }
 
     /// @notice Settings needed to create and initialise a pool

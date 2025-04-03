@@ -27,12 +27,12 @@ contract QuantAMMCoVarianceRuleTest is Test, QuantAMMTestUtils {
     }
 
     function testInitialSettingOfCovariance(uint256 unboundedNumberOfAssets) public {
-        uint256 numberOfAssets = bound(unboundedNumberOfAssets,2,8);
+        uint256 numberOfAssets = bound(unboundedNumberOfAssets, 2, 8);
 
         mockPool.setNumberOfAssets(numberOfAssets);
 
         int256[][] memory initialCovariances = new int256[][](numberOfAssets);
-        for(uint256 i = 0; i < numberOfAssets; i++){
+        for (uint256 i = 0; i < numberOfAssets; i++) {
             initialCovariances[i] = new int256[](numberOfAssets);
 
             for (uint256 j = 0; j < numberOfAssets; j++) {
@@ -43,21 +43,26 @@ contract QuantAMMCoVarianceRuleTest is Test, QuantAMMTestUtils {
         mockCalculationRule.setInitialCovariance(address(mockPool), initialCovariances, numberOfAssets);
 
         int256[][] memory results = mockCalculationRule.getIntermediateCovariance(address(mockPool), numberOfAssets);
+        int256[] memory flattenedResults = mockCalculationRule.getIntermediateCovarianceState(
+            address(mockPool),
+            numberOfAssets
+        );
 
         for (uint256 i = 0; i < numberOfAssets; i++) {
-            for(uint256 j = 0; j < numberOfAssets; j++){
+            for (uint256 j = 0; j < numberOfAssets; j++) {
                 assertEq(results[i][j], initialCovariances[i][j]);
+                assertEq(flattenedResults[i * numberOfAssets + j], initialCovariances[i][j]);
             }
         }
     }
 
     function testBreakGlassSettingOfCovariances(uint256 unboundedNumberOfAssets) public {
-        uint256 numberOfAssets = bound(unboundedNumberOfAssets,2,8);
+        uint256 numberOfAssets = bound(unboundedNumberOfAssets, 2, 8);
 
         mockPool.setNumberOfAssets(numberOfAssets);
 
         int256[][] memory initialCovariances = new int256[][](numberOfAssets);
-        for(uint256 i = 0; i < numberOfAssets; i++){
+        for (uint256 i = 0; i < numberOfAssets; i++) {
             initialCovariances[i] = new int256[](numberOfAssets);
 
             for (uint256 j = 0; j < numberOfAssets; j++) {
@@ -68,14 +73,19 @@ contract QuantAMMCoVarianceRuleTest is Test, QuantAMMTestUtils {
         mockCalculationRule.setInitialCovariance(address(mockPool), initialCovariances, numberOfAssets);
 
         int256[][] memory results = mockCalculationRule.getIntermediateCovariance(address(mockPool), numberOfAssets);
+        int256[] memory flattenedResults = mockCalculationRule.getIntermediateCovarianceState(
+            address(mockPool),
+            numberOfAssets
+        );
 
         for (uint256 i = 0; i < numberOfAssets; i++) {
-            for(uint256 j = 0; j < numberOfAssets; j++){
+            for (uint256 j = 0; j < numberOfAssets; j++) {
                 assertEq(results[i][j], initialCovariances[i][j]);
+                assertEq(flattenedResults[i * numberOfAssets + j], initialCovariances[i][j]);
             }
         }
         for (uint256 i = 0; i < numberOfAssets; i++) {
-            for(uint256 j = 0; j < numberOfAssets; j++){
+            for (uint256 j = 0; j < numberOfAssets; j++) {
                 initialCovariances[i][j] = PRBMathSD59x18.fromInt(int256(i + 3));
             }
         }
@@ -83,10 +93,12 @@ contract QuantAMMCoVarianceRuleTest is Test, QuantAMMTestUtils {
         mockCalculationRule.setInitialCovariance(address(mockPool), initialCovariances, numberOfAssets);
 
         results = mockCalculationRule.getIntermediateCovariance(address(mockPool), numberOfAssets);
+        flattenedResults = mockCalculationRule.getIntermediateCovarianceState(address(mockPool), numberOfAssets);
 
         for (uint256 i = 0; i < numberOfAssets; i++) {
-            for(uint256 j = 0; j < numberOfAssets; j++){
+            for (uint256 j = 0; j < numberOfAssets; j++) {
                 assertEq(results[i][j], initialCovariances[i][j]);
+                assertEq(flattenedResults[i * numberOfAssets + j], initialCovariances[i][j]);
             }
         }
     }
@@ -96,15 +108,15 @@ contract QuantAMMCoVarianceRuleTest is Test, QuantAMMTestUtils {
         int256[][] memory priceDataBn,
         int256[][] memory movingAverages,
         int256[][] memory initialCovariance,
-        bool vectorLambda) internal returns (int256[][][] memory results) {
-            
+        bool vectorLambda
+    ) internal returns (int256[][][] memory results) {
         mockCalculationRule.setInitialCovariance(address(mockPool), initialCovariance, priceData[0].length);
         mockCalculationRule.setPrevMovingAverage(movingAverages[0]);
 
         results = new int256[][][](movingAverages.length);
 
         int128[] memory lambda = new int128[](vectorLambda ? priceData[0].length : 1);
-        for(uint256 i = 0; i < lambda.length; i++) {
+        for (uint256 i = 0; i < lambda.length; i++) {
             lambda[i] = int128(uint128(0.5e18));
         }
         console.log("lambda", lambda.length);
@@ -133,7 +145,13 @@ contract QuantAMMCoVarianceRuleTest is Test, QuantAMMTestUtils {
         int256[][][] memory expectedRes,
         bool vectorLambda
     ) internal {
-        int256[][][] memory results = testCovariance(priceData, priceDataBn, movingAverages, initialCovariance, vectorLambda);
+        int256[][][] memory results = testCovariance(
+            priceData,
+            priceDataBn,
+            movingAverages,
+            initialCovariance,
+            vectorLambda
+        );
 
         checkCovarianceResult(priceData, results, expectedRes);
     }
@@ -327,7 +345,11 @@ contract QuantAMMCoVarianceRuleTest is Test, QuantAMMTestUtils {
                     [PRBMathSD59x18.fromInt(2076), PRBMathSD59x18.fromInt(2034), PRBMathSD59x18.fromInt(2034)]
                 ],
                 [
-                    [PRBMathSD59x18.fromInt(1120) + 1875e14, PRBMathSD59x18.fromInt(1115) + 5e17, PRBMathSD59x18.fromInt(1115) + 5e17],
+                    [
+                        PRBMathSD59x18.fromInt(1120) + 1875e14,
+                        PRBMathSD59x18.fromInt(1115) + 5e17,
+                        PRBMathSD59x18.fromInt(1115) + 5e17
+                    ],
                     [PRBMathSD59x18.fromInt(1115) + 5e17, PRBMathSD59x18.fromInt(1117), PRBMathSD59x18.fromInt(1117)],
                     [PRBMathSD59x18.fromInt(1115) + 5e17, PRBMathSD59x18.fromInt(1117), PRBMathSD59x18.fromInt(1117)]
                 ]
@@ -338,7 +360,11 @@ contract QuantAMMCoVarianceRuleTest is Test, QuantAMMTestUtils {
     }
 
     // Fuzz test for covariance calculation with random number of assets
-    function testFuzz_CovarianceCalculationAccess(uint256 unboundNumAssets, uint256 unboundNumberOfCalculations, bool vectorLambda) public {
+    function testFuzz_CovarianceCalculationAccess(
+        uint256 unboundNumAssets,
+        uint256 unboundNumberOfCalculations,
+        bool vectorLambda
+    ) public {
         uint256 numAssets = bound(unboundNumAssets, 2, 8);
         uint256 numberOfCalculations = bound(unboundNumberOfCalculations, 1, 20);
 
@@ -352,10 +378,10 @@ contract QuantAMMCoVarianceRuleTest is Test, QuantAMMTestUtils {
             priceDataBn[i] = new int256[](numAssets);
             movingAverages[i] = new int256[](numAssets * 2);
             for (uint256 j = 0; j < numAssets; j++) {
-            priceData[i][j] = PRBMathSD59x18.fromInt(1000 + int256(i * 100 + j * 10));
-            priceDataBn[i][j] = PRBMathSD59x18.fromInt(1000 + int256(i * 100 + j * 10));
-            movingAverages[i][j] = PRBMathSD59x18.fromInt(1000 + int256(i * 50 + j * 5));
-            movingAverages[i][j + numAssets] = PRBMathSD59x18.fromInt(1000 + int256(i * 50 + j * 5));
+                priceData[i][j] = PRBMathSD59x18.fromInt(1000 + int256(i * 100 + j * 10));
+                priceDataBn[i][j] = PRBMathSD59x18.fromInt(1000 + int256(i * 100 + j * 10));
+                movingAverages[i][j] = PRBMathSD59x18.fromInt(1000 + int256(i * 50 + j * 5));
+                movingAverages[i][j + numAssets] = PRBMathSD59x18.fromInt(1000 + int256(i * 50 + j * 5));
             }
         }
 
@@ -363,7 +389,7 @@ contract QuantAMMCoVarianceRuleTest is Test, QuantAMMTestUtils {
         for (uint256 i = 0; i < numAssets; i++) {
             initialCovariance[i] = new int256[](numAssets);
             for (uint256 j = 0; j < numAssets; j++) {
-            initialCovariance[i][j] = 0;
+                initialCovariance[i][j] = 0;
             }
         }
 

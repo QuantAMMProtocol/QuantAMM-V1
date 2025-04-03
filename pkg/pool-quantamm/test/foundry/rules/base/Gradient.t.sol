@@ -31,7 +31,7 @@ contract QuantAMMGradientRuleTests is Test, QuantAMMTestUtils {
         require(delta <= tolerance, "Values are not within tolerance");
     }
 
-function calculateGradient(
+    function calculateGradient(
         int256[][] memory priceData,
         int256[][] memory priceDataBn,
         int256[][] memory movingAverages,
@@ -58,6 +58,7 @@ function calculateGradient(
 
         return results;
     }
+
     // Function to test gradient calculation
     function testGradient(
         int256[][] memory priceData,
@@ -67,8 +68,13 @@ function calculateGradient(
         int128[] memory lambdas,
         int256[][] memory expectedRes
     ) internal {
-        
-        int256[][] memory results = calculateGradient(priceData, priceDataBn, movingAverages, initialGradients, lambdas);
+        int256[][] memory results = calculateGradient(
+            priceData,
+            priceDataBn,
+            movingAverages,
+            initialGradients,
+            lambdas
+        );
 
         checkResult(priceData, results, expectedRes);
     }
@@ -87,7 +93,7 @@ function calculateGradient(
     }
 
     function testInitialSettingOfGradients(uint256 unboundedNumberOfAssets) public {
-        uint256 numberOfAssets = bound(unboundedNumberOfAssets,2,8);
+        uint256 numberOfAssets = bound(unboundedNumberOfAssets, 2, 8);
 
         mockPool.setNumberOfAssets(numberOfAssets);
 
@@ -98,15 +104,20 @@ function calculateGradient(
 
         mockCalculationRule.setInitialGradient(address(mockPool), initialGradients, numberOfAssets);
 
+        int256[] memory intermediateResults = mockCalculationRule.getIntermediateGradientState(
+            address(mockPool),
+            numberOfAssets
+        );
         int256[] memory results = mockCalculationRule.getInitialGradient(address(mockPool), numberOfAssets);
 
         for (uint256 i = 0; i < numberOfAssets; i++) {
             assertEq(results[i], initialGradients[i]);
+            assertEq(intermediateResults[i], initialGradients[i]);
         }
     }
 
     function testBreakGlassSettingOfGradients(uint256 unboundedNumberOfAssets) public {
-        uint256 numberOfAssets = bound(unboundedNumberOfAssets,2,8);
+        uint256 numberOfAssets = bound(unboundedNumberOfAssets, 2, 8);
 
         mockPool.setNumberOfAssets(numberOfAssets);
 
@@ -118,9 +129,14 @@ function calculateGradient(
         mockCalculationRule.setInitialGradient(address(mockPool), initialGradients, numberOfAssets);
 
         int256[] memory results = mockCalculationRule.getInitialGradient(address(mockPool), numberOfAssets);
+        int256[] memory intermediateResults = mockCalculationRule.getIntermediateGradientState(
+            address(mockPool),
+            numberOfAssets
+        );
 
         for (uint256 i = 0; i < numberOfAssets; i++) {
             assertEq(results[i], initialGradients[i]);
+            assertEq(intermediateResults[i], initialGradients[i]);
         }
 
         for (uint256 i = 0; i < numberOfAssets; i++) {
@@ -130,9 +146,11 @@ function calculateGradient(
         mockCalculationRule.setInitialGradient(address(mockPool), initialGradients, numberOfAssets);
 
         results = mockCalculationRule.getInitialGradient(address(mockPool), numberOfAssets);
+        intermediateResults = mockCalculationRule.getIntermediateGradientState(address(mockPool), numberOfAssets);
 
         for (uint256 i = 0; i < numberOfAssets; i++) {
             assertEq(results[i], initialGradients[i]);
+            assertEq(intermediateResults[i], initialGradients[i]);
         }
     }
 
@@ -272,6 +290,7 @@ function calculateGradient(
 
         testGradient(priceData, priceDataBn, movingAverages, gradients, lambdas, expectedRes);
     }
+
     // Vector Lambda parameters
     // 2 tokens
     function testGradientCalculation2TokensVectorLambda() public {
@@ -327,6 +346,7 @@ function calculateGradient(
 
         testGradient(priceData, priceDataBn, movingAverages, gradients, lambdas, expectedRes);
     }
+
     // 3 tokens
     function testGradientCalculation3TokensVectorLambda() public {
         mockPool.setNumberOfAssets(3);
@@ -400,7 +420,11 @@ function calculateGradient(
     }
 
     // Fuzz test for gradient calculation with random number of assets
-    function testFuzz_GradientCalculationAccess(uint256 unboundNumAssets, uint256 unboundNumberOfCalculations, bool scalarLambda) public {
+    function testFuzz_GradientCalculationAccess(
+        uint256 unboundNumAssets,
+        uint256 unboundNumberOfCalculations,
+        bool scalarLambda
+    ) public {
         uint256 numAssets = bound(unboundNumAssets, 2, 8);
         uint256 numberOfCalculations = bound(unboundNumberOfCalculations, 1, 20);
 
@@ -422,17 +446,16 @@ function calculateGradient(
         }
 
         int256[] memory gradients = new int256[](numAssets);
-        
-        for(uint256 i = 0; i < numAssets; i++){
+
+        for (uint256 i = 0; i < numAssets; i++) {
             gradients[i] = PRBMathSD59x18.fromInt(0);
         }
-        
+
         int128[] memory lambdas;
-        if(scalarLambda){
+        if (scalarLambda) {
             lambdas = new int128[](1);
             lambdas[0] = LAMBDA;
-        }
-        else{
+        } else {
             lambdas = new int128[](numAssets);
             for (uint256 i = 0; i < numAssets; i++) {
                 lambdas[i] = LAMBDA;
@@ -441,5 +464,4 @@ function calculateGradient(
 
         calculateGradient(priceData, priceDataBn, movingAverages, gradients, lambdas);
     }
-    
 }

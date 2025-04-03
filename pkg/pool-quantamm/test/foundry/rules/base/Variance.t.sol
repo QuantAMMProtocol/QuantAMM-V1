@@ -26,7 +26,7 @@ contract QuantAMMVarianceRuleTest is Test, QuantAMMTestUtils {
         mockQuantAMMMathGuard = new MockQuantAMMMathGuard();
     }
 
-    function calculateVariance (
+    function calculateVariance(
         int256[][] memory priceData,
         int256[][] memory priceDataBn,
         int256[][] memory movingAverages,
@@ -39,9 +39,9 @@ contract QuantAMMVarianceRuleTest is Test, QuantAMMTestUtils {
         int256[][] memory results = new int256[][](movingAverages.length);
 
         int128[] memory lambda;
-        if(vectorLambda) {
+        if (vectorLambda) {
             lambda = new int128[](priceData[0].length);
-            for(uint i = 0; i < priceData[0].length; i++) {
+            for (uint i = 0; i < priceData[0].length; i++) {
                 lambda[i] = int128(uint128(0.5e18));
             }
         } else {
@@ -64,6 +64,7 @@ contract QuantAMMVarianceRuleTest is Test, QuantAMMTestUtils {
         }
         return results;
     }
+
     // Function to test Variance calculation
     function testVariance(
         int256[][] memory priceData,
@@ -73,7 +74,13 @@ contract QuantAMMVarianceRuleTest is Test, QuantAMMTestUtils {
         int256[][] memory expectedRes,
         bool vectorLambda
     ) internal {
-        int256[][] memory results = calculateVariance(priceData, priceDataBn, movingAverages, initialVariance, vectorLambda);
+        int256[][] memory results = calculateVariance(
+            priceData,
+            priceDataBn,
+            movingAverages,
+            initialVariance,
+            vectorLambda
+        );
 
         checkResult(priceData, results, expectedRes);
     }
@@ -92,10 +99,7 @@ contract QuantAMMVarianceRuleTest is Test, QuantAMMTestUtils {
     }
 
     // Check results with tolerance
-    function checkResult(
-        int256[][] memory res,
-        int256[][] memory expectedRes
-    ) internal pure {
+    function checkResult(int256[][] memory res, int256[][] memory expectedRes) internal pure {
         for (uint256 i = 0; i < res.length; i++) {
             assertEq(expectedRes[i], res[i]); // Compare for exact equality
         }
@@ -248,33 +252,47 @@ contract QuantAMMVarianceRuleTest is Test, QuantAMMTestUtils {
         uint numAssets = bound(unboundNumAssets, 2, 8);
         mockPool.setNumberOfAssets(numAssets);
         int256[] memory initialVariance = new int256[](numAssets);
-        for(uint i = 0; i < numAssets; i++) {
+        for (uint i = 0; i < numAssets; i++) {
             initialVariance[i] = PRBMathSD59x18.fromInt(int256(i));
         }
 
         mockCalculationRule.setInitialVariance(address(mockPool), initialVariance, numAssets);
 
-        int256[] memory savedInitialVariance = mockCalculationRule.getIntermediateVariance(address(mockPool), numAssets);
+        int256[] memory savedInitialVariance = mockCalculationRule.getIntermediateVariance(
+            address(mockPool),
+            numAssets
+        );
 
         checkResult(initialVariance, savedInitialVariance);
-        
-        for(uint i = 0; i < numAssets; i++) {
+
+        // Additional check using getIntermediateVarianceState
+        int256[] memory stateVariance = mockCalculationRule.getIntermediateVarianceState(address(mockPool), numAssets);
+        checkResult(initialVariance, stateVariance);
+
+        for (uint i = 0; i < numAssets; i++) {
             initialVariance[i] = PRBMathSD59x18.fromInt(int256(i)) + PRBMathSD59x18.fromInt(int256(1));
         }
-        
+
         //break glass post initialisation
         mockCalculationRule.setInitialVariance(address(mockPool), initialVariance, numAssets);
 
         savedInitialVariance = mockCalculationRule.getIntermediateVariance(address(mockPool), numAssets);
 
         checkResult(initialVariance, savedInitialVariance);
-        
-    } 
-        
+
+        // Additional check using getIntermediateVarianceState
+        stateVariance = mockCalculationRule.getIntermediateVarianceState(address(mockPool), numAssets);
+        checkResult(initialVariance, stateVariance);
+    }
+
     // Fuzz test for Variance calculation with varying number of assets
-    function testVarianceStorageAccessFuzz(uint256 unboundNumAssets, uint256 unboundNumCalcs, bool vectorLambda) public {
-        uint256 numAssets = bound(unboundNumAssets,2,8);
-        uint256 boundNumCalcs = bound(unboundNumCalcs,1,20);
+    function testVarianceStorageAccessFuzz(
+        uint256 unboundNumAssets,
+        uint256 unboundNumCalcs,
+        bool vectorLambda
+    ) public {
+        uint256 numAssets = bound(unboundNumAssets, 2, 8);
+        uint256 boundNumCalcs = bound(unboundNumCalcs, 1, 20);
         mockPool.setNumberOfAssets(numAssets);
 
         int256[][] memory priceData = new int256[][](boundNumCalcs);

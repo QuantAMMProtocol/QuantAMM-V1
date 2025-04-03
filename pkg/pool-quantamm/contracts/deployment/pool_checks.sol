@@ -37,8 +37,8 @@ contract Deploy is Script {
 
         IPermit2 permit2 = IPermit2(0x000000000022D473030F116dDEE9F6B43aC78BA3); // Permit2 contract address
 
-        //IERC20(tokenAddresses[1]).approve(address(permit2), type(uint256).max);
-        //IERC20(tokenAddresses[0]).approve(address(permit2), type(uint256).max);
+        IERC20(tokenAddresses[1]).approve(address(permit2), type(uint256).max);
+        IERC20(tokenAddresses[0]).approve(address(permit2), type(uint256).max);
         // Approve token 0 using Permit2
         permit2.approve(
             address(tokenAddresses[0]),
@@ -55,23 +55,16 @@ contract Deploy is Script {
             uint48(block.timestamp + 24 hours) // Expiry: 24 hours from now
         );
 
-        tokenAddresses[0].approve(
-            0x0BF61f706105EA44694f2e92986bD01C39930280, // The contract that will spend tokens
-            uint256(2) // Expiry: 24 hours from now
-        );
-        tokenAddresses[1].approve(
-            0x0BF61f706105EA44694f2e92986bD01C39930280, // The contract that will spend tokens
-            uint256(2) // Expiry: 24 hours from now
-        );
 
         uint256[] memory weights = new uint256[](2);
         weights[0] = uint256(100000000);
-        weights[1] = uint256(100000);
+        weights[1] = uint256(100000000);
 
         //IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9).sendTo(IERC20(0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8), msg.sender, uint256(1));
         //IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9).sendTo(IERC20(0x29f2D40B0605204364af54EC677bD022dA425d03), msg.sender, uint256(1));
-        uint256 amountIn = IRouter(0x0BF61f706105EA44694f2e92986bD01C39930280).addLiquidityUnbalanced(
-            0xA3a6398f3B29b84a6657A1f4bcE5c90F38462bf7,
+        uint256 amountIn = IRouter(0x0BF61f706105EA44694f2e92986bD01C39930280).initialize(
+            0x2E629cd9061E2B5214B6CFc8d001DEB726275Eb0,
+            tokenAddresses,
             weights,
             0,
             true,

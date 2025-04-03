@@ -14,6 +14,14 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
     // this can be just the moving averages per token, or if prev moving average is true then it is [...moving averages, ...prev moving averages]
     mapping(address => int256[]) public movingAverages;
 
+    /// @notice View function to get the moving averages for a given pool
+    /// @param poolAddress The address of the pool
+    /// @param numberOfAssets The number of assets in the pool
+    /// @return The unpacked moving averages as an array of int256
+    function getMovingAverages(address poolAddress, uint numberOfAssets) external view returns (int256[] memory) {
+        return _quantAMMUnpack128Array(movingAverages[poolAddress], numberOfAssets);
+    }
+
     /// @notice Calculates the new moving average value, i.e. p̅(t) = p̅(t - 1) + (1 - λ)(p(t) - p̅(t - 1))
     /// @param _prevMovingAverage p̅(t - 1)
     /// @param _newData p(t)
@@ -22,7 +30,7 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
     /// @return p̅(t) avertage price of the pool
     function _calculateQuantAMMMovingAverage(
         int256[] memory _prevMovingAverage,
-        int256[]  memory _newData,
+        int256[] memory _newData,
         int128[] memory _lambda,
         uint _numberOfAssets
     ) internal pure returns (int256[] memory) {
@@ -67,8 +75,7 @@ abstract contract QuantAMMMathMovingAverage is ScalarRuleQuantAMMStorage {
         uint _numberOfAssets
     ) internal {
         //CODEHAWKS H-04 no longer storing prev, also /s/767
-        if (_initialMovingAverages.length == _numberOfAssets)  
-        {
+        if (_initialMovingAverages.length == _numberOfAssets) {
             //should be during create pool
             movingAverages[_poolAddress] = _quantAMMPack128Array(_initialMovingAverages);
         } else {

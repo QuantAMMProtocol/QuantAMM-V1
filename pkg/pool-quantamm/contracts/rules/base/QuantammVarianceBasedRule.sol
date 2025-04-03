@@ -19,6 +19,17 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
     // Key is the pool address and stores the intermediate variance state in a packed array of 128 bit integers
     mapping(address => int256[]) internal intermediateVarianceStates;
 
+    /// @notice View function to get the intermediate variance state for a given pool
+    /// @param poolAddress The address of the pool
+    /// @param numberOfAssets The number of assets in the pool
+    /// @return The unpacked intermediate variance state as an array of int256
+    function getIntermediateVarianceState(
+        address poolAddress,
+        uint numberOfAssets
+    ) external view returns (int256[] memory) {
+        return _quantAMMUnpack128Array(intermediateVarianceStates[poolAddress], numberOfAssets);
+    }
+
     /// @dev struct to avoind stack to deep issues
     /// @notice Struct to store local variables for the variance calculation
     /// @param storageIndex index of the storage array
@@ -192,12 +203,11 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
 
                 locals.intermediateVarianceState[locals.nMinusOne] = locals.intermediateState;
                 locals.finalState[locals.nMinusOne] = locals.oneMinusLambda.mul(locals.intermediateState);
-                
+
                 //CODEHAWKS INFO /s/755
                 intermediateVarianceStates[_poolParameters.pool][locals.storageIndex] = _quantAMMPackTwo128(
                     int256(0),
-                    locals
-                    .intermediateVarianceState[locals.nMinusOne]
+                    locals.intermediateVarianceState[locals.nMinusOne]
                 );
             }
         }
@@ -217,10 +227,12 @@ contract QuantAMMVarianceBasedRule is ScalarRuleQuantAMMStorage {
         bool evenInitialValues = _initialValues.length % 2 == 0;
 
         //CODEHAWKS M-18
-        if ((_initialValues.length == _numberOfAssets) && 
-        (storeLength == 0 
-        || evenInitialValues && _initialValues.length / 2 == storeLength
-        || !evenInitialValues && (_initialValues.length + 1) / 2 == storeLength)) {
+        if (
+            (_initialValues.length == _numberOfAssets) &&
+            (storeLength == 0 ||
+                (evenInitialValues && _initialValues.length / 2 == storeLength) ||
+                (!evenInitialValues && (_initialValues.length + 1) / 2 == storeLength))
+        ) {
             //should be during create pool
             intermediateVarianceStates[_poolAddress] = _quantAMMPack128Array(_initialValues);
         } else {

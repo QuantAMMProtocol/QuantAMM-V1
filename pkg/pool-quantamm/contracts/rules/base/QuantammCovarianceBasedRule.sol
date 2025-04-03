@@ -17,6 +17,31 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
     //key is pool address, value is the intermediate state of the covariance matrix in a packed array of 128 bit integers
     mapping(address => int256[]) internal intermediateCovarianceStates;
 
+    /// @notice View function to get the intermediate covariance state for a given pool
+    /// @param poolAddress The address of the pool
+    /// @param numberOfAssets The number of assets in the pool
+    /// @return The unpacked intermediate covariance state as a 1D flattened array of int256
+    function getIntermediateCovarianceState(
+        address poolAddress,
+        uint numberOfAssets
+    ) external view returns (int256[] memory) {
+        int256[][] memory unpackedMatrix = _quantAMMUnpack128Matrix(
+            intermediateCovarianceStates[poolAddress],
+            numberOfAssets
+        );
+
+        uint256 flattenedLength = numberOfAssets * numberOfAssets;
+        int256[] memory flattenedArray = new int256[](flattenedLength);
+
+        for (uint i = 0; i < numberOfAssets; i++) {
+            for (uint j = 0; j < numberOfAssets; j++) {
+                flattenedArray[i * numberOfAssets + j] = unpackedMatrix[i][j];
+            }
+        }
+
+        return flattenedArray;
+    }
+
     /// @dev struct to avoind stack to deep issues
     /// @notice Struct to store local variables for the covariance calculation
     /// @param n Dimension of square matrix
@@ -44,7 +69,7 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
     /// @param _poolParameters pool parameters
     /// @return newState new state of the covariance matrix
     function _calculateQuantAMMCovariance(
-        int256[]  memory _newData,
+        int256[] memory _newData,
         QuantAMMPoolParameters memory _poolParameters
     ) internal returns (int256[][] memory) {
         QuantAMMCovariance memory locals;
@@ -134,13 +159,15 @@ abstract contract QuantAMMCovarianceBasedRule is VectorRuleQuantAMMStorage {
         uint _numberOfAssets
     ) internal {
         uint storeLength = intermediateCovarianceStates[_poolAddress].length;
-        
+
         uint256 totalValues = _initialValues.length * _initialValues.length;
         bool evenInitialValues = totalValues % 2 == 0;
-        if (_initialValues.length == _numberOfAssets &&
-        (storeLength == 0 
-        || (evenInitialValues && totalValues / 2 == storeLength)
-        || (!evenInitialValues && (totalValues + 1) / 2 == storeLength))) {
+        if (
+            _initialValues.length == _numberOfAssets &&
+            (storeLength == 0 ||
+                (evenInitialValues && totalValues / 2 == storeLength) ||
+                (!evenInitialValues && (totalValues + 1) / 2 == storeLength))
+        ) {
             for (uint i; i < _numberOfAssets; ) {
                 require(_initialValues[i].length == _numberOfAssets, "Bad init covar row");
                 unchecked {

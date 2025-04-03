@@ -36,10 +36,21 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
         int256[] intermediateGradientState;
     }
 
+    /// @notice View function to get the intermediate gradient state for a given pool
+    /// @param poolAddress The address of the pool
+    /// @param numberOfAssets The number of assets in the pool
+    /// @return The unpacked intermediate gradient state as an array of int256
+    function getIntermediateGradientState(
+        address poolAddress,
+        uint numberOfAssets
+    ) external view returns (int256[] memory) {
+        return _quantAMMUnpack128Array(intermediateGradientStates[poolAddress], numberOfAssets);
+    }
+
     /// @param _newData p(t)
     /// @param _poolParameters pool parameters
     function _calculateQuantAMMGradient(
-        int256[]  memory _newData,
+        int256[] memory _newData,
         QuantAMMPoolParameters memory _poolParameters
     ) internal returns (int256[] memory) {
         QuantAMMGradientLocals memory locals;
@@ -93,7 +104,7 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
                     locals.intermediateGradientState[i],
                     locals.secondIntermediateValue
                 );
-                
+
                 // the storage array is tracked separately
                 unchecked {
                     i += 2;
@@ -185,7 +196,7 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
                     );
 
                 locals.finalValues[numberOfAssetsMinusOne] = locals.mulFactor.mul(locals.intermediateValue);
-                
+
                 //CODEHAWKS INFO /s/755
                 intermediateGradientStates[_poolParameters.pool][locals.storageArrayIndex] = _quantAMMPackTwo128(
                     int256(0),
@@ -204,12 +215,14 @@ abstract contract QuantAMMGradientBasedRule is ScalarRuleQuantAMMStorage {
         uint storeLength = intermediateGradientStates[poolAddress].length;
 
         //CODEHAWKS /s/444
-        if (_initialValues.length == _numberOfAssets 
-            && (storeLength == 0  
-                || (_initialValues.length % 2 == 0 && (_initialValues.length / 2) == storeLength)
+        if (
+            _initialValues.length == _numberOfAssets &&
+            (storeLength == 0 ||
+                (_initialValues.length % 2 == 0 && (_initialValues.length / 2) == storeLength) ||
                 //This does not check the last half of the last sticky end, you could set +1 but given numAssets
                 //normally passed by the update weight runner this will be wiped on first run if an extra weight is set
-                || (_initialValues.length % 2 != 0 && (_initialValues.length / 2) + 1 == storeLength))) {
+                (_initialValues.length % 2 != 0 && (_initialValues.length / 2) + 1 == storeLength))
+        ) {
             //should be during create pool
             intermediateGradientStates[poolAddress] = _quantAMMPack128Array(_initialValues);
         } else {

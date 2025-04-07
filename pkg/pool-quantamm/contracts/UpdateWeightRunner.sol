@@ -12,6 +12,7 @@ import "./rules/UpdateRule.sol";
 import "./QuantAMMWeightedPool.sol";
 
 import { IWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-weighted/IWeightedPool.sol";
+
 /*
 ARCHITECTURE DESIGN NOTES
 
@@ -74,9 +75,28 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     event ETHUSDOracleSet(address ethUsdOracle);
     event PoolLastRunSet(address poolAddress, uint40 time);
     event PoolRuleSetAdminOverride(address admin, address poolAddress, address ruleAddress);
+    event CalculateWeightsRequest(
+        int256[] currentWeights,
+        int256[] data,
+        address pool,
+        int256[][] ruleParameters,
+        uint64[] lambda,
+        uint64 epsilonMax,
+        uint64 absoluteWeightGuardRail
+    );
+
+    event CalculateWeightsResponse(
+        int256[] updatedWeights
+    );
 
     ///@dev Emitted when the weights of the pool are updated
-    event WeightsUpdated(address indexed poolAddress, address updateOwner, int256[] weights, uint40 lastInterpolationTimePossible, uint40 lastUpdateTime);
+    event WeightsUpdated(
+        address indexed poolAddress,
+        address updateOwner,
+        int256[] weights,
+        uint40 lastInterpolationTimePossible,
+        uint40 lastUpdateTime
+    );
 
     /// @notice main eth oracle that could be used to determine value of pools and assets.
     /// @dev this could be used for things like uplift only withdrawal fee hooks
@@ -116,7 +136,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     /// @notice Mapping of pool backup oracles keyed by pool address for each asset in the pool (in order of priority)
     mapping(address => address[][]) public poolBackupOracles;
 
-    /// @notice The % of the total swap fee that is allocated to the protocol for running costs. 
+    /// @notice The % of the total swap fee that is allocated to the protocol for running costs.
     uint256 public quantAMMSwapFeeTake = 0.5e18;
 
     function setQuantAMMSwapFeeTake(uint256 _quantAMMSwapFeeTake) external override {
@@ -131,10 +151,10 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     function getQuantAMMSwapFeeTake() external view override returns (uint256) {
         return quantAMMSwapFeeTake;
     }
-    
+
     /// @notice Set the quantAMM uplift fee % amount allocated to the protocol for running costs
     /// @param _quantAMMUpliftFeeTake The new uplift fee % amount allocated to the protocol for running costs
-    function setQuantAMMUpliftFeeTake(uint256 _quantAMMUpliftFeeTake) external{
+    function setQuantAMMUpliftFeeTake(uint256 _quantAMMUpliftFeeTake) external {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
         require(_quantAMMUpliftFeeTake <= 1e18, "Uplift fee must be less than 100%");
         uint256 oldSwapFee = quantAMMSwapFeeTake;
@@ -144,10 +164,9 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     }
 
     /// @notice Get the quantAMM uplift fee % amount allocated to the protocol for running costs
-    function getQuantAMMUpliftFeeTake() external view returns (uint256){
+    function getQuantAMMUpliftFeeTake() external view returns (uint256) {
         return quantAMMSwapFeeTake;
     }
-
 
     function getQuantAMMAdmin() external view override returns (address) {
         return quantammAdmin;
@@ -223,7 +242,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     /// @param _pool Pool to set actions for
     function setApprovedActionsForPool(address _pool, uint256 _actions) external {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
-        require(_actions != approvedPoolActions[_pool],"DUPEACTION");
+        require(_actions != approvedPoolActions[_pool], "DUPEACTION");
         approvedPoolActions[_pool] = _actions;
         emit SetApprovedActionsForPool(msg.sender, _pool, _actions);
     }
@@ -239,7 +258,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
         require(_pool != address(0), "Invalid pool address");
         require(IQuantAMMWeightedPool(_pool).getWithinFixWindow(), "Pool now immutable");
-        
+
         require(address(rules[_pool]) == address(0), "Rule already set");
         require(_poolSettings.oracles.length > 0, "Empty oracles array");
         require(poolOracles[_pool].length == 0, "pool rule already set");
@@ -249,7 +268,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         require(_poolSettings.updateInterval > 0, "Update interval must be greater than 0");
 
         _setRuleForPool(_poolSettings, _pool);
-        
+
         emit PoolRuleSetAdminOverride(msg.sender, _pool, address(_poolSettings.rule));
     }
 
@@ -265,7 +284,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         _setRuleForPool(_poolSettings, msg.sender);
     }
 
-    function _setRuleForPool(IQuantAMMWeightedPool.PoolSettings memory _poolSettings, address pool) internal {        
+    function _setRuleForPool(IQuantAMMWeightedPool.PoolSettings memory _poolSettings, address pool) internal {
         for (uint i; i < _poolSettings.oracles.length; ++i) {
             require(_poolSettings.oracles[i].length > 0, "Empty oracles array");
             for (uint j; j < _poolSettings.oracles[i].length; ++j) {
@@ -366,7 +385,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         for (uint i; i < oracleLength; ) {
             // Asset is base asset
             OracleData memory oracleResult;
-            
+
             require(approvedOracles[address(optimisedOracles[i])], "Oracle not approved");
 
             try OracleWrapper(optimisedOracles[i]).getData() returns (int216 data, uint40 timestamp) {
@@ -388,12 +407,14 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
                 if (numAssetOracles == 1) {
                     revert("No fresh oracle values available");
                 }
-                
-                for (uint j = 1 /*0 already done via optimised poolOracles*/; j < numAssetOracles; ) {
 
+                for (uint j = 1 /*0 already done via optimised poolOracles*/; j < numAssetOracles; ) {
                     require(approvedOracles[address(poolBackupOracles[_pool][i][j])], "Oracle not approved");
 
-                    try OracleWrapper(poolBackupOracles[_pool][i][j]).getData() returns (int216 data, uint40 timestamp) {
+                    try OracleWrapper(poolBackupOracles[_pool][i][j]).getData() returns (
+                        int216 data,
+                        uint40 timestamp
+                    ) {
                         oracleResult.data = data;
                         oracleResult.timestamp = timestamp;
                     } catch {
@@ -429,6 +450,16 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     ) private returns (int256[] memory updatedWeights, int256[] memory data) {
         data = _getData(_pool, true);
 
+        emit CalculateWeightsRequest(
+            _currentWeights,
+            data,
+            _pool,
+            _ruleSettings.ruleParameters,
+            _ruleSettings.lambda,
+            _ruleSettings.epsilonMax,
+            _ruleSettings.absoluteWeightGuardRail
+        );
+
         updatedWeights = rules[_pool].CalculateNewWeights(
             _currentWeights,
             data,
@@ -439,16 +470,15 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
             _ruleSettings.absoluteWeightGuardRail
         );
 
+        emit CalculateWeightsResponse(updatedWeights);
+
         poolRuleSettings[_pool].timingSettings.lastPoolUpdateRun = uint40(block.timestamp);
     }
 
     /// @notice Perform the update for a pool and get the new data
     /// @param _poolAddress Pool to update
     /// @param _ruleSettings Settings for the rule to use for the update (lambda, epsilonMax, absolute guard rails, ruleParameters)
-    function _performUpdateAndGetData(
-        address _poolAddress,
-        PoolRuleSettings memory _ruleSettings
-    ) private {
+    function _performUpdateAndGetData(address _poolAddress, PoolRuleSettings memory _ruleSettings) private {
         //CODEHAWKS INFO /s/405
         uint256[] memory currentWeightsUnsigned = IWeightedPool(_poolAddress).getNormalizedWeights();
         int256[] memory currentWeights = new int256[](currentWeightsUnsigned.length);
@@ -581,9 +611,9 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         //some level of protocol oversight required here that no rule is approved where this function is not called inapproriately
         require(msg.sender == address(rules[params.poolAddress]), "ONLYRULECANSETWEIGHTS");
 
-        //CODEHAWKS M-02 redeployment of update weight runners means really it is a better 
+        //CODEHAWKS M-02 redeployment of update weight runners means really it is a better
         //design to have pool creator trusted managed pools as a separate factory and weight runner
-        uint256 poolRegistryEntry =  approvedPoolActions[params.poolAddress];
+        uint256 poolRegistryEntry = approvedPoolActions[params.poolAddress];
         require(poolRegistryEntry & MASK_POOL_RULE_DIRECT_SET_WEIGHT > 0, "FUNCTIONNOTAPPROVEDFORPOOL");
 
         //why do we still need to calculate the multiplier and why not just set the weights like in the manual override?
@@ -604,7 +634,7 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         uint40 _lastInterpolationTimePossible,
         uint _numberOfAssets
     ) external {
-        //CODEHAWKS M-02 redeployment of update weight runners means really it is a better 
+        //CODEHAWKS M-02 redeployment of update weight runners means really it is a better
         //design to have pool creator trusted managed pools as a separate factory and weight runner
         uint256 poolRegistryEntry = approvedPoolActions[_poolAddress];
         if (poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0) {
@@ -629,7 +659,13 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
 
         IQuantAMMWeightedPool(_poolAddress).setWeights(_weights, _poolAddress, _lastInterpolationTimePossible);
 
-        emit SetWeightManual(msg.sender, _poolAddress, _weights, _lastInterpolationTimePossible, uint40(block.timestamp));
+        emit SetWeightManual(
+            msg.sender,
+            _poolAddress,
+            _weights,
+            _lastInterpolationTimePossible,
+            uint40(block.timestamp)
+        );
     }
 
     /// @notice Breakglass function to allow the admin or the pool manager to set the intermediate values of the rule manually

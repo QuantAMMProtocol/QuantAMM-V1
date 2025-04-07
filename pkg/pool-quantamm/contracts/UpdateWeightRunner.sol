@@ -551,6 +551,13 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
 
         //L01 possible if multiplier is 0
         if (currentLastInterpolationPossible < int256(type(int40).max) - int256(int40(uint40(block.timestamp)))) {
+            if(currentLastInterpolationPossible < 0) {
+                //an ultimate final backstop, so we need to set the last interpolation time to the current blocktime
+                //current weights are handled by the same multiplier process so in theory not possible but if a manual intervention was not
+                //added correctly this prevents any big weight jump
+                currentLastInterpolationPossible = 0;
+            }
+
             //next expected update + time beyond that
             lastTimestampThatInterpolationWorks = uint40(
                 int40(currentLastInterpolationPossible + int40(uint40(block.timestamp)))

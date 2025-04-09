@@ -2,15 +2,15 @@
 pragma solidity 0.8.26;
 
 import {Script} from "forge-std/Script.sol";
-import "../rules/AntimomentumUpdateRule.sol";
-import "../rules/MomentumUpdateRule.sol";
-import "../rules/DifferenceMomentumUpdateRule.sol";
-import "../rules/ChannelFollowingUpdateRule.sol";
-import "../rules/MinimumVarianceUpdateRule.sol";
-import "../rules/PowerChannelUpdateRule.sol";
-import "../UpdateWeightRunner.sol";
-import "../QuantAMMWeightedPoolFactory.sol";
-import "../ChainlinkOracle.sol";
+import "../../rules/AntimomentumUpdateRule.sol";
+import "../../rules/MomentumUpdateRule.sol";
+import "../../rules/DifferenceMomentumUpdateRule.sol";
+import "../../rules/ChannelFollowingUpdateRule.sol";
+import "../../rules/MinimumVarianceUpdateRule.sol";
+import "../../rules/PowerChannelUpdateRule.sol";
+import "../../UpdateWeightRunner.sol";
+import "../../QuantAMMWeightedPoolFactory.sol";
+import "../../ChainlinkOracle.sol";
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
 
 

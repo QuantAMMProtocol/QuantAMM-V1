@@ -3,15 +3,15 @@ pragma solidity 0.8.26;
 
 import "forge-std/console.sol"; // Import the console library for logging
 import { Script } from "forge-std/Script.sol";
-import "../rules/AntimomentumUpdateRule.sol";
-import "../rules/MomentumUpdateRule.sol";
-import "../rules/DifferenceMomentumUpdateRule.sol";
-import "../rules/ChannelFollowingUpdateRule.sol";
-import "../rules/MinimumVarianceUpdateRule.sol";
-import "../rules/PowerChannelUpdateRule.sol";
-import "../UpdateWeightRunner.sol";
-import "../QuantAMMWeightedPoolFactory.sol";
-import "../ChainlinkOracle.sol";
+import "../../rules/AntimomentumUpdateRule.sol";
+import "../../rules/MomentumUpdateRule.sol";
+import "../../rules/DifferenceMomentumUpdateRule.sol";
+import "../../rules/ChannelFollowingUpdateRule.sol";
+import "../../rules/MinimumVarianceUpdateRule.sol";
+import "../../rules/PowerChannelUpdateRule.sol";
+import "../../UpdateWeightRunner.sol";
+import "../../QuantAMMWeightedPoolFactory.sol";
+import "../../ChainlinkOracle.sol";
 import { IRouter } from "@balancer-labs/v3-interfaces/contracts/vault/IRouter.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";

@@ -118,7 +118,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
 
     // constants
     uint64 public constant _MAX_SWAP_FEE_PERCENTAGE = 10e16;
-    uint16 private constant _UPDATE_INTERVAL = 60; // 60 seconds
+    uint40 private constant _UPDATE_INTERVAL = 60; // 60 seconds
     uint64 private constant _LAMBDA = 0.2e18; // 20% lambda
     int256 private constant _KAPPA = 0.2e18; // 20% kappa
     uint64 private constant _MAX_TRADE_SIZE_RATIO = 0.01e18; // 1% max trade size ratio

@@ -60,7 +60,7 @@ interface IQuantAMMWeightedPool {
         uint64 epsilonMax;
         uint64 absoluteWeightGuardRail;
         uint256 maxTradeSizeRatio;
-        uint64 updateInterval;
+        uint40 updateInterval;
     }
 
     ///@notice the time variables used for interpolation
@@ -98,7 +98,7 @@ interface IQuantAMMWeightedPool {
         IERC20[] assets;
         IUpdateRule rule;
         address[][] oracles;
-        uint16 updateInterval;
+        uint40 updateInterval;
         uint64[] lambda;
         uint64 epsilonMax;
         uint64 absoluteWeightGuardRail;

@@ -170,7 +170,7 @@ contract QuantAMMWeightedPool is
     uint256 internal maxTradeSizeRatio;
 
     ///@dev Minimum amount of seconds between two updates
-    uint40 public updateInterval;
+    uint64 public updateInterval;
 
     ///@dev the maximum amount of time that an oracle an be stale.
     uint oracleStalenessThreshold;

@@ -63,7 +63,7 @@ contract Deploy is Script {
         //IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9).sendTo(IERC20(0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8), msg.sender, uint256(1));
         //IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9).sendTo(IERC20(0x29f2D40B0605204364af54EC677bD022dA425d03), msg.sender, uint256(1));
         uint256 amountIn = IRouter(0x0BF61f706105EA44694f2e92986bD01C39930280).initialize(
-            0x7E7AAbC766aD4079257c88d41B9E95B0dd48c2C3,
+            0xCB78DF4EAd6D9558c19960Cdec71AcA3e37c1087,
             tokenAddresses,
             weights,
             0,

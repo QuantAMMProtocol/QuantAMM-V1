@@ -33,7 +33,9 @@ contract Deploy is Script {
             vm.startBroadcast();
         }
 
-        address pool = 0x7E7AAbC766aD4079257c88d41B9E95B0dd48c2C3;
+        address pool = 0xCB78DF4EAd6D9558c19960Cdec71AcA3e37c1087;
+        address rule = 0x2B311426f1bFbC69a526162acC308e13750bB61A;
+        address updateWeightRunnerAddress = 0xB6b7CCa5E4D3B4DD1a4f52C38f287c7303Db7dA2;
 
         IQuantAMMWeightedPool.QuantAMMWeightedPoolDynamicData memory weights = QuantAMMWeightedPool(
             pool
@@ -60,13 +62,13 @@ contract Deploy is Script {
 
         console.log("intermediate state");
 
-        int256[] memory intermediateState = AntiMomentumUpdateRule(0x5104f2e6CB97334cD3c1BD000fAe871d77B66D15)
+        int256[] memory intermediateState = AntiMomentumUpdateRule(rule)
             .getIntermediateGradientState(pool, 2);
         console.logInt(intermediateState[0]);
         console.logInt(intermediateState[1]);
 
 
-        int256[] memory movingAverages = AntiMomentumUpdateRule(0x5104f2e6CB97334cD3c1BD000fAe871d77B66D15)
+        int256[] memory movingAverages = AntiMomentumUpdateRule(rule)
             .getMovingAverages(pool, 2);
         console.logInt(intermediateState[0]);
         console.logInt(intermediateState[1]);
@@ -81,7 +83,7 @@ contract Deploy is Script {
         console.logUint(uint256(weights.lastUpdateTime));
 
         address[] memory oracles = UpdateWeightRunner(
-            0xc840e742C9CC87F08C14537C6b6515cD952AC789
+            updateWeightRunnerAddress
         ).getOptimisedPoolOracle(pool);
 
         console.log("poolOracles");

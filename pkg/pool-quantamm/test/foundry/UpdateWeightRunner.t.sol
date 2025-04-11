@@ -27,7 +27,7 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
     uint256 constant FIXED_VALUE_2 = 1001;
     uint256 constant FIXED_VALUE_3 = 1002;
     uint256 constant DELAY = 3600;
-    uint16 constant UPDATE_INTERVAL = 1800;
+    uint40 constant UPDATE_INTERVAL = 1800;
     // Deploy UpdateWeightRunner contract before each test
     function setUp() public {
         (address ownerLocal, address addr1Local, address addr2Local) = (vm.addr(1), vm.addr(2), vm.addr(3));

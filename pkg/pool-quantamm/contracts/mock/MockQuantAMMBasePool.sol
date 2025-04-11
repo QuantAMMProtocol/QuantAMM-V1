@@ -33,7 +33,7 @@ import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "../UpdateWeightRunner.sol";
 
 contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
-    constructor(uint16 _updateInterval, address _updateWeightRunner) {
+    constructor(uint40 _updateInterval, address _updateWeightRunner) {
         updateInterval = _updateInterval;
         lambda = new uint64[](0);
         epsilonMax = 1 * 1e18; // PRBMathSD69x18 1

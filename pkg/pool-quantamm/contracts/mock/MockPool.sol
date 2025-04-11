@@ -5,7 +5,7 @@ import "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol";
 import "../rules/UpdateRule.sol";
 
 contract MockPool {
-    uint16 public  immutable updateInterval;
+    uint40 public  immutable updateInterval;
 
     int256 public lambda;
 
@@ -25,7 +25,7 @@ contract MockPool {
 
     uint256 public afterTokenTransferID;
 
-    constructor(uint16 _updateInterval, int256 _lambda, address _updateWeightRunner) {
+    constructor(uint40 _updateInterval, int256 _lambda, address _updateWeightRunner) {
         updateInterval = _updateInterval;
         lambda = _lambda;
         epsilonMax = 1 * 1e18; // PRBMathSD69x18 1
@@ -63,7 +63,7 @@ contract MockPool {
         IQuantAMMWeightedPool.PoolSettings memory _poolSettings;
         _poolSettings.rule = _rule;
         _poolSettings.oracles = _poolOracles;
-        _poolSettings.updateInterval = uint16(_updateInterval);
+        _poolSettings.updateInterval = uint40(_updateInterval);
         _poolSettings.lambda = _lambda;
         _poolSettings.epsilonMax = _epsilonMax;
         _poolSettings.absoluteWeightGuardRail = _absoluteWeightGuardRail;

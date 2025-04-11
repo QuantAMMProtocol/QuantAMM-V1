@@ -52,7 +52,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
     int256 private constant _MIN_WEIGHT = int256(uint256(_ABSOLUTE_WEIGHT_GUARD_RAIL)); // 0.01e18
     int256 private constant _MAX_WEIGHT =
         1e18 - (int256(_NUM_TOKENS) - 1) * int256(uint256(_ABSOLUTE_WEIGHT_GUARD_RAIL)); // 1e18- (8-1) * 0.01e18 = 0.93e18
-    uint16 private constant _UPDATE_INTERVAL = 60; // 60 seconds
+    uint40 private constant _UPDATE_INTERVAL = 60; // 60 seconds
 
     uint64 private constant _LAMBDA = 0.2e18; // 20% lambda
     int256 private constant _KAPPA = 0.2e18; // 20% kappa
@@ -95,7 +95,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         uint64 epsilonMax;
         uint64 absoluteWeightGuardRail;
         uint64 maxTradeSizeRatio;
-        uint16 updateInterval;
+        uint40 updateInterval;
     }
 
     struct RuleFuzzParams {
@@ -1131,7 +1131,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
         params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
         params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
-        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+        params.poolParams.updateInterval = uint40(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
 
         // fuzz the interpolation time
         params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
@@ -1160,7 +1160,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
         params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
         params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
-        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+        params.poolParams.updateInterval = uint40(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
 
         // fuzz the interpolation time
         params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
@@ -1357,7 +1357,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
         params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
         params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
-        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+        params.poolParams.updateInterval = uint40(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
 
         // fuzz the interpolation time
         params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
@@ -1385,7 +1385,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         params.poolParams.maxSwapfee = _MAX_SWAP_FEE_PERCENTAGE;
         params.poolParams.absoluteWeightGuardRail = _ABSOLUTE_WEIGHT_GUARD_RAIL;
         params.poolParams.maxTradeSizeRatio = _MAX_TRADE_SIZE_RATIO;
-        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+        params.poolParams.updateInterval = uint40(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
 
         // fuzz the interpolation time
         params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
@@ -1595,7 +1595,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         ruleParams.kappa = int256(bound(ruleParams.kappa, 0.01e18, 1e18));
         params.ruleParams = ruleParams;
         // fuzz update interval
-        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+        params.poolParams.updateInterval = uint40(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
 
         // fuzz the interpolation time
         params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);
@@ -1711,7 +1711,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         ruleParams.kappa = int256(bound(ruleParams.kappa, 0.01e18, 1e18));
         params.ruleParams = ruleParams;
         // fuzz update interval
-        params.poolParams.updateInterval = uint16(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
+        params.poolParams.updateInterval = uint40(bound(params.poolParams.updateInterval, 1, 7 * 86400)); // 7 days
 
         // fuzz the interpolation time
         params.interpolationTime = bound(params.interpolationTime, 1, params.poolParams.updateInterval);

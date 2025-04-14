@@ -137,7 +137,20 @@ contract MockQuantAMMBasePool is IQuantAMMWeightedPool, IBasePool {
         view
         override
         returns (QuantAMMWeightedPoolDynamicData memory data)
-    {}
+    {
+        data.firstFourWeightsAndMultipliers = new int256[](8);
+        data.secondFourWeightsAndMultipliers = new int256[](8);
+        
+        for(uint i = 0; i < 8 && i < weights.length; i++){
+            data.firstFourWeightsAndMultipliers[i] = weights[i];
+        }
+
+        if(weights.length > 8){
+            for(uint i = 8; i < 16 && i < weights.length; i++){
+                data.secondFourWeightsAndMultipliers[i - 8] = weights[i];
+            }
+        }
+    }
 
     function getQuantAMMWeightedPoolImmutableData()
         external

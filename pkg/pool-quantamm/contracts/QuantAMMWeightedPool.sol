@@ -121,11 +121,28 @@ contract QuantAMMWeightedPool is
     }
 
     ///@dev Emitted when the weights of the pool are updated
-    event WeightsUpdated(address indexed poolAddress, int256[] weights, uint40 lastInterpolationTimePossible, uint40 lastUpdateTime);
+    /// @notice The information regarding the weight update. A second event is sent with finalised weights from the updateWeightRunner with precisions used for trading.
+    /// @param poolAddress The address of the pool
+    /// @param calculatedWeightsAndMultipliers The weights and multipliers submitted to be saved. These are in 18dp. Trade precision is in 9dp.
+    /// @param lastInterpolationTimePossible The last time the weights can be interpolated
+    /// @param lastUpdateTime The last time the weights were updated
+    event WeightsUpdated(address indexed poolAddress, int256[] calculatedWeightsAndMultipliers, uint40 lastInterpolationTimePossible, uint40 lastUpdateTime);
 
-    ///@dev Emitted when the update weight runner is updated
+    /// @notice Emitted when the update weight runner is updated. This is during break glass situations.
+    /// @param oldAddress The old address of the update weight runner
+    /// @param newAddress The new address of the update weight runner
     event UpdateWeightRunnerAddressUpdated(address indexed oldAddress, address indexed newAddress);
 
+    /// @notice Emitted when the pool is set in the update weight runner
+    /// @param rule The rule to use for the pool
+    /// @param poolOracles The oracles to use for the pool. [asset oracle][backup oracles for that asset]
+    /// @param lambda The decay parameter for the rule
+    /// @param ruleParameters The parameters for the rule
+    /// @param epsilonMax The parameter that controls maximum allowed delta for a weight update
+    /// @param absoluteWeightGuardRail The parameter that controls minimum allowed absolute weight allowed
+    /// @param updateInterval The time between updates
+    /// @param poolManager The address of the pool manager
+    /// @param creatorAddress The address of the creator of the pool
     event PoolRuleSet(
         address rule,
         address[][] poolOracles,

@@ -58,7 +58,8 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         address indexed pool,
         int256[] weights,
         uint40 lastInterpolationTimePossible,
-        uint40 lastUpdateTime
+        uint40 lastUpdateTime,
+        uint tradePrecision
     );
     event SetIntermediateValuesManually(
         address indexed caller,
@@ -95,7 +96,8 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         address updateOwner,
         int256[] weights,
         uint40 lastInterpolationTimePossible,
-        uint40 lastUpdateTime
+        uint40 lastUpdateTime,
+        uint tradePrecision
     );
 
     /// @notice main eth oracle that could be used to determine value of pools and assets.
@@ -307,7 +309,8 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
             absoluteWeightGuardRail: _poolSettings.absoluteWeightGuardRail,
             ruleParameters: _poolSettings.ruleParameters,
             timingSettings: PoolTimingSettings({ updateInterval: _poolSettings.updateInterval, lastPoolUpdateRun: 0 }),
-            poolManager: _poolSettings.poolManager
+            poolManager: _poolSettings.poolManager,
+            tradePrecision: _poolSettings.tradePrecision
         });
     }
 
@@ -600,7 +603,8 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
             msg.sender,
             targetWeightsAndBlockMultiplier,
             lastTimestampThatInterpolationWorks,
-            uint40(block.timestamp)
+            uint40(block.timestamp),
+            poolRuleSettings[local.poolAddress].tradePrecision
         );
     }
 
@@ -664,7 +668,8 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
             _poolAddress,
             _weights,
             _lastInterpolationTimePossible,
-            uint40(block.timestamp)
+            uint40(block.timestamp),
+            poolRuleSettings[_poolAddress].tradePrecision
         );
     }
 

@@ -429,6 +429,7 @@ contract QuantAMMWeightedPoolFactoryTest is QuantAMMWeightedPoolContractsDeploye
                 new IERC20[](2),
                 IUpdateRule(momentumRule),
                 oracles,
+                9,
                 60,
                 lambdas,
                 0.2e18,

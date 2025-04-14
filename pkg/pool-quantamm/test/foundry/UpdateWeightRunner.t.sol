@@ -255,7 +255,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -321,7 +322,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -397,7 +399,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -441,7 +444,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             }), address(mockPool)
         );
         vm.stopPrank();
@@ -515,7 +519,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -565,7 +570,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             }), address(mockPool)
         );
         vm.stopPrank();
@@ -628,7 +634,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
             absoluteWeightGuardRail: 0.2e18,
             maxTradeSizeRatio: 0.2e18,
             ruleParameters: new int256[][](0),
-            poolManager: addr2
+            poolManager: addr2,
+            tradePrecision: 9
         });
         poolSettings.oracles[0] = new address[](1);
         poolSettings.oracles[0][0] = address(chainlinkOracle);
@@ -661,7 +668,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
             absoluteWeightGuardRail: 0.2e18,
             maxTradeSizeRatio: 0.2e18,
             ruleParameters: new int256[][](0),
-            poolManager: addr2
+            poolManager: addr2,
+            tradePrecision: 9
         });
         poolSettings.oracles[0] = new address[](1);
         poolSettings.oracles[0][0] = address(chainlinkOracle);
@@ -691,7 +699,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
             absoluteWeightGuardRail: 0.2e18,
             maxTradeSizeRatio: 0.2e18,
             ruleParameters: new int256[][](0),
-            poolManager: addr2
+            poolManager: addr2,
+            tradePrecision: 9
         });
         poolSettings.oracles[0] = new address[](1);
         poolSettings.oracles[0][0] = address(chainlinkOracle);
@@ -714,7 +723,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
             absoluteWeightGuardRail: 0.2e18,
             maxTradeSizeRatio: 0.2e18,
             ruleParameters: new int256[][](0),
-            poolManager: addr2
+            poolManager: addr2,
+            tradePrecision: 9
         });
 
         vm.expectRevert("Empty oracles array");
@@ -742,7 +752,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
             absoluteWeightGuardRail: 0.2e18,
             maxTradeSizeRatio: 0.2e18,
             ruleParameters: new int256[][](0),
-            poolManager: addr2
+            poolManager: addr2,
+            tradePrecision: 9
         });
         poolSettings.oracles[0] = new address[](1);
         poolSettings.oracles[0][0] = address(chainlinkOracle);
@@ -773,7 +784,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
             absoluteWeightGuardRail: 0.2e18,
             maxTradeSizeRatio: 0.2e18,
             ruleParameters: new int256[][](0),
-            poolManager: addr2
+            poolManager: addr2,
+            tradePrecision: 9
         });
         poolSettings.oracles[0] = new address[](1);
         poolSettings.oracles[0][0] = address(chainlinkOracle);
@@ -803,7 +815,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
             absoluteWeightGuardRail: 0.2e18,
             maxTradeSizeRatio: 0.2e18,
             ruleParameters: new int256[][](0),
-            poolManager: addr2
+            poolManager: addr2,
+            tradePrecision: 9
         });
         poolSettings.oracles[0] = new address[](1);
         poolSettings.oracles[0][0] = address(chainlinkOracle);
@@ -883,7 +896,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -981,7 +995,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -1051,7 +1066,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -1133,7 +1149,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -1221,7 +1238,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -1315,7 +1333,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -1386,7 +1405,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -1482,7 +1502,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -1557,7 +1578,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -1653,7 +1675,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -1751,7 +1774,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.35e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -1843,7 +1867,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -2020,7 +2045,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -2078,7 +2104,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -2192,7 +2219,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -2334,7 +2362,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -2529,7 +2558,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();
@@ -2652,7 +2682,8 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
                 absoluteWeightGuardRail: 0.2e18,
                 maxTradeSizeRatio: 0.2e18,
                 ruleParameters: new int256[][](0),
-                poolManager: addr2
+                poolManager: addr2,
+                tradePrecision: 9
             })
         );
         vm.stopPrank();

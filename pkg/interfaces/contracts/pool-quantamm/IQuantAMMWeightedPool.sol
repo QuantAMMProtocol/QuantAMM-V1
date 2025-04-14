@@ -98,6 +98,7 @@ interface IQuantAMMWeightedPool {
         IERC20[] assets;
         IUpdateRule rule;
         address[][] oracles;
+        uint tradePrecision;
         uint40 updateInterval;
         uint64[] lambda;
         uint64 epsilonMax;

@@ -590,6 +590,7 @@ contract QuantAMMWeightedPool8TokenTest is QuantAMMWeightedPoolContractsDeployer
                 new IERC20[](8),
                 IUpdateRule(momentumRule),
                 oracles,
+                9,
                 60,
                 lambdas,
                 0.01e18,

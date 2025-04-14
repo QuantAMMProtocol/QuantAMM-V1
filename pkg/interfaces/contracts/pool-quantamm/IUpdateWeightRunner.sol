@@ -66,6 +66,7 @@ interface IUpdateWeightRunner {
         uint64 absoluteWeightGuardRail;
         int256[][] ruleParameters;
         address poolManager;
+        uint tradePrecision;
     }
 
     /// @notice Struct for caching oracle replies

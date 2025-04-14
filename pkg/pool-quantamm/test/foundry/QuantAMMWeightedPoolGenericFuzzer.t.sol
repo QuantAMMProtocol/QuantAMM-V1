@@ -253,7 +253,8 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                     absoluteWeightGuardRail: 0,
                     maxTradeSizeRatio: 0.1e18,
                     ruleParameters: new int256[][](0),
-                    poolManager: address(0)
+                    poolManager: address(0),
+                    tradePrecision: 9
                 }),
                 _initialMovingAverages: initialWeights,
                 _initialIntermediateValues: initialWeights,
@@ -307,7 +308,8 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
                 absoluteWeightGuardRail: poolParams.absoluteWeightGuardRail,
                 maxTradeSizeRatio: poolParams.maxTradeSizeRatio,
                 ruleParameters: ruleParameters,
-                poolManager: address(0)
+                poolManager: address(0),
+                tradePrecision: 9
             });
     }
 

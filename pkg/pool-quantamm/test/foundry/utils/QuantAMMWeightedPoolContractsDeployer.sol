@@ -170,6 +170,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
                 tokens.asIERC20(),
                 IUpdateRule(new MockMomentumRule(owner)),
                 oracles,
+                9,
                 60,
                 lambdas,
                 0.2e18,

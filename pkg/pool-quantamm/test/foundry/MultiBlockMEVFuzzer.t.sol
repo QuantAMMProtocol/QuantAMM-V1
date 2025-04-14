@@ -281,7 +281,8 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
                     absoluteWeightGuardRail: 0,
                     maxTradeSizeRatio: 0,
                     ruleParameters: new int256[][](0),
-                    poolManager: address(0)
+                    poolManager: address(0),
+                    tradePrecision: 9
                 }),
                 _initialMovingAverages: initialWeights,
                 _initialIntermediateValues: initialWeights,
@@ -337,7 +338,8 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
                 absoluteWeightGuardRail: params.absoluteWeightGuardRail,
                 maxTradeSizeRatio: _MAX_TRADE_SIZE_RATIO,
                 ruleParameters: ruleParams,
-                poolManager: address(0)
+                poolManager: address(0),
+                tradePrecision: 9
             });
     }
 

@@ -516,6 +516,28 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         address poolAddress;
     }
 
+    /// @notice Flatten the weights and multipliers into a single array
+    /// @param firstFourWeightsAndMultipliers The first four weights and multipliers w,w,w,w,m,m,m,m
+    /// @param secondFourWeightsAndMultipliers The second four weights and multipliers w,w,w,w,m,m,m,m
+    /// @return The flattened weights and multipliers w,w,w,w,w,w,w,w,m,m,m,m,m,m,m,m
+    function flattenDynamicDataWeightAndMutlipliers(
+        int256[] memory firstFourWeightsAndMultipliers,
+        int256[] memory secondFourWeightsAndMultipliers
+    ) internal pure returns (int256[] memory) {
+        int256[] memory flattenedWeightsAndMultipliers = new int256[](16);
+        
+        //as dynamic data always returns 2, 8 elem arrays (populated with 0s if it is not an 8 token pool)
+        //we can make the assumptions made below about array lengths.
+        for (uint i = 0; i < 4; i++) {
+            flattenedWeightsAndMultipliers[i] = firstFourWeightsAndMultipliers[i];
+            flattenedWeightsAndMultipliers[i + 4] = secondFourWeightsAndMultipliers[i];
+            flattenedWeightsAndMultipliers[i + 8] = firstFourWeightsAndMultipliers[i + 4];
+            flattenedWeightsAndMultipliers[i + 12] = secondFourWeightsAndMultipliers[i + 4];
+        }
+
+            return flattenedWeightsAndMultipliers;
+        }
+
     /// @dev The multipler is the amount per block to add/remove from the last successful weight update.
     /// @notice Calculate the multiplier and set the weights for a pool.
     /// @param local Local data for the function
@@ -594,11 +616,13 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
             lastTimestampThatInterpolationWorks
         );
 
+        IQuantAMMWeightedPool.QuantAMMWeightedPoolDynamicData memory dynamicData = IQuantAMMWeightedPool(local.poolAddress).getQuantAMMWeightedPoolDynamicData();
+
         //L-04 similar possibility with set weights as set rule for pool.
         emit WeightsUpdated(
             local.poolAddress,
             msg.sender,
-            targetWeightsAndBlockMultiplier,
+            flattenDynamicDataWeightAndMutlipliers(dynamicData.firstFourWeightsAndMultipliers, dynamicData.secondFourWeightsAndMultipliers),
             lastTimestampThatInterpolationWorks,
             uint40(block.timestamp)
         );
@@ -658,11 +682,12 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         }
 
         IQuantAMMWeightedPool(_poolAddress).setWeights(_weights, _poolAddress, _lastInterpolationTimePossible);
-
+        IQuantAMMWeightedPool.QuantAMMWeightedPoolDynamicData memory dynamicData = IQuantAMMWeightedPool(_poolAddress).getQuantAMMWeightedPoolDynamicData();
+        
         emit SetWeightManual(
             msg.sender,
             _poolAddress,
-            _weights,
+            flattenDynamicDataWeightAndMutlipliers(dynamicData.firstFourWeightsAndMultipliers, dynamicData.secondFourWeightsAndMultipliers),
             _lastInterpolationTimePossible,
             uint40(block.timestamp)
         );

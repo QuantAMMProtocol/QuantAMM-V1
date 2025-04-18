@@ -31,16 +31,21 @@ contract Deploy is Script {
             vm.startBroadcast();
         }
 
-        int256[] memory newMovingAverages = new int256[](2);
+        int256[] memory newMovingAverages = new int256[](4);
         newMovingAverages[0] = 1e18;
         newMovingAverages[1] = 1e18;
+        newMovingAverages[2] = 1e18;
+        newMovingAverages[3] = 1e18;
 
-        int256[] memory newParameters = new int256[](2);
+        int256[] memory newParameters = new int256[](4);
         newParameters[0] = 1e18;
         newParameters[1] = 1e18;
+        newParameters[2] = 1e18;
+        newParameters[3] = 1e18;
 
-        UpdateWeightRunner(0xB6b7CCa5E4D3B4DD1a4f52C38f287c7303Db7dA2)
-        .setIntermediateValuesManually(0xCB78DF4EAd6D9558c19960Cdec71AcA3e37c1087, newMovingAverages, newParameters, 2);
+        UpdateWeightRunner(0x26570ad4CC61eA3E944B1c4660416E45796D44b3)
+        .setIntermediateValuesManually(0x6663545aF63bC3268785Cf859f0608506759EBe8
+, newMovingAverages, newParameters, 4);
         
         vm.stopBroadcast();
     }

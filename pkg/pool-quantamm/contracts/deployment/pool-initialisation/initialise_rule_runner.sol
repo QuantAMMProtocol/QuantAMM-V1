@@ -31,7 +31,8 @@ contract Deploy is Script {
             vm.startBroadcast();
         }
 
-        UpdateWeightRunner(0xB6b7CCa5E4D3B4DD1a4f52C38f287c7303Db7dA2).InitialisePoolLastRunTime(0xCB78DF4EAd6D9558c19960Cdec71AcA3e37c1087, uint40(10));
+        UpdateWeightRunner(0x26570ad4CC61eA3E944B1c4660416E45796D44b3).InitialisePoolLastRunTime(0x6663545aF63bC3268785Cf859f0608506759EBe8
+, uint40(10));
         
         vm.stopBroadcast();
     }

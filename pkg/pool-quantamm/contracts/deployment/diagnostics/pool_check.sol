@@ -33,14 +33,64 @@ contract Deploy is Script {
             vm.startBroadcast();
         }
 
-        address pool = 0xCB78DF4EAd6D9558c19960Cdec71AcA3e37c1087;
-        address rule = 0x2B311426f1bFbC69a526162acC308e13750bB61A;
-        address updateWeightRunnerAddress = 0xB6b7CCa5E4D3B4DD1a4f52C38f287c7303Db7dA2;
+        address pool = 0x6663545aF63bC3268785Cf859f0608506759EBe8
+;
+        address rule = 0xfA9d23F4dd92F1C4fEB330848906d0d4C386EbF2;
+        address updateWeightRunnerAddress = 0x26570ad4CC61eA3E944B1c4660416E45796D44b3;
 
         IQuantAMMWeightedPool.QuantAMMWeightedPoolDynamicData memory weights = QuantAMMWeightedPool(
             pool
         ).getQuantAMMWeightedPoolDynamicData();
 
+        console.log("Total Supply");
+        console.logUint(weights.totalSupply);
+
+        console.log("Is Pool Initialized");
+        console.log(weights.isPoolInitialized);
+
+        console.log("Is Pool Paused");
+        console.log(weights.isPoolPaused);
+
+        console.log("Is Pool In Recovery Mode");
+        console.log(weights.isPoolInRecoveryMode);
+        IQuantAMMWeightedPool.QuantAMMWeightedPoolImmutableData memory immutableData = QuantAMMWeightedPool(
+            pool
+        ).getQuantAMMWeightedPoolImmutableData();
+
+        console.log("Oracle Staleness Threshold");
+        console.logUint(immutableData.oracleStalenessThreshold);
+
+        console.log("Pool Registry");
+        console.logUint(immutableData.poolRegistry);
+
+        console.log("Epsilon Max");
+        console.logUint(immutableData.epsilonMax);
+
+        console.log("Absolute Weight Guard Rail");
+        console.logUint(immutableData.absoluteWeightGuardRail);
+
+        console.log("Update Interval");
+        console.logUint(immutableData.updateInterval);
+
+        console.log("Max Trade Size Ratio");
+        console.logUint(immutableData.maxTradeSizeRatio);
+
+        console.log("Tokens");
+        for (uint256 i = 0; i < immutableData.tokens.length; i++) {
+            console.log(address(immutableData.tokens[i]));
+        }
+
+        console.log("Lambda");
+        for (uint256 i = 0; i < immutableData.lambda.length; i++) {
+            console.logUint(immutableData.lambda[i]);
+        }
+
+        console.log("Rule Parameters");
+        for (uint256 i = 0; i < immutableData.ruleParameters.length; i++) {
+            for (uint256 j = 0; j < immutableData.ruleParameters[i].length; j++) {
+            console.logInt(immutableData.ruleParameters[i][j]);
+            }
+        }
         console.log("Balances Live Scaled 18");
         for (uint256 i = 0; i < weights.balancesLiveScaled18.length; i++) {
             console.logInt(int256(weights.balancesLiveScaled18[i]));
@@ -62,16 +112,20 @@ contract Deploy is Script {
 
         console.log("intermediate state");
 
-        int256[] memory intermediateState = AntiMomentumUpdateRule(rule)
-            .getIntermediateGradientState(pool, 2);
+        int256[] memory intermediateState = MomentumUpdateRule(rule)
+            .getIntermediateGradientState(pool, 4);
         console.logInt(intermediateState[0]);
         console.logInt(intermediateState[1]);
+        console.logInt(intermediateState[2]);
+        console.logInt(intermediateState[3]);
 
 
-        int256[] memory movingAverages = AntiMomentumUpdateRule(rule)
-            .getMovingAverages(pool, 2);
+        int256[] memory movingAverages = MomentumUpdateRule(rule)
+            .getMovingAverages(pool, 4);
         console.logInt(intermediateState[0]);
         console.logInt(intermediateState[1]);
+        console.logInt(intermediateState[2]);
+        console.logInt(intermediateState[3]);
 
         console.log("movingAverages");
         for (uint256 i = 0; i < movingAverages.length; i++) {
@@ -91,6 +145,11 @@ contract Deploy is Script {
         for(uint256 i = 0; i < oracles.length; i++) {
             console.log(oracles[i]);
         }
+
+        console.log("approved permissions");
+        uint256 registry = UpdateWeightRunner(updateWeightRunnerAddress)
+            .getPoolApprovedActions(pool);
+        console.logUint(registry);
 
         vm.stopBroadcast();
     }

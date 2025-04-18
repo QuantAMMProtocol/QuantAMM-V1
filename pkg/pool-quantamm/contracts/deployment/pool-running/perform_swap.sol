@@ -17,9 +17,17 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
 
 import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {
+    SwapKind,
+    VaultSwapParams
+} from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 
 contract Deploy is Script {
+
     function run() external {
+
+
         uint256 deployerPrivateKey;
 
         // Only load the private key if broadcasting (i.e., not dry run)
@@ -30,9 +38,18 @@ contract Deploy is Script {
             // For dry runs, we don't need a private key
             vm.startBroadcast();
         }
-
-        UpdateWeightRunner(0x26570ad4CC61eA3E944B1c4660416E45796D44b3).setApprovedActionsForPool(0x6663545aF63bC3268785Cf859f0608506759EBe8
-, uint256(19));
+        VaultSwapParams memory params = VaultSwapParams({
+            kind: SwapKind.EXACT_IN,
+            pool: 0x6663545aF63bC3268785Cf859f0608506759EBe8,
+            tokenIn: IERC20(0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8), // Replace with actual tokenIn address
+            tokenOut: IERC20(0x29f2D40B0605204364af54EC677bD022dA425d03), // Replace with actual tokenOut address
+            amountGivenRaw: 100, // Replace with the actual amount
+            limitRaw: 1e18, // Replace with the actual limit
+            userData: ""
+        });
+        
+        IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9)
+        .swap(params);
         
         vm.stopBroadcast();
     }

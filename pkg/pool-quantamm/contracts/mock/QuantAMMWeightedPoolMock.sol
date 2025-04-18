@@ -29,7 +29,7 @@ contract MockQuantAMMWeightedPool is QuantAMMWeightedPool {
         _normalizedWeights[1] = newWeights[1];
     }
 
-    function _getNormalizedWeight(uint256 tokenIndex, uint256, uint256) internal view override returns (uint256) {
+    function _getNormalizedWeight(uint256 tokenIndex, uint256) internal view override returns (uint256) {
         if (tokenIndex < _normalizedWeights.length) {
             return _normalizedWeights[tokenIndex];
         } else {

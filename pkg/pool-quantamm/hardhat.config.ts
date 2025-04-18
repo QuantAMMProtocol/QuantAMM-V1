@@ -26,7 +26,7 @@ export default {
           evmVersion: 'cancun',
           optimizer: {
             enabled: true,
-            runs: 850,
+            runs: 9999,
             details: {
               yulDetails: {
                 optimizerSteps,

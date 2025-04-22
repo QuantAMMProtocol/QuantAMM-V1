@@ -2038,6 +2038,282 @@ contract UpdateWeightRunnerTest is Test, QuantAMMTestUtils {
         assertEq(IWeightedPool(address(mockPool)).getNormalizedWeights(), poolWeights);
     }
 
+    function testSetTargetWeightsManuallyNegativeFails_Fuzz(int256 negativeWeight) public {
+        int256[] memory weights = new int256[](2);
+        weights[0] = bound(negativeWeight, type(int256).min, 0e18);
+        weights[1] = 0.0000000005e18;
+        mockPool.setPoolRegistry(16);
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 16);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        vm.expectRevert("Below min allowed weight");
+        updateWeightRunner.setTargetWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
+    function testSetTargetWeightsManuallyBetween0And1Allowed_Fuzz(int256 firstWeight, int256 secondWeight) public {
+        int256[] memory initialWeights = new int256[](4);
+        initialWeights[0] = 0.5e18;
+        initialWeights[1] = 0.5e18;
+        initialWeights[2] = 0;
+        initialWeights[3] = 0;
+        
+        mockPool.setPoolRegistry(16);
+        mockPool.setInitialWeights(initialWeights);
+
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 16);
+        vm.stopPrank();
+
+        int256[] memory weights = new int256[](2);
+        weights[0] = bound(firstWeight, 0.01e18, 0.99e18);
+        weights[1] = bound(secondWeight, 0.01e18, 0.99e18);
+        
+        vm.startPrank(owner);
+        updateWeightRunner.setTargetWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
+    function testSetTargetWeightsManuallyNegativeFails2ndWeight_Fuzz(int256 negativeWeight) public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = 0.0000000005e18;
+        weights[1] = bound(negativeWeight, type(int256).min, -0.000000001e18);
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(16);
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 16);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        vm.expectRevert("Below min allowed weight");
+        updateWeightRunner.setTargetWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
+    function testSetTargetWeightsManuallyGreaterThan99PctFails_Fuzz(int256 moreThanOneWeight) public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = bound(moreThanOneWeight, 0.99e18 + 1, type(int256).max);
+        weights[1] = 0.0000000005e18;
+        weights[2] = 0;
+        weights[3] = 0;
+
+        mockPool.setPoolRegistry(16);
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 16);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        vm.expectRevert("Above max allowed weight");
+        updateWeightRunner.setTargetWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
+    function testSetTargetWeightsManuallyGreaterThanOne2ndWeightFails_Fuzz(int256 moreThanOneWeight) public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = 0.01e18;
+        weights[1] = bound(moreThanOneWeight, 1e18, type(int256).max);
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(16);
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 16);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        vm.expectRevert("Above max allowed weight");
+        updateWeightRunner.setTargetWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
+    function testSetTargetWeightsManuallyAdmin() public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = 0.01e18;
+        weights[1] = 0.01e18;
+        weights[2] = 0;
+        weights[3] = 0;
+
+        mockPool.setPoolRegistry(16);
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 16);
+        mockPool.setInitialWeights(weights);
+
+        vm.startPrank(owner);
+        int256[] memory newWeights = new int256[](2);
+        newWeights[0] = 0.5e18;
+        newWeights[1] = 0.5e18;
+
+        updateWeightRunner.setTargetWeightsManually(newWeights, address(mockPool), 1000, 2);
+
+        vm.stopPrank();
+
+        uint256[] memory poolWeights = new uint256[](2);
+        poolWeights[0] = 0.01e18;
+        poolWeights[1] = 0.01e18;
+        assertEq(IWeightedPool(address(mockPool)).getNormalizedWeights(), poolWeights);
+
+        int256[] memory getCurrentWeightsAndMultipliers = mockPool.getWeights();
+
+        assertEq(getCurrentWeightsAndMultipliers[0], 0.01e18);
+        assertEq(getCurrentWeightsAndMultipliers[1], 0.01e18);
+        assertEq(getCurrentWeightsAndMultipliers[2], 0.00049e18);
+        assertEq(getCurrentWeightsAndMultipliers[3], 0.00049e18);
+    }
+
+
+    function testSetTargetWeightsManuallyFailsAdminPermOwnerFails() public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = 0.0000000005e18;
+        weights[1] = 0.0000000005e18;
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(16);
+
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 16);
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        vm.expectRevert("ONLYADMIN");
+        updateWeightRunner.setTargetWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
+    function testSetTargetWeightsManuallyPoolOwner() public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = 0.01e18;
+        weights[1] = 0.01e18;
+        weights[2] = 0;
+        weights[3] = 0;
+        mockPool.setPoolRegistry(8);
+
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 8);
+        mockPool.setInitialWeights(weights);
+        vm.stopPrank();
+        
+        uint40 blockTime = uint40(block.timestamp);
+        int216 fixedValue = 1000;
+        uint delay = 3600;
+        chainlinkOracle = deployOracle(fixedValue, delay);
+
+        vm.startPrank(owner);
+        updateWeightRunner.addOracle(OracleWrapper(chainlinkOracle));
+        vm.stopPrank();
+
+        vm.startPrank(address(mockPool));
+        address[][] memory oracles = new address[][](1);
+        oracles[0] = new address[](1);
+        oracles[0][0] = address(chainlinkOracle);
+
+        uint64[] memory lambda = new uint64[](1);
+        lambda[0] = 0.0000000005e18;
+        updateWeightRunner.setRuleForPool(
+            IQuantAMMWeightedPool.PoolSettings({
+                assets: new IERC20[](0),
+                rule: mockRule,
+                oracles: oracles,
+                updateInterval: 1,
+                lambda: lambda,
+                epsilonMax: 0.2e18,
+                absoluteWeightGuardRail: 0.2e18,
+                maxTradeSizeRatio: 0.2e18,
+                ruleParameters: new int256[][](0),
+                poolManager: addr2
+            })
+        );
+        vm.stopPrank();
+
+        vm.startPrank(addr2);
+        updateWeightRunner.InitialisePoolLastRunTime(address(mockPool), blockTime);
+        vm.stopPrank();
+        
+        vm.startPrank(addr2);
+
+        int256[] memory newWeights = new int256[](2);
+        newWeights[0] = 0.5e18;
+        newWeights[1] = 0.5e18;
+        
+        //multiplier should be 0.5e18 - 0.01e18 = 0.49e18
+
+        updateWeightRunner.setTargetWeightsManually(newWeights, address(mockPool), 100, 2);
+
+        vm.stopPrank();
+
+        uint256[] memory poolWeights = new uint256[](2);
+        poolWeights[0] = 0.01e18;
+        poolWeights[1] = 0.01e18;
+        assertEq(IWeightedPool(address(mockPool)).getNormalizedWeights(), poolWeights);
+        
+        int256[] memory getCurrentWeightsAndMultipliers = mockPool.getWeights();
+
+        assertEq(getCurrentWeightsAndMultipliers[0], 0.01e18);
+        assertEq(getCurrentWeightsAndMultipliers[1], 0.01e18);
+        assertEq(getCurrentWeightsAndMultipliers[2], 0.0049e18);
+        assertEq(getCurrentWeightsAndMultipliers[3], 0.0049e18);
+    }
+
+
+    function testSetTargetWeightsManuallyFailsOwnerPermAdminFails() public {
+        int256[] memory weights = new int256[](2);
+        weights[0] = 0.0000000005e18;
+        weights[1] = 0.0000000005e18;
+        mockPool.setPoolRegistry(8);
+
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 8);
+
+        vm.expectRevert("ONLYMANAGER");
+        updateWeightRunner.setWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
+
+    function testSetTargetWeightsManuallyInitiallyNonOwnerFails() public {
+        int256[] memory weights = new int256[](2);
+        weights[0] = 0.0000000005e18;
+        weights[1] = 0.0000000005e18;
+
+        vm.startPrank(addr1);
+        vm.expectRevert("No permission to set weight values");
+        updateWeightRunner.setTargetWeightsManually(weights, address(mockPool), 6, 2);
+    }
+
+    function testSetTargetWeightsManuallyOwnerPermedNonOwnerFails() public {
+        int256[] memory weights = new int256[](2);
+        weights[0] = 0.0000000005e18;
+        weights[1] = 0.0000000005e18;
+        mockPool.setPoolRegistry(8);
+
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 8);
+        vm.stopPrank();
+
+        vm.startPrank(addr1);
+        vm.expectRevert("ONLYMANAGER");
+        updateWeightRunner.setTargetWeightsManually(weights, address(mockPool), 6, 2);
+    }
+
+    function testSetTargetWeightsManuallyAdminPermedNonOwnerFails() public {
+        int256[] memory weights = new int256[](4);
+        weights[0] = 0.0000000005e18;
+        weights[1] = 0.0000000005e18;
+        weights[2] = 0;
+        weights[3] = 0;
+
+        mockPool.setPoolRegistry(16);
+
+        vm.startPrank(owner);
+        updateWeightRunner.setApprovedActionsForPool(address(mockPool), 16);
+        mockPool.setInitialWeights(weights);
+        vm.stopPrank();
+
+        vm.startPrank(addr1);
+        vm.expectRevert("ONLYADMIN");
+        updateWeightRunner.setTargetWeightsManually(weights, address(mockPool), 6, 2);
+        vm.stopPrank();
+    }
 
     function testCalculateMultiplierAndSetWeightsFromRuleSuccess() public {
         int256[] memory weights = new int256[](4);

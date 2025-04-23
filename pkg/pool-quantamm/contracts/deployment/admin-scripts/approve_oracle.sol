@@ -14,6 +14,16 @@ import "../../ChainlinkOracle.sol";
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
 
 
+interface IDelayModifier {
+    function executeNextTx(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        uint8 operation
+    ) external;
+}
+
+
 contract Deploy is Script {
     function run() external {
         uint256 deployerPrivateKey;
@@ -27,9 +37,27 @@ contract Deploy is Script {
             vm.startBroadcast();
         }
 
-        UpdateWeightRunner(0xCf70bf72e52c60D4B378F302c3798fdd7247709a).addOracle(OracleWrapper(0xdA841aEEE267b4607f8F0F3622e99060D64644EF));
-        UpdateWeightRunner(0xCf70bf72e52c60D4B378F302c3798fdd7247709a).addOracle(OracleWrapper(0x809CEbbb376A97D175570b5c71ED2a219ACd6f21));
-        UpdateWeightRunner(0xCf70bf72e52c60D4B378F302c3798fdd7247709a).addOracle(OracleWrapper(0xb71a9eeD4Ae116A1a9600F4B1d045F2eb91Ba66A));
+
+        // replace with your deployed addresses & payload
+        IDelayModifier delay = IDelayModifier(0x4F824dDe06314a7Aa1091902d17B82c4b519F424);
+        address target       = 0x34932B2670BC4fb110fBe7772f0fC9905269705E;
+        uint256 value        = 0;
+        bytes memory data = hex"df5dd1a50000000000000000000000006fe415f986b12da4381d7082ca0223a0a49771a9";
+        uint8   operation    = 0;
+
+        delay.executeNextTx(target, value, data, operation);
+
+        //BTC
+        //UpdateWeightRunner(0x34932B2670BC4fb110fBe7772f0fC9905269705E).addOracle(OracleWrapper(0x6fE415F986b12Da4381d7082CA0223a0a49771A9));
+//
+        ////ETH
+        //UpdateWeightRunner(0x34932B2670BC4fb110fBe7772f0fC9905269705E).addOracle(OracleWrapper(0x70BE6803cD94EEecA55603C25a550d78D619B037));
+//
+        ////PAXG
+        //UpdateWeightRunner(0x34932B2670BC4fb110fBe7772f0fC9905269705E).addOracle(OracleWrapper(0x2E24826974Cd23bb851dBdbFD838521c61A530b3));
+//
+        ////USDC
+        //UpdateWeightRunner(0x34932B2670BC4fb110fBe7772f0fC9905269705E).addOracle(OracleWrapper(0x47eD785C84376F49610b90cea0A88dAe447B7881));
         
         vm.stopBroadcast();
     }

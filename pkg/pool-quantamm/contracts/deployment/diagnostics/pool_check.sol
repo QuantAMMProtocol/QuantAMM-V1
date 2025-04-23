@@ -33,10 +33,10 @@ contract Deploy is Script {
             vm.startBroadcast();
         }
 
-        address pool = 0x6663545aF63bC3268785Cf859f0608506759EBe8
+        address pool = 0x5C427119ad1676d08e8cbaB2BcAEfe9ce334A29c
 ;
-        address rule = 0xfA9d23F4dd92F1C4fEB330848906d0d4C386EbF2;
-        address updateWeightRunnerAddress = 0x26570ad4CC61eA3E944B1c4660416E45796D44b3;
+        address rule = 0xb7Fe8caBBA9B05f59da643748ba725564aE496C1;
+        address updateWeightRunnerAddress = 0x4397d0D8dCc24a5A6a007B768a1CFB45bF37267D;
 
         IQuantAMMWeightedPool.QuantAMMWeightedPoolDynamicData memory weights = QuantAMMWeightedPool(
             pool
@@ -112,20 +112,18 @@ contract Deploy is Script {
 
         console.log("intermediate state");
 
-        int256[] memory intermediateState = MomentumUpdateRule(rule)
-            .getIntermediateGradientState(pool, 4);
+        int256[] memory intermediateState = PowerChannelUpdateRule(rule)
+            .getIntermediateGradientState(pool, 3);
         console.logInt(intermediateState[0]);
         console.logInt(intermediateState[1]);
         console.logInt(intermediateState[2]);
-        console.logInt(intermediateState[3]);
 
 
-        int256[] memory movingAverages = MomentumUpdateRule(rule)
-            .getMovingAverages(pool, 4);
+        int256[] memory movingAverages = PowerChannelUpdateRule(rule)
+            .getMovingAverages(pool, 3);
         console.logInt(intermediateState[0]);
         console.logInt(intermediateState[1]);
         console.logInt(intermediateState[2]);
-        console.logInt(intermediateState[3]);
 
         console.log("movingAverages");
         for (uint256 i = 0; i < movingAverages.length; i++) {

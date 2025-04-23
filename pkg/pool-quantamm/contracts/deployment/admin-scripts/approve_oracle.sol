@@ -40,7 +40,7 @@ contract Deploy is Script {
 
         // replace with your deployed addresses & payload
         IDelayModifier delay = IDelayModifier(0x4F824dDe06314a7Aa1091902d17B82c4b519F424);
-        address target       = 0x34932B2670BC4fb110fBe7772f0fC9905269705E;
+        address target       = 0xeE20C7956bd715052DF13DB9BD77984Eab85F0C4;
         uint256 value        = 0;
         bytes memory data = hex"df5dd1a50000000000000000000000006fe415f986b12da4381d7082ca0223a0a49771a9";
         uint8   operation    = 0;

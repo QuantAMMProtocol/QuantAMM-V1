@@ -135,7 +135,9 @@ contract Deploy is Script {
                 console.log(uint256(intermediateState[i]).toString());
             }
         }
-
+        
+        int256[] memory movingAverages = PowerChannelUpdateRule(rule)
+                    .getMovingAverages(pool, 3);
         console.log("movingAverages");
         for (uint256 i = 0; i < movingAverages.length; i++) {
             console.logInt(int256(movingAverages[i]));

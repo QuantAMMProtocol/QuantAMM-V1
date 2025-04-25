@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import "forge-std/console.sol";  // Import the console library for logging
-import {Script} from "forge-std/Script.sol";
+import "forge-std/console.sol"; // Import the console library for logging
+import { Script } from "forge-std/Script.sol";
 import "../../rules/AntimomentumUpdateRule.sol";
 import "../../rules/MomentumUpdateRule.sol";
 import "../../rules/DifferenceMomentumUpdateRule.sol";
@@ -23,7 +23,8 @@ contract Deploy is Script {
         uint256 deployerPrivateKey;
 
         // Only load the private key if broadcasting (i.e., not dry run)
-        if (block.chainid != 11155111) { // Replace 11155111 with the chain ID you're working with (e.g., Sepolia)
+        if (block.chainid != 11155111) {
+            // Replace 11155111 with the chain ID you're working with (e.g., Sepolia)
             deployerPrivateKey = vm.envUint("PRIVATE_KEY");
             vm.startBroadcast(deployerPrivateKey);
         } else {
@@ -76,7 +77,6 @@ contract Deploy is Script {
             uint48(block.timestamp + 24 hours) // Expiry: 24 hours from now
         );
 
-
         uint256[] memory weights = new uint256[](4);
         weights[0] = uint256(1000000);
         weights[1] = uint256(1000000);
@@ -93,7 +93,7 @@ contract Deploy is Script {
             false,
             bytes("")
         );
-        
+
         vm.stopBroadcast();
     }
 }

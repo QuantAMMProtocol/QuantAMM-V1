@@ -20,21 +20,24 @@ import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
 
 contract Deploy is Script {
     function run() external {
-        uint256 deployerPrivateKey;
+        // For dry runs, we don't need a private key
+        vm.startBroadcast();
 
-        // Only load the private key if broadcasting (i.e., not dry run)
-        if (block.chainid != 11155111) {
-            // Replace 11155111 with the chain ID you're working with (e.g., Sepolia)
-            deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-            vm.startBroadcast(deployerPrivateKey);
-        } else {
-            // For dry runs, we don't need a private key
-            vm.startBroadcast();
-        }
+        IERC20(0x314fDFAf8AD9b50fF105993C722a1826019Cf21D).approve(0xAE563E3f8219521950555F5962419C8919758Ea2, type(uint256).max);
 
-        UpdateWeightRunner(0x26570ad4CC61eA3E944B1c4660416E45796D44b3).InitialisePoolLastRunTime(
-            0x6663545aF63bC3268785Cf859f0608506759EBe8,
-            uint40(10)
+        uint256[] memory minAmountsOut = new uint256[](3);
+        minAmountsOut[0] = uint256(0);
+        minAmountsOut[1] = uint256(0);
+        minAmountsOut[2] = uint256(0);
+
+        bytes memory userData = "";
+
+        uint256[] memory amountIn = IRouter(0xAE563E3f8219521950555F5962419C8919758Ea2).removeLiquidityProportional(
+            0x314fDFAf8AD9b50fF105993C722a1826019Cf21D,
+            uint256(0.2646781979e18),
+            minAmountsOut,
+            false,
+            userData
         );
 
         vm.stopBroadcast();

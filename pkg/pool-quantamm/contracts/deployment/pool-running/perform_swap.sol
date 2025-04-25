@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import "forge-std/console.sol";  // Import the console library for logging
-import {Script} from "forge-std/Script.sol";
+import "forge-std/console.sol"; // Import the console library for logging
+import { Script } from "forge-std/Script.sol";
 import "../../rules/AntimomentumUpdateRule.sol";
 import "../../rules/MomentumUpdateRule.sol";
 import "../../rules/DifferenceMomentumUpdateRule.sol";
@@ -18,20 +18,15 @@ import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol"
 
 import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {
-    SwapKind,
-    VaultSwapParams
-} from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
+import { SwapKind, VaultSwapParams } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 
 contract Deploy is Script {
-
     function run() external {
-
-
         uint256 deployerPrivateKey;
 
         // Only load the private key if broadcasting (i.e., not dry run)
-        if (block.chainid != 11155111) { // Replace 11155111 with the chain ID you're working with (e.g., Sepolia)
+        if (block.chainid != 11155111) {
+            // Replace 11155111 with the chain ID you're working with (e.g., Sepolia)
             deployerPrivateKey = vm.envUint("PRIVATE_KEY");
             vm.startBroadcast(deployerPrivateKey);
         } else {
@@ -47,10 +42,9 @@ contract Deploy is Script {
             limitRaw: 1e18, // Replace with the actual limit
             userData: ""
         });
-        
-        IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9)
-        .swap(params);
-        
+
+        IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9).swap(params);
+
         vm.stopBroadcast();
     }
 }

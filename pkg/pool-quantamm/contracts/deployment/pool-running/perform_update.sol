@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.26;
 
-import "forge-std/console.sol";  // Import the console library for logging
-import {Script} from "forge-std/Script.sol";
+import "forge-std/console.sol"; // Import the console library for logging
+import { Script } from "forge-std/Script.sol";
 import "../../rules/AntimomentumUpdateRule.sol";
 import "../../rules/MomentumUpdateRule.sol";
 import "../../rules/DifferenceMomentumUpdateRule.sol";
@@ -22,19 +22,15 @@ contract Deploy is Script {
     function run() external {
         uint256 deployerPrivateKey;
 
-        // Only load the private key if broadcasting (i.e., not dry run)
-        if (block.chainid != 11155111) { // Replace 11155111 with the chain ID you're working with (e.g., Sepolia)
-            deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-            vm.startBroadcast(deployerPrivateKey);
-        } else {
-            // For dry runs, we don't need a private key
-            vm.startBroadcast();
-        }
+        // For dry runs, we don't need a private key
+        vm.startBroadcast();
 
-        UpdateWeightRunner(0x26570ad4CC61eA3E944B1c4660416E45796D44b3)
-        .performUpdate(0x6663545aF63bC3268785Cf859f0608506759EBe8
-);
-        
+        address pool = 0x314fDFAf8AD9b50fF105993C722a1826019Cf21D;
+        address rule = 0x62B9eC6A5BBEBe4F5C5f46C8A8880df857004295;
+        address updateWeightRunnerAddress = 0x21Ae9576a393413D6d91dFE2543dCb548Dbb8748;
+
+        UpdateWeightRunner(updateWeightRunnerAddress).performUpdate(pool);
+
         vm.stopBroadcast();
     }
 }

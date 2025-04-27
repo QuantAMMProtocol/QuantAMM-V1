@@ -61,14 +61,14 @@ contract Deploy is Script {
         );
 
         uint256[] memory weights = new uint256[](3);
-        weights[0] = uint256(47125);
-        weights[1] = uint256(409000000000000000);
-        weights[2] = uint256(44021591);
+        weights[0] = uint256(126506);
+        weights[1] = uint256(1126277192074030000);
+        weights[2] = uint256(119423884);
 
         //IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9).sendTo(IERC20(0xff34b3d4aee8ddcd6f9afffb6fe49bd371b8a357), msg.sender, uint256(1));
         //IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9).sendTo(IERC20(0x29f2D40B0605204364af54EC677bD022dA425d03), msg.sender, uint256(1));
         uint256 amountIn = IRouter(0xAE563E3f8219521950555F5962419C8919758Ea2).initialize(
-            0x9D430BFE48f2FCFd9a3964987144Eee2d7d5b4E9,
+            0xd4Ed17bBF48Af09B87fD7d8C60970f5Da79D4852,
             tokenAddresses,
             weights,
             0,

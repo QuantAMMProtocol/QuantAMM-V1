@@ -31,7 +31,7 @@ contract Deploy is Script {
         // For dry runs, we don't need a private key
         vm.startBroadcast();
 
-        address pool = 0x9D430BFE48f2FCFd9a3964987144Eee2d7d5b4E9;
+        address pool = 0xd4Ed17bBF48Af09B87fD7d8C60970f5Da79D4852;
         address rule = 0x62B9eC6A5BBEBe4F5C5f46C8A8880df857004295;
         address updateWeightRunnerAddress = 0x21Ae9576a393413D6d91dFE2543dCb548Dbb8748;
 
@@ -167,6 +167,44 @@ contract Deploy is Script {
         console.logUint(registry);
         console.log(registry.toString());
 
+        console.log("getPoolRuleSettings");
+        IUpdateWeightRunner.PoolRuleSettings memory ruleSettings = UpdateWeightRunner(updateWeightRunnerAddress)
+            .getPoolRuleSettings(pool);
+            console.log("Lambda");
+            for (uint256 i = 0; i < ruleSettings.lambda.length; i++) {
+                console.logUint(ruleSettings.lambda[i]);
+                console.log(ruleSettings.lambda[i].toString());
+            }
+
+            console.log("Timing Settings");
+            console.logUint(ruleSettings.timingSettings.updateInterval);
+            console.log(ruleSettings.timingSettings.updateInterval.toString());
+            console.log("Last Pool Update Run");
+            console.logUint(ruleSettings.timingSettings.lastPoolUpdateRun);
+            console.log(ruleSettings.timingSettings.lastPoolUpdateRun.toString());
+
+            console.log("Epsilon Max");
+            console.logUint(ruleSettings.epsilonMax);
+            console.log(ruleSettings.epsilonMax.toString());
+
+            console.log("Absolute Weight Guard Rail");
+            console.logUint(ruleSettings.absoluteWeightGuardRail);
+            console.log(ruleSettings.absoluteWeightGuardRail.toString());
+
+            console.log("Rule Parameters");
+            for (uint256 i = 0; i < ruleSettings.ruleParameters.length; i++) {
+                for (uint256 j = 0; j < ruleSettings.ruleParameters[i].length; j++) {
+                    console.logInt(ruleSettings.ruleParameters[i][j]);
+                    if (ruleSettings.ruleParameters[i][j] < 0) {
+                        console.log(string.concat("-", uint256(-ruleSettings.ruleParameters[i][j]).toString()));
+                    } else {
+                        console.log(uint256(ruleSettings.ruleParameters[i][j]).toString());
+                    }
+                }
+            }
+
+            console.log("Pool Manager");
+            console.log(ruleSettings.poolManager);
         vm.stopBroadcast();
     }
 }

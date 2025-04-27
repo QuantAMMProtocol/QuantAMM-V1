@@ -24,6 +24,8 @@ contract Deploy is Script {
         vm.startBroadcast();
         address pool = 0x9D430BFE48f2FCFd9a3964987144Eee2d7d5b4E9;
 
+        address permit2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+        address router = 0xAE563E3f8219521950555F5962419C8919758Ea2;
         // Approve permit2 contract on token
         IERC20(pool).approve(permit2, type(uint256).max);
         // Approve router on Permit2

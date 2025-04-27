@@ -24,26 +24,54 @@ contract Deploy is Script {
     function run() external {
         uint256 deployerPrivateKey;
 
-        // Only load the private key if broadcasting (i.e., not dry run)
-        if (block.chainid != 11155111) {
-            // Replace 11155111 with the chain ID you're working with (e.g., Sepolia)
-            deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-            vm.startBroadcast(deployerPrivateKey);
-        } else {
             // For dry runs, we don't need a private key
             vm.startBroadcast();
-        }
-        VaultSwapParams memory params = VaultSwapParams({
-            kind: SwapKind.EXACT_IN,
-            pool: 0x6663545aF63bC3268785Cf859f0608506759EBe8,
-            tokenIn: IERC20(0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8), // Replace with actual tokenIn address
-            tokenOut: IERC20(0x29f2D40B0605204364af54EC677bD022dA425d03), // Replace with actual tokenOut address
-            amountGivenRaw: 100, // Replace with the actual amount
-            limitRaw: 1e18, // Replace with the actual limit
-            userData: ""
-        });
+        address pool = 0xd4Ed17bBF48Af09B87fD7d8C60970f5Da79D4852;
+        address permit2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+        address router = 0xAE563E3f8219521950555F5962419C8919758Ea2;
 
-        IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9).swap(params);
+        ////Approve token 0 using Permit2
+        //IPermit2(permit2).approve(
+        //    0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
+        //    router, // The contract that will spend tokens
+        //    uint160(type(uint256).max), // Amount to approve
+        //    uint48(block.timestamp + 24 hours) // Expiry: 24 hours from now
+        //);
+//
+        ////Approve token 0 using Permit2
+        //IPermit2(permit2).approve(
+        //    0x45804880De22913dAFE09f4980848ECE6EcbAf78,
+        //    router, // The contract that will spend tokens
+        //    uint160(type(uint256).max), // Amount to approve
+        //    uint48(block.timestamp + 24 hours) // Expiry: 24 hours from now
+        //);
+
+
+        //Approve token 0 using Permit2
+        IPermit2(permit2).approve(
+            0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599,
+            router, // The contract that will spend tokens
+            uint160(type(uint256).max), // Amount to approve
+            uint48(block.timestamp + 24 hours) // Expiry: 24 hours from now
+        );
+
+        //Approve permit2 contract on token
+        //IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).approve(permit2, type(uint256).max);
+        //IERC20(0x45804880De22913dAFE09f4980848ECE6EcbAf78).approve(permit2, type(uint256).max);
+        IERC20(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599).approve(permit2, type(uint256).max);
+        //Approve router on Permit2
+        //IPermit2(permit2).approve(pool, router, type(uint160).max, type(uint48).max);
+
+        uint256 amountOut = IRouter(router).swapSingleTokenExactIn(
+            pool, // pool
+            IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48), // tokenIn
+            IERC20(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599), // tokenOut
+            9364160, // exactAmountIn
+            0, // minAmountOut
+            999999999999999999, // deadline
+            false, // wethIsEth
+            "" // userData
+        );
 
         vm.stopBroadcast();
     }

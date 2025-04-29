@@ -22,7 +22,7 @@ contract Deploy is Script {
     function run() external {
         // For dry runs, we don't need a private key
         vm.startBroadcast();
-        address pool = 0x9D430BFE48f2FCFd9a3964987144Eee2d7d5b4E9;
+        address pool = 0xd4Ed17bBF48Af09B87fD7d8C60970f5Da79D4852;
         address permit2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
         address router = 0xAE563E3f8219521950555F5962419C8919758Ea2;
         // Approve permit2 contract on token
@@ -66,9 +66,9 @@ contract Deploy is Script {
 
 
         uint256[] memory amountIn = new uint256[](3);
-        amountIn[0] = uint256(62785);
-        amountIn[1] = uint256(569019341313499000);
-        amountIn[2] = uint256(60000000);
+        amountIn[0] = uint256(0);
+        amountIn[1] = uint256(0);
+        amountIn[2] = uint256(0);
         bytes memory userData = "";
 
         uint256 amountOut = IRouter(router).addLiquidityUnbalanced(

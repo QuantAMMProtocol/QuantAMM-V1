@@ -653,6 +653,73 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         //it also centralises logic for weight vectors, just like normal rules, zk rules do not to duplicate logic somewhere else.
         _calculateMultiplerAndSetWeights(params);
     }
+/// @notice Breakglass function to allow the admin or the pool manager to set the quantammAdmins weights manually
+    /// @param _weights the new weights
+    /// @param _poolAddress the target pool
+    /// @param _interpolationTime the time required to calcluate the multiplier
+    /// @param _numberOfAssets the number of assets in the pool
+    /// @dev this function is different to setWeightsManually as it is more timelock friendly
+    function setTargetWeightsManually(
+        int256[] calldata _weights,
+        address _poolAddress,
+        uint40 _interpolationTime,
+        uint _numberOfAssets
+    ) external {
+        //CODEHAWKS M-02 redeployment of update weight runners means really it is a better
+        //design to have pool creator trusted managed pools as a separate factory and weight runner
+        uint256 poolRegistryEntry = approvedPoolActions[_poolAddress];
+        if (poolRegistryEntry & MASK_POOL_OWNER_UPDATES > 0) {
+            require(msg.sender == poolRuleSettings[_poolAddress].poolManager, "ONLYMANAGER");
+        } else if (poolRegistryEntry & MASK_POOL_QUANTAMM_ADMIN_UPDATES > 0) {
+            require(msg.sender == quantammAdmin, "ONLYADMIN");
+        } else {
+            revert("No permission to set weight values");
+        }
+        
+        //though we try to keep manual overrides as open as possible for unknown unknows
+        //given how the math library works weights it is easiest to define weights as 18dp
+        //even though technically G3M works of the ratio between them so it is not strictly necessary
+        //CYFRIN L-02
+        for (uint i; i < _weights.length; i++) {
+            if (i < _numberOfAssets) {
+                //CODEHAWKS M-08 change to weighted math underlying limits
+                require(_weights[i] >= 0.01e18, "Below min allowed weight");
+                require(_weights[i] <= 0.99e18, "Above max allowed weight");
+            }
+        }
+
+        uint256[] memory currentWeightsUnsigned = IQuantAMMWeightedPool(_poolAddress).getNormalizedWeights();
+        int256[] memory currentWeights = new int256[](currentWeightsUnsigned.length);
+
+        require(currentWeightsUnsigned.length == _weights.length, "Weights length mismatch");
+
+        for (uint i; i < currentWeights.length; ) {
+            currentWeights[i] = int256(currentWeightsUnsigned[i]);
+            unchecked {
+                i++;
+            }
+        }
+
+        _calculateMultiplerAndSetWeights(
+            CalculateMuliplierAndSetWeightsLocal({
+                currentWeights: currentWeights,
+                updatedWeights: _weights,
+                updateInterval: int256(int40(_interpolationTime)),
+                absoluteWeightGuardRail18: int256(int64(poolRuleSettings[_poolAddress].absoluteWeightGuardRail)),
+                poolAddress: _poolAddress
+            })
+        );
+
+        IQuantAMMWeightedPool.QuantAMMWeightedPoolDynamicData memory dynamicData = IQuantAMMWeightedPool(_poolAddress).getQuantAMMWeightedPoolDynamicData();
+        
+        emit SetWeightManual(
+            msg.sender,
+            _poolAddress,
+            flattenDynamicDataWeightAndMutlipliers(dynamicData.firstFourWeightsAndMultipliers, dynamicData.secondFourWeightsAndMultipliers),
+            dynamicData.lastInteropTime,
+            uint40(block.timestamp)
+        );
+    }
 
     /// @notice Breakglass function to allow the admin or the pool manager to set the quantammAdmins weights manually
     /// @param _weights the new weights

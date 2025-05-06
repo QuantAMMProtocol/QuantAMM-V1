@@ -149,6 +149,19 @@ interface IUpdateWeightRunner {
         uint40 _time
     ) external ;
 
+/// @notice Breakglass function to allow the admin or the pool manager to set the quantammAdmins weights manually
+    /// @param _weights the new weights
+    /// @param _poolAddress the target pool
+    /// @param _interpolationTime the time required to calcluate the multiplier
+    /// @param _numberOfAssets the number of assets in the pool
+    /// @dev this function is different to setWeightsManually as it is more timelock friendly
+    function setTargetWeightsManually(
+        int256[] calldata _weights,
+        address _poolAddress,
+        uint40 _interpolationTime,
+        uint _numberOfAssets
+    ) external ;
+
     /// @notice Breakglass function to allow the admin or the pool manager to set the quantammAdmins weights manually
     /// @param _weights the new weights
     /// @param _poolAddress the target pool

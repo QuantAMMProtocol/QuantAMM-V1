@@ -437,7 +437,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         uint256[] memory amountsOutRaw,
         uint256[] memory,
         bytes memory userData
-    ) public override onlySelfRouter(router) returns (bool, uint256[] memory hookAdjustedAmountsOutRaw) {
+    ) public override onlyVault onlySelfRouter(router) returns (bool, uint256[] memory hookAdjustedAmountsOutRaw) {
         address userAddress = address(bytes20(userData));
 
         AfterRemoveLiquidityData memory localData = AfterRemoveLiquidityData({

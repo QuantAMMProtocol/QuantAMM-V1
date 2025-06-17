@@ -587,6 +587,10 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         if (poolAddress == address(0)) {
             revert TransferUpdateTokenIDInvalid(_from, _to, _tokenID);
         }
+        
+        if (poolsFeeData[poolAddress][_to].length >= 100) {
+            revert TooManyDeposits(poolAddress, _to);
+        }
 
         int256[] memory prices = IUpdateWeightRunner(_updateWeightRunner).getData(poolAddress);
         uint256 lpTokenDepositValueNow = getPoolLPTokenValue(prices, poolAddress, MULDIRECTION.MULDOWN);

@@ -139,6 +139,9 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     /// @notice The % of the total swap fee that is allocated to the protocol for running costs.
     uint256 public quantAMMSwapFeeTake = 0.5e18;
 
+    /// @notice The % of the total swap fee that is allocated to the protocol for running costs.
+    uint256 public quantAMMUpliftFeeTake = 0.5e18;
+
     function setQuantAMMSwapFeeTake(uint256 _quantAMMSwapFeeTake) external override {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
         require(_quantAMMSwapFeeTake <= 1e18, "Swap fee must be less than 100%");
@@ -157,15 +160,15 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
     function setQuantAMMUpliftFeeTake(uint256 _quantAMMUpliftFeeTake) external {
         require(msg.sender == quantammAdmin, "ONLYADMIN");
         require(_quantAMMUpliftFeeTake <= 1e18, "Uplift fee must be less than 100%");
-        uint256 oldSwapFee = quantAMMSwapFeeTake;
-        quantAMMSwapFeeTake = _quantAMMUpliftFeeTake;
+        uint256 oldUplFee = quantAMMUpliftFeeTake;
+        quantAMMUpliftFeeTake = _quantAMMUpliftFeeTake;
 
-        emit UpliftFeeTakeSet(oldSwapFee, _quantAMMUpliftFeeTake);
+        emit UpliftFeeTakeSet(oldUplFee, _quantAMMUpliftFeeTake);
     }
 
     /// @notice Get the quantAMM uplift fee % amount allocated to the protocol for running costs
     function getQuantAMMUpliftFeeTake() external view returns (uint256) {
-        return quantAMMSwapFeeTake;
+        return quantAMMUpliftFeeTake;
     }
 
     function getQuantAMMAdmin() external view override returns (address) {

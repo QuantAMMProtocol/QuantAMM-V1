@@ -328,7 +328,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                     hookAdjustedAmountCalculatedRaw += hookFee;
                 }
 
-                uint256 quantAMMFeeTake = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
+                uint256 quantAMMFeeTake = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMSwapFeeTake();
                 uint256 ownerFee = hookFee;
 
                 if (quantAMMFeeTake > 0) {

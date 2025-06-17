@@ -92,7 +92,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
 
     uint64 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16; // 0.001%
     uint64 private constant _MAX_SWAP_FEE_PERCENTAGE = 10e16; // 10%
-
+    uint64 public immutable _MAX_UPLIFT_FEE_PERCENTAGE = 5000; // 10%
     /**
      * @notice A new `UpliftOnlyExampleRegistered` contract has been registered successfully for a given pool.
      * @dev If the registration fails the call will revert, so there will be no event.
@@ -476,6 +476,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                 int256(localData.lpTokenDepositValueNow);
 
             uint256 feePerLP;
+            
             // if the pool has increased in value since the deposit, the fee is calculated based on the deposit value
             if (localData.lpTokenDepositValueChange > 0) {
                 feePerLP =
@@ -487,6 +488,10 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                 //in most cases this should be a normal swap fee amount.
                 //there always myst be at least the swap fee amount to avoid deposit/withdraw attack surgace.
                 feePerLP = (uint256(minWithdrawalFeeBps) * 1e18) / 10000;
+            }
+
+            if (feePerLP > (_MAX_UPLIFT_FEE_PERCENTAGE * 1e18) / 10000) {
+                feePerLP = (_MAX_UPLIFT_FEE_PERCENTAGE * 1e18) / 10000;
             }
 
             // if the deposit is less than the amount left to burn, burn the whole deposit and move on to the next

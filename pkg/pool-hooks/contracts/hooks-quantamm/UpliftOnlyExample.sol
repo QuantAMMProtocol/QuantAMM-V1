@@ -620,7 +620,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                 // Update the deposit value to the current value of the pool in base currency (e.g. USD) and the block index to the current block number
                 //vault.transferLPTokens(_from, _to, feeDataArray[i].amount);
                 feeDataArray[tokenIdIndex].lpTokenDepositValue = lpTokenDepositValueNow;
-                feeDataArray[tokenIdIndex].blockTimestampDeposit = uint32(block.number);
+                feeDataArray[tokenIdIndex].blockTimestampDeposit = uint40(block.timestamp);
 
                 //actual transfer not a afterTokenTransfer caused by a burn
                 poolsFeeData[poolAddress][_to].push(feeDataArray[tokenIdIndex]);

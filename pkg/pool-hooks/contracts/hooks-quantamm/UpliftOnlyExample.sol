@@ -332,7 +332,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                 uint256 ownerFee = hookFee;
 
                 if (quantAMMFeeTake > 0) {
-                    uint256 adminFee = hookFee / (1e18 / quantAMMFeeTake);
+                    uint256 adminFee = hookFee * quantAMMFeeTake / 1e18;
                     ownerFee = hookFee - adminFee;
                     address quantAMMAdmin = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin();
                     _vault.sendTo(feeToken, quantAMMAdmin, adminFee);
@@ -534,6 +534,10 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         }
 
         if (localData.adminFeePercent > 0) {
+            for (uint256 i = 0; i < localData.accruedQuantAMMFees.length; i++) {
+                localData.accruedQuantAMMFees[i] += 1;
+                hookAdjustedAmountsOutRaw[i] -= 1;
+            }
             _vault.addLiquidity(
                 AddLiquidityParams({
                     pool: localData.pool,

@@ -162,6 +162,14 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
      */
     error TooManyDeposits(address pool, address depositor);
 
+        /**
+     * @notice To avoid Ddos issues, a single depositor can only deposit 100 times
+     * @param pool The pool the depositor is attempting to deposit to
+     * @param depositor The address of the depositor
+     */
+    error TooFastDeposits(address pool, address depositor);
+
+
     /**
      * @notice Attempted withdrawal of an NFT-associated position by an address that is not the owner.
      * @param withdrawer The address attempting to withdraw
@@ -227,11 +235,13 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         if (currentLength > 100) {
             revert TooManyDeposits(pool, msg.sender);
         }
-        
+
         if(currentLength > 0){
             //There is a possibility that multiple deposits and transfers in the same block can be exploited.
             uint256 lastTimestamp = poolsFeeData[pool][msg.sender][currentLength - 1].blockTimestampDeposit;
-            require(block.timestamp - lastTimestamp > 1, "TOO_FREQUENT_DEPOSITS");
+            if (block.timestamp - lastTimestamp <= 1) {
+                revert TooFastDeposits(pool, msg.sender);
+            }
         }
 
         // Do addLiquidity operation - BPT is minted to this contract.

@@ -185,7 +185,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
      * @param to The address the NFT is being transferred to
      * @param tokenId The token ID being transferred
      */
-    error TransferUpdateTokenIDInvaid(address from, address to, uint256 tokenId);
+    error TransferUpdateTokenIDInvalid(address from, address to, uint256 tokenId);
 
     modifier onlySelfRouter(address router) {
         _ensureSelfRouter(router);
@@ -585,7 +585,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         address poolAddress = nftPool[_tokenID];
 
         if (poolAddress == address(0)) {
-            revert TransferUpdateTokenIDInvaid(_from, _to, _tokenID);
+            revert TransferUpdateTokenIDInvalid(_from, _to, _tokenID);
         }
 
         int256[] memory prices = IUpdateWeightRunner(_updateWeightRunner).getData(poolAddress);

@@ -904,7 +904,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.stopPrank();
 
         vm.startPrank(address(upliftOnlyRouter.lpNFT()));
-        vm.expectRevert(abi.encodeWithSelector(UpliftOnlyExample.TransferUpdateTokenIDInvaid.selector, bob, lp, 2));
+        vm.expectRevert(abi.encodeWithSelector(UpliftOnlyExample.TransferUpdateTokenIDInvalid.selector, bob, lp, 2));
         upliftOnlyRouter.afterUpdate(bob, lp, 2);
         vm.stopPrank();
     }

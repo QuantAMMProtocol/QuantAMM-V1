@@ -472,7 +472,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             localData.lpTokenDepositValue = feeDataArray[i].lpTokenDepositValue;
 
             localData.lpTokenDepositValueChange =
-                (int256(localData.lpTokenDepositValueNow) - int256(localData.lpTokenDepositValue)) /
+                ((int256(localData.lpTokenDepositValueNow) - int256(localData.lpTokenDepositValue)) * 1e18) /
                 int256(localData.lpTokenDepositValueNow);
 
             uint256 feePerLP;

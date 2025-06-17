@@ -340,7 +340,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                 }
 
                 if (ownerFee > 0) {
-                    _vault.sendTo(feeToken, address(this), ownerFee);
+                    _vault.sendTo(feeToken, owner(), ownerFee);
 
                     emit SwapHookFeeCharged(address(this), feeToken, ownerFee);
                 }

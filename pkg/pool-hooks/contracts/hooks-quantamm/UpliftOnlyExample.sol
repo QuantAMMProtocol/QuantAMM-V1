@@ -473,7 +473,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
 
             localData.lpTokenDepositValueChange =
                 (int256(localData.lpTokenDepositValueNow) - int256(localData.lpTokenDepositValue)) /
-                int256(localData.lpTokenDepositValue);
+                int256(localData.lpTokenDepositValueNow);
 
             uint256 feePerLP;
             // if the pool has increased in value since the deposit, the fee is calculated based on the deposit value

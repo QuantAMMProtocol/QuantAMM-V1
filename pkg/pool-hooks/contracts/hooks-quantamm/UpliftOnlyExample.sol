@@ -223,9 +223,17 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         bool wethIsEth,
         bytes memory userData
     ) external payable saveSender(msg.sender) returns (uint256[] memory amountsIn) {
-        if (poolsFeeData[pool][msg.sender].length > 100) {
+        uint256 currentLength = poolsFeeData[pool][msg.sender].length;
+        if (currentLength > 100) {
             revert TooManyDeposits(pool, msg.sender);
         }
+        
+        if(currentLength > 0){
+            //There is a possibility that multiple deposits and transfers in the same block can be exploited.
+            uint256 lastTimestamp = poolsFeeData[pool][msg.sender][currentLength - 1].blockTimestampDeposit;
+            require(block.timestamp - lastTimestamp > 1, "TOO_FREQUENT_DEPOSITS");
+        }
+
         // Do addLiquidity operation - BPT is minted to this contract.
         amountsIn = _addLiquidityProportional(
             pool,

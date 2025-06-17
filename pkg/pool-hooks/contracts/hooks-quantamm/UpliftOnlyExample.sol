@@ -621,7 +621,6 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                 //vault.transferLPTokens(_from, _to, feeDataArray[i].amount);
                 feeDataArray[tokenIdIndex].lpTokenDepositValue = lpTokenDepositValueNow;
                 feeDataArray[tokenIdIndex].blockTimestampDeposit = uint32(block.number);
-                feeDataArray[tokenIdIndex].upliftFeeBps = upliftFeeBps;
 
                 //actual transfer not a afterTokenTransfer caused by a burn
                 poolsFeeData[poolAddress][_to].push(feeDataArray[tokenIdIndex]);

@@ -438,6 +438,10 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
         vm.stopPrank();
 
+        vm.prank(owner);
+        UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
+        vm.stopPrank();
+
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
         assertEq(
@@ -530,6 +534,10 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
         upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        vm.stopPrank();
+
+        vm.prank(owner);
+        UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
         vm.stopPrank();
 
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
@@ -630,6 +638,10 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
         upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        vm.stopPrank();
+
+        vm.prank(owner);
+        UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
         vm.stopPrank();
 
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
@@ -952,12 +964,12 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         vm.expectEmit();
         emit UpliftOnlyExample.HookSwapFeePercentageChanged(poolHooksContract, hookFeePercentage);
-
+        
         vm.prank(owner);
         UpliftOnlyExample(payable(poolHooksContract)).setHookSwapFeePercentage(hookFeePercentage);
         uint256 hookFee = swapAmount.mulUp(hookFeePercentage);
 
-        BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
+        BaseVaultTest.Balances memory balancesBefore = getBalances(owner);
 
         vm.prank(bob);
         vm.expectCall(
@@ -988,21 +1000,21 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         router.swapSingleTokenExactIn(address(pool), dai, usdc, swapAmount, 0, MAX_UINT256, false, bytes(""));
 
-        BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
+        BaseVaultTest.Balances memory balancesAfter = getBalances(owner);
 
         assertEq(
-            balancesBefore.userTokens[daiIdx] - balancesAfter.userTokens[daiIdx],
+            balancesBefore.bobTokens[daiIdx] - balancesAfter.bobTokens[daiIdx],
             swapAmount,
             "Bob DAI balance is wrong"
         );
-        assertEq(balancesBefore.hookTokens[daiIdx], balancesAfter.hookTokens[daiIdx], "Hook DAI balance is wrong");
+        assertEq(balancesBefore.userTokens[daiIdx], balancesAfter.userTokens[daiIdx], "Hook DAI balance is wrong");
         assertEq(
-            balancesAfter.userTokens[usdcIdx] - balancesBefore.userTokens[usdcIdx],
+            balancesAfter.bobTokens[usdcIdx] - balancesBefore.bobTokens[usdcIdx],
             swapAmount - hookFee,
             "Bob USDC balance is wrong"
         );
         assertEq(
-            balancesAfter.hookTokens[usdcIdx] - balancesBefore.hookTokens[usdcIdx],
+            balancesAfter.userTokens[usdcIdx] - balancesBefore.userTokens[usdcIdx],
             hookFee,
             "Hook USDC balance is wrong"
         );
@@ -1024,7 +1036,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         UpliftOnlyExample(payable(poolHooksContract)).setHookSwapFeePercentage(hookFeePercentage);
         uint256 hookFee = swapAmount.mulUp(hookFeePercentage);
 
-        BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
+        BaseVaultTest.Balances memory balancesBefore = getBalances(owner);
 
         vm.prank(bob);
         vm.expectCall(
@@ -1064,21 +1076,21 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             bytes("")
         );
 
-        BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
+        BaseVaultTest.Balances memory balancesAfter = getBalances(owner);
 
         assertEq(
-            balancesAfter.userTokens[usdcIdx] - balancesBefore.userTokens[usdcIdx],
+            balancesAfter.bobTokens[usdcIdx] - balancesBefore.bobTokens[usdcIdx],
             swapAmount,
             "Bob USDC balance is wrong"
         );
-        assertEq(balancesBefore.hookTokens[usdcIdx], balancesAfter.hookTokens[usdcIdx], "Hook USDC balance is wrong");
+        assertEq(balancesBefore.userTokens[usdcIdx], balancesAfter.userTokens[usdcIdx], "Hook USDC balance is wrong");
         assertEq(
-            balancesBefore.userTokens[daiIdx] - balancesAfter.userTokens[daiIdx],
+            balancesBefore.bobTokens[daiIdx] - balancesAfter.bobTokens[daiIdx],
             swapAmount + hookFee,
             "Bob DAI balance is wrong"
         );
         assertEq(
-            balancesAfter.hookTokens[daiIdx] - balancesBefore.hookTokens[daiIdx],
+            balancesAfter.userTokens[daiIdx] - balancesBefore.userTokens[daiIdx],
             hookFee,
             "Hook DAI balance is wrong"
         );
@@ -1119,6 +1131,9 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
         vm.stopPrank();
 
+        vm.prank(owner);
+        UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
+
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
 
@@ -1144,6 +1159,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
         BaseVaultTest.Balances memory balancesBefore = getBalances(updateWeightRunner.getQuantAMMAdmin());
+
 
         vm.startPrank(bob);
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);

@@ -22,7 +22,7 @@ contract SafeHavenFeeController {
             //hardcoded length for safe haven. 
             // [w1,w2,w3,m1,m2,m3]
             for(uint256 i = 3; i < 6; i++) {
-                if (poolData.firstFourWeightsAndMultipliers[i] < 1e2) {
+                if (poolData.firstFourWeightsAndMultipliers[i] > 1e2) {
                     isStable = false;
                     break;
                 }

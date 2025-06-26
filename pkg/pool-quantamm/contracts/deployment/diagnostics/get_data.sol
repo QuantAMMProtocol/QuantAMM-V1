@@ -26,8 +26,6 @@ contract Deploy is Script {
     using Strings for uint40;
 
     function run() external {
-        uint256 deployerPrivateKey;
-
         // For dry runs, we don't need a private key
         vm.startBroadcast();
 

@@ -32,7 +32,7 @@ contract Deploy is Script {
 
         bytes memory userData = "";
 
-        uint256[] memory amountIn = IRouter(0xAE563E3f8219521950555F5962419C8919758Ea2).removeLiquidityProportional(
+        IRouter(0xAE563E3f8219521950555F5962419C8919758Ea2).removeLiquidityProportional(
             0x314fDFAf8AD9b50fF105993C722a1826019Cf21D,
             uint256(0.2646781979e18),
             minAmountsOut,

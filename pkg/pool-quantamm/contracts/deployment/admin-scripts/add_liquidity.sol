@@ -71,7 +71,7 @@ contract Deploy is Script {
         amountIn[2] = uint256(0);
         bytes memory userData = "";
 
-        uint256 amountOut = IRouter(router).addLiquidityUnbalanced(
+        IRouter(router).addLiquidityUnbalanced(
             pool,
             amountIn,
             0,

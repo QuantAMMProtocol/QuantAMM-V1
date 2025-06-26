@@ -20,7 +20,6 @@ import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
 
 contract Deploy is Script {
     function run() external {
-        uint256 deployerPrivateKey;
 
         // For dry runs, we don't need a private key
         vm.startBroadcast();
@@ -67,7 +66,7 @@ contract Deploy is Script {
 
         //IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9).sendTo(IERC20(0xff34b3d4aee8ddcd6f9afffb6fe49bd371b8a357), msg.sender, uint256(1));
         //IVault(0xbA1333333333a1BA1108E8412f11850A5C319bA9).sendTo(IERC20(0x29f2D40B0605204364af54EC677bD022dA425d03), msg.sender, uint256(1));
-        uint256 amountIn = IRouter(0xAE563E3f8219521950555F5962419C8919758Ea2).initialize(
+        IRouter(0xAE563E3f8219521950555F5962419C8919758Ea2).initialize(
             0xd4Ed17bBF48Af09B87fD7d8C60970f5Da79D4852,
             tokenAddresses,
             weights,

@@ -20,13 +20,11 @@ import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
 
 contract Deploy is Script {
     function run() external {
-        uint256 deployerPrivateKey;
 
         // For dry runs, we don't need a private key
         vm.startBroadcast();
 
         address pool = 0x314fDFAf8AD9b50fF105993C722a1826019Cf21D;
-        address rule = 0x62B9eC6A5BBEBe4F5C5f46C8A8880df857004295;
         address updateWeightRunnerAddress = 0x21Ae9576a393413D6d91dFE2543dCb548Dbb8748;
 
         UpdateWeightRunner(updateWeightRunnerAddress).performUpdate(pool);

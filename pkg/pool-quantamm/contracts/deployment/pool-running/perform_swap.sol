@@ -22,7 +22,6 @@ import { SwapKind, VaultSwapParams } from "@balancer-labs/v3-interfaces/contract
 
 contract Deploy is Script {
     function run() external {
-        uint256 deployerPrivateKey;
 
             // For dry runs, we don't need a private key
             vm.startBroadcast();
@@ -62,7 +61,7 @@ contract Deploy is Script {
         //Approve router on Permit2
         //IPermit2(permit2).approve(pool, router, type(uint160).max, type(uint48).max);
 
-        uint256 amountOut = IRouter(router).swapSingleTokenExactIn(
+        IRouter(router).swapSingleTokenExactIn(
             pool, // pool
             IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48), // tokenIn
             IERC20(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599), // tokenOut

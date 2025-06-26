@@ -2,6 +2,8 @@
 
 pragma solidity >=0.8.24;
 
+import "forge-std/console.sol";
+import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -162,13 +164,12 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
      */
     error TooManyDeposits(address pool, address depositor);
 
-        /**
+    /**
      * @notice To avoid Ddos issues, a single depositor can only deposit 100 times
      * @param pool The pool the depositor is attempting to deposit to
      * @param depositor The address of the depositor
      */
     error TooFastDeposits(address pool, address depositor);
-
 
     /**
      * @notice Attempted withdrawal of an NFT-associated position by an address that is not the owner.
@@ -236,7 +237,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             revert TooManyDeposits(pool, msg.sender);
         }
 
-        if(currentLength > 0){
+        if (currentLength > 0) {
             //There is a possibility that multiple deposits and transfers in the same block can be exploited.
             uint256 lastTimestamp = poolsFeeData[pool][msg.sender][currentLength - 1].blockTimestampDeposit;
             if (block.timestamp - lastTimestamp <= 1) {
@@ -350,7 +351,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                 uint256 ownerFee = hookFee;
 
                 if (quantAMMFeeTake > 0) {
-                    uint256 adminFee = hookFee * quantAMMFeeTake / 1e18;
+                    uint256 adminFee = (hookFee * quantAMMFeeTake) / 1e18;
                     ownerFee = hookFee - adminFee;
                     address quantAMMAdmin = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin();
                     _vault.sendTo(feeToken, quantAMMAdmin, adminFee);
@@ -456,8 +457,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         uint256[] memory,
         bytes memory userData
     ) public override onlyVault onlySelfRouter(router) returns (bool, uint256[] memory hookAdjustedAmountsOutRaw) {
-        address userAddress = address(bytes20(userData));
-
+        address userAddress = IRouterCommon(router).getSender();
         AfterRemoveLiquidityData memory localData = AfterRemoveLiquidityData({
             pool: pool,
             bptAmountIn: bptAmountIn,
@@ -486,37 +486,36 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         FeeData[] storage feeDataArray = poolsFeeData[pool][userAddress];
         localData.feeDataArrayLength = feeDataArray.length;
         localData.amountLeft = bptAmountIn;
+
         for (uint256 i = localData.feeDataArrayLength - 1; i >= 0; --i) {
             localData.lpTokenDepositValue = feeDataArray[i].lpTokenDepositValue;
-
             localData.lpTokenDepositValueChange =
                 ((int256(localData.lpTokenDepositValueNow) - int256(localData.lpTokenDepositValue)) * 1e18) /
                 int256(localData.lpTokenDepositValueNow);
 
             uint256 feePerLP;
-            
+
             // if the pool has increased in value since the deposit, the fee is calculated based on the deposit value
             if (localData.lpTokenDepositValueChange > 0) {
                 feePerLP =
-                    (uint256(localData.lpTokenDepositValueChange) * (uint256(feeDataArray[i].upliftFeeBps) * 1e18)) /
+                    (uint256(localData.lpTokenDepositValueChange) * uint256(feeDataArray[i].upliftFeeBps)) /
                     10000;
             }
             // if the pool has decreased in value since the deposit, the fee is calculated based on the base value - see wp
             else {
                 //in most cases this should be a normal swap fee amount.
-                //there always myst be at least the swap fee amount to avoid deposit/withdraw attack surgace.
+                //there always must be at least the swap fee amount to avoid deposit/withdraw attack surgace.
                 feePerLP = (uint256(minWithdrawalFeeBps) * 1e18) / 10000;
             }
 
-            if (feePerLP > (_MAX_UPLIFT_FEE_PERCENTAGE * 1e18) / 10000) {
-                feePerLP = (_MAX_UPLIFT_FEE_PERCENTAGE * 1e18) / 10000;
+            if (feePerLP > (uint256(_MAX_UPLIFT_FEE_PERCENTAGE) * 1e18) / 10000) {
+                feePerLP = (uint256(_MAX_UPLIFT_FEE_PERCENTAGE) * 1e18) / 10000;
             }
 
             // if the deposit is less than the amount left to burn, burn the whole deposit and move on to the next
             if (feeDataArray[i].amount <= localData.amountLeft) {
                 uint256 depositAmount = feeDataArray[i].amount;
-                localData.feeAmount += (depositAmount * feePerLP);
-
+                localData.feeAmount += depositAmount.mulDown(feePerLP);
                 localData.amountLeft -= feeDataArray[i].amount;
 
                 lpNFT.burn(feeDataArray[i].tokenID);
@@ -529,13 +528,12 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                 }
             } else {
                 feeDataArray[i].amount -= localData.amountLeft;
-                localData.feeAmount += (feePerLP * localData.amountLeft);
+                localData.feeAmount += localData.amountLeft.mulDown(feePerLP);
                 break;
             }
         }
 
-        localData.feePercentage = (localData.feeAmount) / bptAmountIn;
-
+        localData.feePercentage = localData.feeAmount.divDown(bptAmountIn);
         hookAdjustedAmountsOutRaw = localData.amountsOutRaw;
         localData.tokens = _vault.getPoolTokens(localData.pool);
 
@@ -557,25 +555,21 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         }
 
         if (localData.adminFeePercent > 0) {
-            for (uint256 i = 0; i < localData.accruedQuantAMMFees.length; i++) {
-                localData.accruedQuantAMMFees[i] += 1;
-                hookAdjustedAmountsOutRaw[i] -= 1;
-            }
             _vault.addLiquidity(
                 AddLiquidityParams({
                     pool: localData.pool,
                     to: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin(),
                     maxAmountsIn: localData.accruedQuantAMMFees,
-                    minBptAmountOut: localData.feeAmount.mulDown(localData.adminFeePercent) / 1e18,
+                    minBptAmountOut: localData.feeAmount.mulDown(localData.adminFeePercent),
                     kind: AddLiquidityKind.PROPORTIONAL,
-                    userData: bytes("")
+                    userData: userData
                 })
             );
             emit ExitFeeCharged(
                 userAddress,
                 localData.pool,
                 IERC20(localData.pool),
-                localData.feeAmount.mulDown(localData.adminFeePercent) / 1e18
+                localData.feeAmount.mulDown(localData.adminFeePercent)
             );
         }
 
@@ -584,7 +578,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             _vault.addLiquidity(
                 AddLiquidityParams({
                     pool: localData.pool,
-                    to: msg.sender, // It would mint BPTs to router, but it's a donation so no BPT is minted
+                    to: address(this), // It would mint BPTs to router, but it's a donation so no BPT is minted
                     maxAmountsIn: localData.accruedFees, // Donate all accrued fees back to the pool (i.e. to the LPs)
                     minBptAmountOut: 0, // Donation does not return BPTs, any number above 0 will revert
                     kind: AddLiquidityKind.DONATION,
@@ -610,7 +604,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         if (poolAddress == address(0)) {
             revert TransferUpdateTokenIDInvalid(_from, _to, _tokenID);
         }
-        
+
         if (poolsFeeData[poolAddress][_to].length >= 100) {
             revert TooManyDeposits(poolAddress, _to);
         }

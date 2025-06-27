@@ -233,7 +233,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         bytes memory userData
     ) external payable saveSender(msg.sender) returns (uint256[] memory amountsIn) {
         uint256 currentLength = poolsFeeData[pool][msg.sender].length;
-        if (currentLength > 100) {
+        if (currentLength >= 100) {
             revert TooManyDeposits(pool, msg.sender);
         }
 

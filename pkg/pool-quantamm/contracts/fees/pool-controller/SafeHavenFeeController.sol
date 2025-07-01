@@ -8,7 +8,7 @@ contract SafeHavenFeeController {
     address public immutable vault;
     address public immutable pool;
     uint256 public immutable rebalancePeriodFee = 2e16; // 2%
-    uint256 public immutable stablePeriodFee = 5e15;
+    uint256 public immutable stablePeriodFee = 0.5e16;
 
     //https://etherscan.io/address/0xbA1333333333a1BA1108E8412f11850A5C319bA9
     //https://etherscan.io/address/0x6B61D8680C4F9E560c8306807908553f95c749C5
@@ -20,7 +20,7 @@ contract SafeHavenFeeController {
         pool = _pool;
     }
 
-    /// @notice Sets the fixed fees for the pool based on whether it is more of a CFMM compared to when weights are changing. When weights are stable lower fees increase likelyhook of retail flow
+    /// @notice Sets the fixed fees for the pool based on whether it is more of a CFMM compared to when weights are changing. When weights are stable lower fees increase likelyhood of retail flow
     function setFixedFees() external {
         IQuantAMMWeightedPool.QuantAMMWeightedPoolDynamicData memory poolData = IQuantAMMWeightedPool(pool)
             .getQuantAMMWeightedPoolDynamicData();

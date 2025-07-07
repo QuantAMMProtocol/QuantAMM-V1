@@ -32,11 +32,22 @@ contract PermissionHook is BaseHooks, VaultGuard, Ownable {
      */
     error PoolDoesNotSupportDonation();
 
+    /**
+     * @notice Thrown when a user is denied permission to perform an action due to restrictions.
+     * @param listType The type of restriction list that denied the action (e.g., Greylist, Whitelist).
+     * @param addr The address of the user that attempted the action.
+     * @param action The specific action that was denied (e.g., add liquidity, remove liquidity, swap).
+     */
     error PermissionDenied(
         RestrictionListProvider.ListType listType,
         address addr,
         uint256 action
     );
+
+    /**
+     * @notice Thrown when the restriction list provider address is invalid.
+     */
+    error InvalidRestrictionListProviderAddress();
 
     RestrictionListProvider private _restrictionListProvider;
     RestrictionListProvider.ListType private _permissionType;
@@ -91,7 +102,7 @@ contract PermissionHook is BaseHooks, VaultGuard, Ownable {
      */
     function updateRestrictionListProvider(address newProvider) external onlyOwner {
         if (newProvider == address(0)) {
-            revert("Invalid restriction list provider address");
+            revert InvalidRestrictionListProviderAddress();
         }
 
         address oldProvider = address(_restrictionListProvider);

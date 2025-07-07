@@ -50,12 +50,22 @@ contract RestrictionListProvider is Ownable {
     uint256 constant GREYLIST_ADD = 1;
     uint256 constant GREYLIST_REMOVE = 2;
     uint256 constant GREYLIST_SWAP = 4;
+    uint256 internal constant _GREY_MASK =
+                GREYLIST_ADD | GREYLIST_REMOVE | GREYLIST_SWAP;
 
     /**
      * @dev Error thrown when an unknown blacklist reason is provided.
      * @param addr The address that has an unknown blacklist reason.
      */
     error UnknownBlacklistReason(address addr);
+
+    /**
+     * @dev Error thrown when an unknown greylist action is provided.
+     * @param addr The address that has an unknown greylist action.
+     * @param action The unknown action value.
+     */
+    error UnknownGreylistAction(address addr, uint256 action);
+
     /**
      * @dev Error thrown when an address is found in both Blacklist and Greylist.
      * @param addr The address that is in both lists.
@@ -98,21 +108,6 @@ contract RestrictionListProvider is Ownable {
     event AddressReset(ListType listType, address indexed addr);
 
     /**
-     * @dev Event emitted when multiple addresses are added to a restriction list.
-     * @param listType The type of restriction list.
-     * @param addresses The array of addresses added to the list.
-     * @param value The associated value for the addresses.
-     */
-    event AddressesBatchAdded(ListType listType, address[] addresses, uint256 value);
-
-    /**
-     * @dev Event emitted when multiple addresses are reset in a restriction list.
-     * @param listType The type of restriction list.
-     * @param addresses The array of addresses reset in the list.
-     */
-    event AddressesBatchReset(ListType listType, address[] addresses);
-
-    /**
      * @dev Error thrown when an invalid list type is provided.
      */
     error InvalidListType();
@@ -128,7 +123,6 @@ contract RestrictionListProvider is Ownable {
         for (uint256 i = 0; i < addresses.length; i++) {
             _addAddress(listType, addresses[i], value);
         }
-        emit AddressesBatchAdded(listType, addresses, value);
     }
 
     /**
@@ -141,7 +135,6 @@ contract RestrictionListProvider is Ownable {
         for (uint256 i = 0; i < addresses.length; i++) {
             _resetAddress(listType, addresses[i]);
         }
-        emit AddressesBatchReset(listType, addresses);
     }
 
     /**
@@ -240,6 +233,11 @@ contract RestrictionListProvider is Ownable {
             if (blacklist[addr] != 0) {
                 revert AddressInBothBlacklistAndGreylist(addr);
             }
+
+            if (value == 0 || (value & ~_GREY_MASK) != 0) {
+                revert UnknownGreylistAction(addr, value);
+            }
+
             greylist[addr] = value;
         } else if (listType == ListType.Whitelist) {
             if (blacklist[addr] != 0 || greylist[addr] != 0) {

@@ -61,9 +61,8 @@ contract RestrictionListProvider is Ownable {
     /**
      * @dev Error thrown when an unknown greylist action is provided.
      * @param addr The address that has an unknown greylist action.
-     * @param action The unknown action value.
      */
-    error UnknownGreylistAction(address addr, uint256 action);
+    error UnknownGreylistAction(address addr);
 
     /**
      * @dev Error thrown when an address is found in both Blacklist and Greylist.
@@ -76,6 +75,7 @@ contract RestrictionListProvider is Ownable {
      * @param addr The address that is in the Greylist or Blacklist.
      */
     error AddressInGreylistOrBlacklist(address addr);
+
     /**
      * @dev Mapping to store blacklist values for addresses.
      */
@@ -171,7 +171,7 @@ contract RestrictionListProvider is Ownable {
             if (listType == ListType.Blacklist) {
                 results[i] = (blacklist[addresses[i]] == value);
             } else if (listType == ListType.Greylist) {
-                results[i] = (greylist[addresses[i]] == value);
+                results[i] = ((greylist[addresses[i]] & value) > 0);
             } else if (listType == ListType.Whitelist) {
                 results[i] = (whitelist[addresses[i]] == value);
             } else {
@@ -234,7 +234,7 @@ contract RestrictionListProvider is Ownable {
             }
 
             if (value == 0 || (value & ~_GREY_MASK) != 0) {
-                revert UnknownGreylistAction(addr, value);
+                revert UnknownGreylistAction(addr);
             }
 
             greylist[addr] = value;

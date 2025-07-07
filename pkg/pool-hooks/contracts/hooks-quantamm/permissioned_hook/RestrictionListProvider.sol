@@ -50,8 +50,7 @@ contract RestrictionListProvider is Ownable {
     uint256 constant GREYLIST_ADD = 1;
     uint256 constant GREYLIST_REMOVE = 2;
     uint256 constant GREYLIST_SWAP = 4;
-    uint256 internal constant _GREY_MASK =
-                GREYLIST_ADD | GREYLIST_REMOVE | GREYLIST_SWAP;
+    uint256 internal constant _GREY_MASK = GREYLIST_ADD | GREYLIST_REMOVE | GREYLIST_SWAP;
 
     /**
      * @dev Error thrown when an unknown blacklist reason is provided.

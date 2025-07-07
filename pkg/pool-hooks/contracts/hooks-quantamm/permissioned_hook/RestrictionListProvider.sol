@@ -195,21 +195,21 @@ contract RestrictionListProvider is Ownable {
         uint256 action
     ) external view returns (ListType listTypeTriggered, uint256 valueTriggered) {
         if (listType == ListType.Whitelist) {
-            return (ListType.Whitelist, whitelist[addr] > 0 ? 0 : whitelist[addr]);
+            if(whitelist[addr] > 0){
+                return (ListType.Whitelist, 0);
+            }
         } else {
             uint256 blacklistValue = blacklist[addr];
             if (blacklistValue != 0) {
                 return (ListType.Blacklist, blacklistValue);
             }
-            uint256 greylistValue = greylist[addr];
-            if (greylistValue == 0) {
-                return (ListType.Greylist, greylistValue);
-            }
-            if ((greylistValue & action) > 0) {
-                return (ListType.Greylist, greylistValue);
-            } else {
-                return (ListType.Greylist, 0);
-            }
+        }
+
+        uint256 greylistValue = greylist[addr];
+        if (greylistValue == 0 || ((greylistValue & action) > 0)) {
+            return (ListType.Greylist, 0);
+        } else {
+            return (ListType.Greylist, greylistValue);
         }
     }
 

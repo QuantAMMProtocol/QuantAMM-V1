@@ -195,7 +195,7 @@ contract RestrictionListProvider is Ownable {
         uint256 action
     ) external view returns (ListType listTypeTriggered, uint256 valueTriggered) {
         if (listType == ListType.Whitelist) {
-            return (ListType.Whitelist, whitelist[addr]);
+            return (ListType.Whitelist, whitelist[addr] > 0 ? 0 : whitelist[addr]);
         } else {
             uint256 blacklistValue = blacklist[addr];
             if (blacklistValue != 0) {

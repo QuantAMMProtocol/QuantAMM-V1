@@ -211,9 +211,9 @@ contract RestrictionListProvider is Ownable {
             }
             uint256 greylistValue = greylist[addr];
             if (greylistValue == 0) {
-                return (ListType.Greylist, 0);
+                return (ListType.Greylist, greylistValue);
             }
-            if ((greylistValue & action) == 0) {
+            if ((greylistValue & action) > 0) {
                 return (ListType.Greylist, greylistValue);
             } else {
                 return (ListType.Greylist, 0);

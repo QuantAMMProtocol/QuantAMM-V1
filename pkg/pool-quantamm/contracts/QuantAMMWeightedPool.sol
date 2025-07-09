@@ -431,8 +431,8 @@ contract QuantAMMWeightedPool is
         data.isPoolInRecoveryMode = poolConfig.isPoolInRecoveryMode;
          uint256 N = _weights.length;
 
-        int256[] memory firstFour = new int256[](N * 2);
-        int256[] memory secondFour = new int256[](N * 2);
+        int256[] memory firstFour = new int256[](8);
+        int256[] memory secondFour = new int256[](8);
 
         // —— Case 1: N ≤ 4 —— 
         if (N <= 4) {

@@ -16,6 +16,8 @@ import { ProtocolFeeControllerMock } from "@balancer-labs/v3-vault/contracts/tes
 import { BaseContractsDeployer } from "@balancer-labs/v3-solidity-utils/test/foundry/utils/BaseContractsDeployer.sol";
 
 import { MockUpdateWeightRunner } from "../../../contracts/mock/MockUpdateWeightRunner.sol";
+import { MockQuantAMMWeightedPoolFactory } from "../../../contracts/mock/MockQuantAMMWeightedPoolFactory.sol";
+
 import { MockChainlinkOracle } from "../../../contracts/mock/MockChainlinkOracles.sol";
 import { MockMomentumRule } from "../../../contracts/mock/mockRules/MockMomentumRule.sol";
 import { MockQuantAMMWeightedPool } from "../../../contracts/mock/QuantAMMWeightedPoolMock.sol";
@@ -35,7 +37,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
     using ArrayHelpers for *;
     string private artifactsRootDir = "artifacts/";
 
-    MockUpdateWeightRunner internal updateWeightRunner;
+    MockUpdateWeightRunner public updateWeightRunner;
     MockChainlinkOracle internal chainlinkOracle;
 
     address internal owner;
@@ -88,6 +90,33 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         } else {
             return
                 new QuantAMMWeightedPoolFactory(
+                    vault,
+                    pauseWindowDuration,
+                    factoryVersion,
+                    poolVersion,
+                    address(updateWeightRunner)
+                );
+        }
+    }
+
+
+    function deployMockQuantAMMWeightedPoolFactory(
+        IVault vault,
+        uint32 pauseWindowDuration,
+        string memory factoryVersion,
+        string memory poolVersion
+    ) internal returns (MockQuantAMMWeightedPoolFactory) {
+        if (reusingArtifacts) {
+            return
+                MockQuantAMMWeightedPoolFactory(
+                    deployCode(
+                        _computeWeightedPath(type(MockQuantAMMWeightedPoolFactory).name),
+                        abi.encode(vault, pauseWindowDuration, factoryVersion, poolVersion, updateWeightRunner)
+                    )
+                );
+        } else {
+            return
+                new MockQuantAMMWeightedPoolFactory(
                     vault,
                     pauseWindowDuration,
                     factoryVersion,
@@ -202,6 +231,34 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         QuantAMMWeightedPoolFactory.CreationNewPoolParams memory poolCreateSettings = _createPoolParams(tokens, rateProviders);
         
         (newPoolAddress, poolArgsRet) =  QuantAMMWeightedPoolFactory(deployerFactory).create(poolCreateSettings);
+       
+        vm.label(newPoolAddress, label);
+
+        // Cannot set the pool creator directly on a standard Balancer stable pool factory.
+        vault.manualSetPoolCreator(newPoolAddress, poolCreator);
+
+        //ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
+        //feeController.manualSetPoolCreator(newPoolAddress, poolCreator);
+    }
+
+
+    function createMockQuantAMMPool(
+        address[] memory tokens,
+        string memory label,
+        IRateProvider[] memory rateProviders,
+        IVaultMock vault,
+        address poolCreator
+    ) internal returns (address newPoolAddress, bytes memory poolArgsRet) {        
+        deployerFactory = address(deployMockQuantAMMWeightedPoolFactory(
+            IVault(address(vault)),
+            365 days,
+            "Factory v1",
+            "Pool v1"
+        ));
+        
+        QuantAMMWeightedPoolFactory.CreationNewPoolParams memory poolCreateSettings = _createPoolParams(tokens, rateProviders);
+        
+        (newPoolAddress, poolArgsRet) =  MockQuantAMMWeightedPoolFactory(deployerFactory).create(poolCreateSettings);
        
         vm.label(newPoolAddress, label);
 

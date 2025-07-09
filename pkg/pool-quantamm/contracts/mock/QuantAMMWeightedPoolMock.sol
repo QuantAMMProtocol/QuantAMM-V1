@@ -13,7 +13,9 @@ contract MockQuantAMMWeightedPool is QuantAMMWeightedPool {
     // Local storage of weights, so that they can be changed for tests.
     uint256[] private _normalizedWeights;
 
-    constructor(NewPoolParams memory params, IVault vault) QuantAMMWeightedPool(params, vault) {}
+    constructor(NewPoolParams memory params, IVault vault) QuantAMMWeightedPool(params, vault) {
+        _normalizedWeights = new uint256[](params.numTokens);
+    }
 
     function setNormalizedWeight(uint256 tokenIndex, uint256 newWeight) external {
         if (tokenIndex < _normalizedWeights.length) {

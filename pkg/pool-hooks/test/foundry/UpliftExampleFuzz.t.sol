@@ -388,7 +388,7 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
 
     function _runFuzz(uint16 withdrawalFeeBps, uint256 protocolTakeE18) internal {
         withdrawalFeeBps = uint16(bound(withdrawalFeeBps, 0, 50));
-        protocolTakeE18 = uint256(bound(protocolTakeE18, 10000000000000, 100000000000000000));//realistically 1% admin take is lowest possible
+        protocolTakeE18 = uint256(bound(protocolTakeE18, 1, 9999)) * 1e13;//realistically 1% admin take is lowest possible
 
         vm.prank(address(vaultAdmin));
         updateWeightRunner.setQuantAMMUpliftFeeTake(protocolTakeE18);
@@ -675,8 +675,8 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
     }
 
     function _runFuzzNegative(uint16 withdrawalFeeBps, uint256 protocolTakeE18) internal {
-        withdrawalFeeBps = uint16(bound(withdrawalFeeBps, 5, 50));
-        protocolTakeE18 = uint256(bound(protocolTakeE18, 0.001e18, 1e18));//realistically 1% admin take is lowest possible
+        withdrawalFeeBps = uint16(bound(withdrawalFeeBps, 5, 500));
+        protocolTakeE18 = uint256(bound(protocolTakeE18, 1, 9999)) * 1e13;//realistically 1% admin take is lowest possible
 
         vm.prank(address(vaultAdmin));
         updateWeightRunner.setQuantAMMUpliftFeeTake(protocolTakeE18);
@@ -786,16 +786,16 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
 
     function testFuzz_removeLiquidityPositive_withProtocolTake(
         uint16 withdrawalFeeBps_,
-        uint256 protocolTakeE18_,
+        uint256 protocolTake,
         uint256 priceMulE18_
     ) public {
-        _runPositiveFuzz(withdrawalFeeBps_, protocolTakeE18_, priceMulE18_);
+        _runPositiveFuzz(withdrawalFeeBps_, protocolTake, priceMulE18_);
     }
 
-    function _runPositiveFuzz(uint16 withdrawalFeeBps_, uint256 protocolTakeE18_, uint256 priceMulE18_) internal {
+    function _runPositiveFuzz(uint16 withdrawalFeeBps_, uint256 protocolTake, uint256 priceMulE18_) internal {
         /* ──────── bounds ──────── */
-        withdrawalFeeBps_ = uint16(bound(withdrawalFeeBps_, 5, 50));
-        protocolTakeE18_ = uint256(bound(protocolTakeE18_, 0.001e18, 1e18));//realistically 1% admin take is lowest possible
+        withdrawalFeeBps_ = uint16(bound(withdrawalFeeBps_, 5, 500));
+        uint256 protocolTakeE18_ = uint256(bound(protocolTake, 1, 9999)) * 1e13;//realistically 1% admin take is lowest possible
         priceMulE18_ = bound(priceMulE18_, 1e18, 10_000e18);
         console.log("withdrawal fees");
         console.log(Strings.toString(withdrawalFeeBps_));

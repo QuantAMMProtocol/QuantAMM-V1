@@ -624,7 +624,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             console.log("adminFeePercent");
             console.log(Strings.toString(localData.adminFeePercent));
             if (localData.adminFeePercent > 0) {
-                localData.accruedQuantAMMFees[i] = exitFee.mulUp(localData.adminFeePercent);
+                localData.accruedQuantAMMFees[i] = exitFee.mulDown(localData.adminFeePercent);
                 console.log("localData.accruedQuantAMMFees[i]");
                 console.log(Strings.toString(localData.accruedQuantAMMFees[i]));
             }
@@ -640,6 +640,11 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             console.log(Strings.toString(localData.accruedFees[i] + localData.accruedQuantAMMFees[i]));
             console.log("localData.amountsOutRaw[i]");
             console.log(Strings.toString(localData.amountsOutRaw[i]));
+            console.log("localData.accruedFees[i]  + localData.accruedQuantAMMFees[i]");
+            console.log(Strings.toString((localData.accruedFees[i]  + localData.accruedQuantAMMFees[i])));
+            console.log("localData.amountsOutRaw[i]");
+            console.log(Strings.toString((localData.amountsOutRaw[i])));
+
             if(localData.accruedFees[i]  + localData.accruedQuantAMMFees[i] > localData.amountsOutRaw[i]){
                 revert("Accrued fees exceed amounts out");
             }
@@ -666,8 +671,8 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                     pool: localData.pool,
                     to: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin(),
                     maxAmountsIn: localData.accruedQuantAMMFees,
-                    minBptAmountOut: (localData.feeAmount * localData.adminFeePercent) / 1e18, // This is the amount of BPTs that will be minted to the QuantAMM admin
-                    kind: AddLiquidityKind.UNBALANCED,
+                    minBptAmountOut: localData.feeAmount.mulDown(localData.adminFeePercent),
+                    kind: AddLiquidityKind.PROPORTIONAL,
                     userData: userData
                 })
             );

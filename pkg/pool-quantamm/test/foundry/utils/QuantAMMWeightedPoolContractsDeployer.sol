@@ -208,8 +208,8 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         // Cannot set the pool creator directly on a standard Balancer stable pool factory.
         vault.manualSetPoolCreator(newPoolAddress, poolCreator);
 
-        ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
-        feeController.manualSetPoolCreator(newPoolAddress, poolCreator);
+        //ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
+        //feeController.manualSetPoolCreator(newPoolAddress, poolCreator);
     }
 
     function deployQuantAMMWeightedMathMock() internal returns (QuantAMMWeightedMathMock) {

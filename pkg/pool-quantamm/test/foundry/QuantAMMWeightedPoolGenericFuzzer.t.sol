@@ -462,7 +462,7 @@ contract QuantAMMWeightedPoolGenericFuzzer is QuantAMMWeightedPoolContractsDeplo
         bool logPoolParams,
         bool logRuleParams,
         bool logBalanceParams
-    ) internal view {
+    ) internal pure {
         // top level fuzz params
         console.logString(string.concat("Interpolation time: ", vm.toString(params.interpolationTime)));
         console.logString(string.concat("Delay: ", vm.toString(params.delay)));

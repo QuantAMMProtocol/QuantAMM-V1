@@ -637,7 +637,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
         return secondRandomWeights;
     }
 
-    function logWeightChange(int256[] memory firstRandomWeights, int256[] memory secondRandomWeights) private view {
+    function logWeightChange(int256[] memory firstRandomWeights, int256[] memory secondRandomWeights) private pure {
         for (uint i; i < firstRandomWeights.length; i++) {
             console.logString(
                 string.concat(
@@ -729,7 +729,7 @@ contract MultiBlockMEVFuzzer is QuantAMMWeightedPoolContractsDeployer, BaseVault
         FuzzParamsSingleSameToken memory params,
         int256 profit,
         uint256 minThresholdProfit
-    ) private view {
+    ) private pure {
         console.log("**********Fuzz Params************* ");
         console.logString(string.concat("Num Tokens: ", vm.toString(params.poolParams.numTokens)));
         console.logString(

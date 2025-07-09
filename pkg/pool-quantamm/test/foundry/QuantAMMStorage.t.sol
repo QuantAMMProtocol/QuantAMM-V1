@@ -15,7 +15,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
     }
 
     // Helper function to check array contents
-    function ArrayCheckSum(int256[] memory sourceArray, int256[] memory targetArray) internal view {
+    function ArrayCheckSum(int256[] memory sourceArray, int256[] memory targetArray) internal pure {
         // Ensure both arrays are of the same length
         assertEq(targetArray.length, sourceArray.length);
 
@@ -30,7 +30,7 @@ contract QuantAMMStorageTest is Test, QuantAMMTestUtils {
         }
     }
 
-    function MatrixCheckSum(int256[][] memory sourceMatrix, int256[][] memory targetMatrix) internal view {
+    function MatrixCheckSum(int256[][] memory sourceMatrix, int256[][] memory targetMatrix) internal pure {
         // Ensure both matrices are of the same length
         assertEq(targetMatrix.length, sourceMatrix.length);
 

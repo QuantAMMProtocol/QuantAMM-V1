@@ -61,7 +61,7 @@ contract E2eBatchSwapWeightedTest is QuantAMMWeightedPoolContractsDeployer, E2eB
         // Cannot set the pool creator directly on a standard Balancer weighted pool factory.
         vault.manualSetPoolCreator(newPool, lp);
 
-        ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
-        feeController.manualSetPoolCreator(newPool, lp);
+        //ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
+        //feeController.manualSetPoolCreator(newPool, lp);
     }
 }

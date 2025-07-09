@@ -6,7 +6,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
 
-import { IRouterCommon } from "@balancer-labs/v3-interfaces/contracts/vault/IRouterCommon.sol";
+import { ISenderGuard } from "@balancer-labs/v3-interfaces/contracts/vault/ISenderGuard.sol";
 import { IWETH } from "@balancer-labs/v3-interfaces/contracts/solidity-utils/misc/IWETH.sol";
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
 import {
@@ -235,7 +235,7 @@ contract NftLiquidityPositionExample is MinimalRouter, ERC721, BaseHooks {
         uint256,
         uint256[] memory,
         bytes memory
-    ) public view override onlySelfRouter(router) returns (bool) {
+    ) public view override onlyVault onlySelfRouter(router) returns (bool) {
         // We only allow addLiquidity via the Router/Hook itself (as it must custody BPT).
         return true;
     }
@@ -250,13 +250,13 @@ contract NftLiquidityPositionExample is MinimalRouter, ERC721, BaseHooks {
         uint256[] memory amountsOutRaw,
         uint256[] memory,
         bytes memory userData
-    ) public override onlySelfRouter(router) returns (bool, uint256[] memory hookAdjustedAmountsOutRaw) {
+    ) public override onlyVault onlySelfRouter(router) returns (bool, uint256[] memory hookAdjustedAmountsOutRaw) {
         // We only allow removeLiquidity via the Router/Hook itself so that fee is applied correctly.
         uint256 tokenId = abi.decode(userData, (uint256));
         hookAdjustedAmountsOutRaw = amountsOutRaw;
         uint256 currentFee = getCurrentFeePercentage(tokenId);
         if (currentFee > 0) {
-            hookAdjustedAmountsOutRaw = _takeFee(IRouterCommon(router).getSender(), pool, amountsOutRaw, currentFee);
+            hookAdjustedAmountsOutRaw = _takeFee(ISenderGuard(router).getSender(), pool, amountsOutRaw, currentFee);
         }
         return (true, hookAdjustedAmountsOutRaw);
     }

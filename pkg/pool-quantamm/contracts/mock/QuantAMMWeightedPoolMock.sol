@@ -42,4 +42,20 @@ contract MockQuantAMMWeightedPool is QuantAMMWeightedPool {
     function _getNormalizedWeights() internal view override returns (uint256[] memory) {
         return _normalizedWeights;
     }
+
+    /// @notice Get the normalised weights for a pair of tokens
+    /// @param tokenIndexOne The index of the first token
+    /// @param tokenIndexTwo The index of the second token
+    function _getNormalisedWeightPair(
+        uint256 tokenIndexOne,
+        uint256 tokenIndexTwo,
+        uint256,
+        uint256
+    ) internal view override returns (QuantAMMNormalisedTokenPair memory) {
+        if (tokenIndexOne < _normalizedWeights.length && tokenIndexTwo < _normalizedWeights.length) {
+            return QuantAMMNormalisedTokenPair(_normalizedWeights[tokenIndexOne], _normalizedWeights[tokenIndexTwo]);
+        } else {
+            revert IVaultErrors.InvalidToken();
+        }
+    }
 }

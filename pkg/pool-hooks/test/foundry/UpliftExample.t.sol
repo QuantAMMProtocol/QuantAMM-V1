@@ -103,8 +103,8 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             IVault(address(vault)),
             weth,
             permit2,
-            200,
-            5,
+            200e14,
+            5e14,
             address(updateWeightRunner),
             "Uplift LiquidityPosition v1",
             "Uplift LiquidityPosition v1",
@@ -233,7 +233,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             500000000000000000,
             "should match sum(amount * price)"
         );
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
         assertEq(upliftOnlyRouter.nftPool(expectedTokenId), pool, "pool mapping is wrong");
 
@@ -298,7 +298,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             500000000000000000,
             "should match sum(amount * price)"
         );
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
         uint256 nftTokenId = 0;
         uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
@@ -310,8 +310,8 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.stopPrank();
         BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
 
-        uint256 feeAmountAmountPercent = ((bptAmount / 2) *
-            ((uint256(upliftOnlyRouter.minWithdrawalFeeBps()) * 1e18) / 10000)) / ((bptAmount / 2));
+        uint256 feeAmountAmountPercent = (((bptAmount / 2) * ((uint256(upliftOnlyRouter.minWithdrawalFeeBps())))) /
+            ((bptAmount / 2)));
         uint256 amountOut = (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent));
 
         assertEq(
@@ -413,7 +413,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             500000000000000000,
             "should match sum(amount * price)"
         );
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
         int256[] memory prices = new int256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; ++i) {
@@ -432,7 +432,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
 
         // Bob gets original liquidity with no fee applied because of full decay.
-        uint64 exitFeePercentage = upliftOnlyRouter.minWithdrawalFeeBps() * 1e14;
+        uint64 exitFeePercentage = upliftOnlyRouter.minWithdrawalFeeBps();
         uint256 amountOut = bptAmount / 2;
         uint256 hookFee = amountOut.mulDown(exitFeePercentage);
 
@@ -521,7 +521,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             500000000000000000,
             "should match sum(amount * price)"
         );
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
         int256[] memory prices = new int256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; ++i) {
@@ -544,7 +544,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         uint256 upliftRatio = ((valueNow - valueAtDeposit) * 1e18) / valueNow; // 18 dp
 
-        uint256 feePercentage = (upliftRatio * upliftOnlyRouter.upliftFeeBps()) / 10_000;
+        uint256 feePercentage = (upliftRatio.mulDown(uint256(upliftOnlyRouter.upliftFeeBps())));
         // feePercentage is 18 dp; e.g. with double price ⇒ 1e16  (1 %)
 
         uint256 amountOut = bptAmount / 2;
@@ -826,7 +826,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
     function testFeeCalculationCausesRevert() public {
         vm.startPrank(address(vaultAdmin));
-        updateWeightRunner.setQuantAMMSwapFeeTake(5); //set admin fee to 5 basis points (same as min withdrawal fee)
+        updateWeightRunner.setQuantAMMSwapFeeTake(5e14); //set admin fee to 5 basis points (same as min withdrawal fee)
         vm.stopPrank();
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
@@ -846,7 +846,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             500000000000000000,
             "should match sum(amount * price)"
         );
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
         int256[] memory prices = new int256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; ++i) {
@@ -861,40 +861,12 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             abi.encodeWithSelector(
                 IVaultErrors.AmountInAboveMax.selector,
                 address(dai),
-                83333333333333333,
-                83333333333333166
+                83333333333333334,
+                83333333333333167
             )
         );
         upliftOnlyRouter.removeLiquidityProportional(bptAmount / 3, minAmountsOut, false, pool);
         vm.stopPrank();
-    }
-
-    function _checkPoolAndVaultBalancesAfterSwap(
-        BaseVaultTest.Balances memory balancesBefore,
-        BaseVaultTest.Balances memory balancesAfter,
-        uint256 poolBalanceChange
-    ) private view {
-        // Considers swap fee = 0, so only hook fees were charged
-        assertEq(
-            balancesAfter.poolTokens[daiIdx] - balancesBefore.poolTokens[daiIdx],
-            poolBalanceChange,
-            "Pool DAI balance is wrong"
-        );
-        assertEq(
-            balancesBefore.poolTokens[usdcIdx] - balancesAfter.poolTokens[usdcIdx],
-            poolBalanceChange,
-            "Pool USDC balance is wrong"
-        );
-        assertEq(
-            balancesAfter.vaultTokens[daiIdx] - balancesBefore.vaultTokens[daiIdx],
-            poolBalanceChange,
-            "Vault DAI balance is wrong"
-        );
-        assertEq(
-            balancesBefore.vaultTokens[usdcIdx] - balancesAfter.vaultTokens[usdcIdx],
-            poolBalanceChange,
-            "Vault USDC balance is wrong"
-        );
     }
 
     function testRemoveLiquidityWithProtocolTakeNoPriceChange() public {
@@ -924,7 +896,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             500000000000000000,
             "should match sum(amount * price)"
         );
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
         uint256 nftTokenId = 0;
         uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
@@ -936,8 +908,9 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.stopPrank();
         BaseVaultTest.Balances memory balancesAfter = getBalances(updateWeightRunner.getQuantAMMAdmin());
 
-        uint256 feeAmountAmountPercent = (((bptAmount / 2) *
-            ((uint256(upliftOnlyRouter.minWithdrawalFeeBps()) * 1e18) / 10000)) / ((bptAmount / 2)));
+        uint256 feeAmountAmountPercent = (
+            (((bptAmount / 2) * ((uint256(upliftOnlyRouter.minWithdrawalFeeBps())))) / ((bptAmount / 2)))
+        );
         uint256 amountOut = (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent));
 
         // Bob gets original liquidity with no fee applied because of full decay.
@@ -1030,7 +1003,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             500000000000000000,
             "should match sum(amount * price)"
         );
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
         int256[] memory prices = new int256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; ++i) {
@@ -1049,7 +1022,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         BaseVaultTest.Balances memory balancesAfter = getBalances(updateWeightRunner.getQuantAMMAdmin());
         // pool share without FixedPoint helpers (avoids double 1e18 division)
 
-        uint64 exitFeePercentage = upliftOnlyRouter.minWithdrawalFeeBps() * 1e14;
+        uint64 exitFeePercentage = upliftOnlyRouter.minWithdrawalFeeBps();
         uint256 amountOut = bptAmount / 2;
         uint256 hookFee = amountOut.mulDown(exitFeePercentage);
 
@@ -1138,7 +1111,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             500000000000000000,
             "should match sum(amount * price)"
         );
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200, "fee");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
         int256[] memory prices = new int256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; ++i) {
@@ -1161,7 +1134,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         uint256 upliftRatio = ((valueNow - valueAtDeposit) * 1e18) / valueNow; // 18 dp
 
-        uint256 feePercentage = (upliftRatio * upliftOnlyRouter.upliftFeeBps()) / 10_000;
+        uint256 feePercentage = upliftRatio.mulDown(uint256(upliftOnlyRouter.upliftFeeBps()));
         // feePercentage is 18 dp; e.g. with double price ⇒ 1e16  (1 %)
 
         uint256 amountOut = bptAmount / 2;

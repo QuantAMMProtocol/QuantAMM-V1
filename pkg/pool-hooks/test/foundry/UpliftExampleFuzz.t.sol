@@ -363,7 +363,7 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
 
     /// @dev Net amount after charging `feeBps` (0 … 10_000).
     function _netAfterFee(uint256 grossAmount, uint256 feeBps) internal pure returns (uint256) {
-        return grossAmount - (grossAmount * feeBps) / 10_000;
+        return grossAmount - grossAmount.mulDown(feeBps);
     }
 
     function testFuzz_removeLiquidity_noProtocolTake(uint16 withdrawalFeeBps) public {
@@ -386,9 +386,11 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         uint256 expectedRouterBpt;
     }
 
-    function _runFuzz(uint16 withdrawalFeeBps, uint256 protocolTakeE18) internal {
-        withdrawalFeeBps = uint16(bound(withdrawalFeeBps, 0, 50));
-        protocolTakeE18 = uint256(bound(protocolTakeE18, 1, 9999)) * 1e13;//realistically 1% admin take is lowest possible
+    function _runFuzz(uint64 withdrawalFeeBps, uint256 protocolTakeE18) internal {
+        withdrawalFeeBps = uint64(bound(withdrawalFeeBps, 5, 500));
+        if (protocolTakeE18 > 0) {
+            protocolTakeE18 = uint256(bound(protocolTakeE18, 5, 9999)) * 1e14; //realistically 1% admin take is lowest possible
+        }
 
         vm.prank(address(vaultAdmin));
         updateWeightRunner.setQuantAMMUpliftFeeTake(protocolTakeE18);
@@ -399,8 +401,8 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
             IVault(address(vault)),
             weth,
             permit2,
-            withdrawalFeeBps,
-            5,
+            withdrawalFeeBps * 1e14, // convert to e18
+            5e14,
             address(updateWeightRunner),
             "Uplift LiquidityPosition v1",
             "Uplift LiquidityPosition v1",
@@ -462,7 +464,7 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         params.expectedNet = _netAfterFee(withdrawBpt, feeBps);
 
         params.upliftBpt = withdrawBpt - params.expectedNet;
-        params.protoShare = (params.upliftBpt * protocolTakeE18) / 1e18;
+        params.protoShare = params.upliftBpt.mulDown(protocolTakeE18);
         params.routerKeep = params.upliftBpt - params.protoShare;
 
         assertEq(before.poolSupply - after_.poolSupply, withdrawBpt - params.protoShare, "pool supply mismatch");
@@ -470,9 +472,7 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         params.expectedRouterBpt = bptAmount - withdrawBpt;
         assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), params.expectedRouterBpt, "router BPT");
 
-        
         assertEq(after_.userBpt, params.protoShare, "admin BPT");
-
 
         assertEq(after_.bobBpt, 0, "bob BPT");
         assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), params.expectedRouterBpt, "router BPT");
@@ -674,10 +674,11 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         uint256 routerKeep;
     }
 
-    function _runFuzzNegative(uint16 withdrawalFeeBps, uint256 protocolTakeE18) internal {
-        withdrawalFeeBps = uint16(bound(withdrawalFeeBps, 5, 500));
-        protocolTakeE18 = uint256(bound(protocolTakeE18, 1, 9999)) * 1e13;//realistically 1% admin take is lowest possible
-
+    function _runFuzzNegative(uint64 withdrawalFeeBps, uint256 protocolTakeE18) internal {
+        withdrawalFeeBps = uint64(bound(withdrawalFeeBps, 5, 500));
+        if (protocolTakeE18 > 0) {
+            protocolTakeE18 = uint256(bound(protocolTakeE18, 5, 9999)) * 1e14; //realistically 1% admin take is lowest possible
+        }
         vm.prank(address(vaultAdmin));
         updateWeightRunner.setQuantAMMUpliftFeeTake(protocolTakeE18);
         vm.stopPrank();
@@ -687,8 +688,8 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
             IVault(address(vault)),
             weth,
             permit2,
-            withdrawalFeeBps,
-            5,
+            withdrawalFeeBps * 1e14,
+            5e14,
             address(updateWeightRunner),
             "Uplift LiquidityPosition v1",
             "Uplift LiquidityPosition v1",
@@ -734,7 +735,7 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
 
         params.amountOut = bptAmount / 2;
 
-        uint64 exitFeePctE18 = upliftOnlyRouter.minWithdrawalFeeBps() * 1e14; // 5 → 5 × 1e14 = 5e14
+        uint64 exitFeePctE18 = upliftOnlyRouter.minWithdrawalFeeBps(); // 5 → 5 × 1e14 = 5e14
         params.hookFee = params.amountOut.mulDown(exitFeePctE18);
 
         assertEq(
@@ -759,18 +760,11 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
             "pool USDC wrong"
         );
 
-        params.upliftBpt = params.hookFee;
-        params.protoShare = (params.upliftBpt * protocolTakeE18) / 1e18;
+        params.upliftBpt = params.hookFee.mulUp(bptAmount).divDown(params.amountOut);
+        params.protoShare = (params.upliftBpt.mulDown(protocolTakeE18));
         params.routerKeep = params.upliftBpt - params.protoShare;
 
         assertEq(before.poolSupply - after_.poolSupply, bptAmount - params.protoShare, "pool supply wrong");
-
-        for(uint i; i < after_.userTokens.length; ++i) {
-            console.log("_after.userTokens[i]");
-            console.log(Strings.toString(after_.userTokens[i]));
-         }
-         console.log("after_.userBpt");
-            console.log(Strings.toString(after_.userBpt));
         assertEq(after_.userBpt, params.protoShare, "admin BPT wrong");
 
         assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), 0, "router BPT wrong");
@@ -792,25 +786,27 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         _runPositiveFuzz(withdrawalFeeBps_, protocolTake, priceMulE18_);
     }
 
-    function _runPositiveFuzz(uint16 withdrawalFeeBps_, uint256 protocolTake, uint256 priceMulE18_) internal {
+    function _runPositiveFuzz(uint64 withdrawalFeeBps_, uint256 protocolTake, uint256 priceMulE18_) internal {
         /* ──────── bounds ──────── */
-        withdrawalFeeBps_ = uint16(bound(withdrawalFeeBps_, 5, 500));
-        uint256 protocolTakeE18_ = uint256(bound(protocolTake, 1, 9999)) * 1e13;//realistically 1% admin take is lowest possible
+        withdrawalFeeBps_ = uint64(bound(withdrawalFeeBps_, 5, 500));
+        if (protocolTake > 0) {
+            protocolTake = uint256(bound(protocolTake, 5, 9999)) * 1e14; //realistically 1% admin take is lowest possible
+        }
+
+        vm.prank(address(vaultAdmin));
+        updateWeightRunner.setQuantAMMUpliftFeeTake(protocolTake);
+        vm.stopPrank();
+
         priceMulE18_ = bound(priceMulE18_, 1e18, 10_000e18);
-        console.log("withdrawal fees");
-        console.log(Strings.toString(withdrawalFeeBps_));
-        console.log("protocol take");
-        console.log(Strings.toString(protocolTakeE18_));
-        console.log("price multiplier");
-        console.log(Strings.toString(priceMulE18_));
+
         /* ──────── fresh router ──────── */
         vm.prank(owner);
         upliftOnlyRouter = new UpliftOnlyExample(
             IVault(address(vault)),
             weth,
             permit2,
-            withdrawalFeeBps_, // upliftFeeBps
-            5, // minWithdrawalFeeBps (5 bps, constant)
+            withdrawalFeeBps_ * 1e14, // upliftFeeBps
+            5e14, // minWithdrawalFeeBps (5 bps, constant)
             address(updateWeightRunner),
             "Uplift LP v1",
             "Uplift LP v1",
@@ -833,7 +829,7 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         updateWeightRunner.setMockPrices(pool, prices);
 
         uint256[] memory minsOut = [uint256(0), uint256(0)].toMemoryArray();
-        address observer = protocolTakeE18_ == 0 ? bob : updateWeightRunner.getQuantAMMAdmin();
+        address observer = protocolTake == 0 ? bob : updateWeightRunner.getQuantAMMAdmin();
 
         BaseVaultTest.Balances memory before = getBalances(observer);
 
@@ -843,14 +839,13 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
 
         BaseVaultTest.Balances memory after_ = getBalances(observer);
 
-        uint256 upliftRatioE18 = ((priceMulE18_ - 1e18) * 1e18) / priceMulE18_; // 0‥1 e18
+        // 3. fee percentage, 18 dec
+        uint256 upliftFeePctE18 = (priceMulE18_ - 1e18).mulDown(1e18).divDown(priceMulE18_).mulDown(
+            withdrawalFeeBps_ * 1e14
+        );
 
-        uint256 upliftFeePctE18 = (upliftRatioE18 * upliftOnlyRouter.upliftFeeBps()) / 10_000;
-
-        uint256 minFeePctE18 = uint256(upliftOnlyRouter.minWithdrawalFeeBps()) * 1e14; // 5 bps → 5 e14
-
+        uint256 minFeePctE18 = uint256(upliftOnlyRouter.minWithdrawalFeeBps()); // 5 bps → 5 e14
         uint256 effectiveFeePctE18 = upliftFeePctE18 > minFeePctE18 ? upliftFeePctE18 : minFeePctE18;
-
         uint256 amountOut = bptAmount / 2; // per-token
         uint256 hookFeeTokens = amountOut.mulDown(effectiveFeePctE18);
 
@@ -866,13 +861,17 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
 
         assertEq(before.vaultTokens[usdcIdx] - after_.vaultTokens[usdcIdx], amountOut - hookFeeTokens, "vault USDC");
 
-        uint256 supplyDiff = before.poolSupply - after_.poolSupply;
-        assertApproxEqAbs(supplyDiff, bptAmount /* burned */ - hookFeeTokens /* ≈ BPT minted */, 2, "pool supply");
+        uint256 adminFeeTokens = hookFeeTokens.mulDown(protocolTake); // 0 if take = 0
+
+        uint256 adminMintedBpt = adminFeeTokens.mulDown(bptAmount).divDown(amountOut);
+
+        // totalSupply must fall by the burned amount minus what we just minted
+        assertApproxEqAbs(before.poolSupply - after_.poolSupply, bptAmount - adminMintedBpt, 2, "pool supply");
 
         assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), 0, "router holds BPT");
         assertEq(after_.bobBpt, 0, "bob BPT");
 
-        if (protocolTakeE18_ == 0) {
+        if (protocolTake == 0) {
             assertEq(after_.userBpt, 0, "admin BPT");
         } else {
             // we can only guarantee the admin received *something* (mint rounding):

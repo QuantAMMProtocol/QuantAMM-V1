@@ -50,6 +50,7 @@ contract LPNFT is ERC721 {
         previousOwner  = super._update(to, tokenId, auth);
         //_update is called during mint, burn and transfer. This functionality is only for transfer
         if (to != address(0) && previousOwner != address(0)) {
+            require(previousOwner != to, "CANNOT_TRANSFER_TO_SELF");
             //if transfering the record in the vault needs to be changed to reflect the change in ownership
             router.afterUpdate(previousOwner, to, tokenId);
         }

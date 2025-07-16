@@ -655,15 +655,16 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         );
     }
 
-    function testFuzz_removeLiquidityNegativePriceChange_noProtocolTake(uint16 withdrawalFeeBps) public {
-        _runFuzzNegative(withdrawalFeeBps, 0);
+    function testFuzz_removeLiquidityNegativePriceChange_noProtocolTake(uint16 withdrawalFeeBps,uint64 minFee) public {
+        _runFuzzNegative(withdrawalFeeBps, 0, minFee);
     }
 
     function testFuzz_removeLiquidityNegativePriceChange_withProtocolTake(
         uint16 withdrawalFeeBps,
-        uint256 protocolTakeE18
+        uint256 protocolTakeE18,
+        uint64 minFee
     ) public {
-        _runFuzzNegative(withdrawalFeeBps, protocolTakeE18);
+        _runFuzzNegative(withdrawalFeeBps, protocolTakeE18, minFee);
     }
 
     struct FuzzNegativeParams {
@@ -674,7 +675,8 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         uint256 routerKeep;
     }
 
-    function _runFuzzNegative(uint64 withdrawalFeeBps, uint256 protocolTakeE18) internal {
+    function _runFuzzNegative(uint64 withdrawalFeeBps, uint256 protocolTakeE18, uint64 minFee) internal {
+        minFee = uint64(bound(minFee, 5, 100));
         withdrawalFeeBps = uint64(bound(withdrawalFeeBps, 5, 500));
         if (protocolTakeE18 > 0) {
             protocolTakeE18 = uint256(bound(protocolTakeE18, 5, 9999)) * 1e14; //realistically 1% admin take is lowest possible
@@ -774,23 +776,25 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
 
     /* ────────────────────────────  FUZZ: POSITIVE P&L  ─────────────────────────── */
 
-    function testFuzz_removeLiquidityPositive_noProtocolTake(uint16 withdrawalFeeBps_, uint256 priceMulE18_) public {
-        _runPositiveFuzz(withdrawalFeeBps_, 0, priceMulE18_);
+    function testFuzz_removeLiquidityPositive_noProtocolTake(uint64 withdrawalFeeBps_, uint256 priceMulE18_, uint64 minFee) public {
+        _runPositiveFuzz(withdrawalFeeBps_, 0, priceMulE18_, minFee);
     }
 
     function testFuzz_removeLiquidityPositive_withProtocolTake(
-        uint16 withdrawalFeeBps_,
+        uint64 withdrawalFeeBps_,
         uint256 protocolTake,
-        uint256 priceMulE18_
+        uint256 priceMulE18_,
+        uint64 minFee
     ) public {
-        _runPositiveFuzz(withdrawalFeeBps_, protocolTake, priceMulE18_);
+        _runPositiveFuzz(withdrawalFeeBps_, protocolTake, priceMulE18_, minFee);
     }
 
-    function _runPositiveFuzz(uint64 withdrawalFeeBps_, uint256 protocolTake, uint256 priceMulE18_) internal {
+    function _runPositiveFuzz(uint64 withdrawalFeeBps_, uint256 protocolTake, uint256 priceMulE18_, uint64 minFee) internal {
         /* ──────── bounds ──────── */
-        withdrawalFeeBps_ = uint64(bound(withdrawalFeeBps_, 5, 500));
+        minFee = uint64(bound(minFee, 5, 100));
+        withdrawalFeeBps_ = uint64(bound(withdrawalFeeBps_, minFee, 500));
         if (protocolTake > 0) {
-            protocolTake = uint256(bound(protocolTake, 5, 9999)) * 1e14; //realistically 1% admin take is lowest possible
+            protocolTake = uint256(bound(protocolTake, minFee, 9999)) * 1e14; //realistically 1% admin take is lowest possible
         }
 
         vm.prank(address(vaultAdmin));
@@ -806,7 +810,7 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
             weth,
             permit2,
             withdrawalFeeBps_ * 1e14, // upliftFeeBps
-            5e14, // minWithdrawalFeeBps (5 bps, constant)
+            minFee * 1e14, // minWithdrawalFeeBps (5 bps, constant)
             address(updateWeightRunner),
             "Uplift LP v1",
             "Uplift LP v1",
@@ -877,5 +881,34 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
             // we can only guarantee the admin received *something* (mint rounding):
             assertGt(after_.userBpt, 0, "admin BPT > 0");
         }
+    }
+
+    function testSetHookFeeOwnerPass(uint64 poolHookAmount) public {
+        uint64 boundFeeAmount = uint64(bound(poolHookAmount, _MIN_SWAP_FEE_PERCENTAGE, _MAX_SWAP_FEE_PERCENTAGE));
+        vm.expectEmit();
+        emit UpliftOnlyExample.HookSwapFeePercentageChanged(poolHooksContract, boundFeeAmount);
+        vm.startPrank(owner);
+        upliftOnlyRouter.setHookSwapFeePercentage(boundFeeAmount);
+        vm.stopPrank();
+    }
+
+    function testSetHookPassSmallerThanMinimumFail(uint64 poolHookAmount) public {
+        uint64 boundFeeAmount = uint64(bound(poolHookAmount, 0, _MIN_SWAP_FEE_PERCENTAGE - 1));
+
+        vm.startPrank(owner);
+        vm.expectRevert("Below _MIN_SWAP_FEE_PERCENTAGE");
+        upliftOnlyRouter.setHookSwapFeePercentage(boundFeeAmount);
+        vm.stopPrank();
+    }
+
+    function testSetHookPassGreaterThanMaxFail(uint64 poolHookAmount) public {
+        uint64 boundFeeAmount = uint64(
+            bound(poolHookAmount, uint64(_MAX_SWAP_FEE_PERCENTAGE) + 1, uint64(type(uint64).max))
+        );
+
+        vm.startPrank(owner);
+        vm.expectRevert("Above _MAX_SWAP_FEE_PERCENTAGE");
+        upliftOnlyRouter.setHookSwapFeePercentage(boundFeeAmount);
+        vm.stopPrank();
     }
 }

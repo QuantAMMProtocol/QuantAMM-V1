@@ -2,6 +2,8 @@
 
 pragma solidity >=0.8.24;
 
+import "forge-std/console.sol";
+import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -444,6 +446,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         uint256 adminFeePercent;
     }
 
+    
     /// @inheritdoc BaseHooks
     function onAfterRemoveLiquidity(
         address router,
@@ -476,11 +479,19 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             adminFeePercent: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake()
         });
 
+
         // We only allow removeLiquidity via the Router/Hook itself so that fee is applied correctly.
         hookAdjustedAmountsOutRaw = amountsOutRaw;
-
+        console.log("hookAdjustedAmountsOutRaw");
+        for(uint256 i; i < hookAdjustedAmountsOutRaw.length; ++i){
+            console.log("hookAdjustedAmountsOutRaw[i]");
+            console.log(Strings.toString(hookAdjustedAmountsOutRaw[i]));
+        }
         //this rounding faxvours the LP
         localData.lpTokenDepositValueNow = getPoolLPTokenValue(localData.prices, pool, MULDIRECTION.MULDOWN);
+
+        console.log("localData.lpTokenDepositValueNow");
+        console.log(Strings.toString(localData.lpTokenDepositValueNow));
 
         FeeData[] storage feeDataArray = poolsFeeData[pool][userAddress];
         localData.feeDataArrayLength = feeDataArray.length;
@@ -489,35 +500,71 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         for (uint256 i = localData.feeDataArrayLength - 1; i >= 0; --i) {
             localData.lpTokenDepositValue = feeDataArray[i].lpTokenDepositValue;
 
+            console.log("localData.lpTokenDepositValue");
+            console.log(Strings.toString(localData.lpTokenDepositValue));
             localData.lpTokenDepositValueChange =
                 ((int256(localData.lpTokenDepositValueNow) - int256(localData.lpTokenDepositValue)) * 1e18) /
                 int256(localData.lpTokenDepositValueNow);
+
+            console.log("localData.lpTokenDepositValueChange");
+            if(localData.lpTokenDepositValueChange > 0){
+                console.log(Strings.toString(uint256(localData.lpTokenDepositValueChange)));
+            }
+            else{
+                console.log("-");
+                console.log(Strings.toString(uint256(-localData.lpTokenDepositValueChange)));
+            }
 
             uint256 feePerLP;
 
             // if the pool has increased in value since the deposit, the fee is calculated based on the deposit value
             if (localData.lpTokenDepositValueChange > 0) {
+
+                console.log("feeDataArray[i].upliftFeeBps");
+                console.log(Strings.toString(feeDataArray[i].upliftFeeBps));
                 feePerLP = (
-                    uint256(localData.lpTokenDepositValueChange).mulDown(uint256(feeDataArray[i].upliftFeeBps))
+                    uint256(localData.lpTokenDepositValueChange).mulUp(uint256(feeDataArray[i].upliftFeeBps))
                 );
+                console.log("feePerLP");
+                console.log(Strings.toString(feePerLP));
             }
 
             if (feePerLP < uint256(minWithdrawalFeeBps)) {
+                console.log("minWithdrawalFeeBps");
+                console.log(Strings.toString(minWithdrawalFeeBps));
                 feePerLP = uint256(minWithdrawalFeeBps);
+                console.log("feePerLP");
+                console.log(Strings.toString(feePerLP));
             }
 
             if (feePerLP > uint256(_MAX_UPLIFT_FEE_PERCENTAGE)) {
+                console.log("_MAX_UPLIFT_FEE_PERCENTAGE");
+                console.log(Strings.toString(_MAX_UPLIFT_FEE_PERCENTAGE));
                 feePerLP = uint256(_MAX_UPLIFT_FEE_PERCENTAGE);
+                console.log("feePerLP");
+                console.log(Strings.toString(feePerLP));
             }
 
             // if the deposit is less than the amount left to burn, burn the whole deposit and move on to the next
             if (feeDataArray[i].amount <= localData.amountLeft) {
+                console.log("feeDataArray[i].amount");
+                console.log(Strings.toString(feeDataArray[i].amount));
+                console.log("localData.amountLeft");
+                console.log(Strings.toString(localData.amountLeft));
                 uint256 withdrawAmount = feeDataArray[i].amount;
-
+                console.log("withdrawAmount");
+                console.log(Strings.toString(withdrawAmount));
                 localData.feeAmount += withdrawAmount.mulDown(feePerLP);
+                console.log("localData.feeAmount");
+                console.log(Strings.toString(localData.feeAmount));
                 localData.amountLeft -= feeDataArray[i].amount;
+                console.log("localData.amountLeft");
+                console.log(Strings.toString(localData.amountLeft));
+
                 lpNFT.burn(feeDataArray[i].tokenID);
 
+                console.log("feeDataArray[i].tokenID");
+                console.log(Strings.toString(feeDataArray[i].tokenID));
                 delete feeDataArray[i];
                 feeDataArray.pop();
 
@@ -525,39 +572,98 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                     break;
                 }
             } else {
+                console.log("localData.amountLeft");
+                console.log(Strings.toString(localData.amountLeft));
+                console.log("feeDataArray[i].amount");
+                console.log(Strings.toString(feeDataArray[i].amount));
                 feeDataArray[i].amount -= localData.amountLeft;
+                console.log("feeDataArray[i].amount");
+                console.log(Strings.toString(feeDataArray[i].amount));
+                console.log("feePerLP");
+                console.log(Strings.toString(feePerLP));
+                console.log("localData.amountLeft");
+                console.log(Strings.toString(localData.amountLeft));
                 localData.feeAmount += localData.amountLeft.mulDown(feePerLP);
+                console.log("localData.feeAmount");
+                console.log(Strings.toString(localData.feeAmount));
                 break;
             }
         }
 
-        localData.feePercentage = localData.feeAmount.divDown(bptAmountIn);
+        console.log("bptAmountIn");
+        console.log(Strings.toString(bptAmountIn));
+        console.log("localData.feeAmount");
+        console.log(Strings.toString(localData.feeAmount));
+        localData.feePercentage = localData.feeAmount.divUp(bptAmountIn);
+        console.log("localData.feePercentage");
+        console.log(Strings.toString(localData.feePercentage));
         hookAdjustedAmountsOutRaw = localData.amountsOutRaw;
-
+        console.log("localData.amountsOutRaw");
+        for(uint256 i; i < localData.amountsOutRaw.length; ++i){
+            console.log("localData.amountsOutRaw[i]");
+            console.log(Strings.toString(localData.amountsOutRaw[i]));
+        }
         localData.tokens = _vault.getPoolTokens(localData.pool);
 
         localData.adminFeePercent = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
 
+        console.log("localData.adminFeePercent");
+        console.log(Strings.toString(localData.adminFeePercent));
         // Charge fees proportional to the `amountOut` of each token.
         for (uint256 i = 0; i < localData.amountsOutRaw.length; i++) {
-            uint256 exitFee = localData.amountsOutRaw[i].mulDown(localData.feePercentage);
+            console.log("localData.amountsOutRaw[i]");
+            console.log(Strings.toString(localData.amountsOutRaw[i]));
+            console.log("localData.feePercentage");
+            console.log(Strings.toString(localData.feePercentage));
+            uint256 exitFee = localData.amountsOutRaw[i].mulUp(localData.feePercentage);
+            console.log("exitFee");
+            console.log(Strings.toString(exitFee));
 
+            console.log("adminFeePercent");
+            console.log(Strings.toString(localData.adminFeePercent));
             if (localData.adminFeePercent > 0) {
                 localData.accruedQuantAMMFees[i] = exitFee.mulUp(localData.adminFeePercent);
+                console.log("localData.accruedQuantAMMFees[i]");
+                console.log(Strings.toString(localData.accruedQuantAMMFees[i]));
             }
 
+            console.log("localData.accruedQuantAMMFees[i]");
+            console.log(Strings.toString(localData.accruedQuantAMMFees[i]));
             localData.accruedFees[i] = exitFee - localData.accruedQuantAMMFees[i];
-            if (localData.accruedFees[i] + localData.accruedQuantAMMFees[i] > localData.amountsOutRaw[i]) {
+            console.log("localData.accruedFees[i]");
+            console.log(Strings.toString(localData.accruedFees[i]));
+            console.log("localData.accruedFees[i]  + localData.accruedQuantAMMFees[i]");
+            console.log(Strings.toString(localData.accruedFees[i] + localData.accruedQuantAMMFees[i]));
+            console.log("localData.amountsOutRaw[i]  - exitFee");
+            console.log(Strings.toString(localData.accruedFees[i] + localData.accruedQuantAMMFees[i]));
+            console.log("localData.amountsOutRaw[i]");
+            console.log(Strings.toString(localData.amountsOutRaw[i]));
+            console.log("localData.accruedFees[i]  + localData.accruedQuantAMMFees[i]");
+            console.log(Strings.toString((localData.accruedFees[i]  + localData.accruedQuantAMMFees[i])));
+            console.log("localData.amountsOutRaw[i]");
+            console.log(Strings.toString((localData.amountsOutRaw[i])));
+
+            if(localData.accruedFees[i]  + localData.accruedQuantAMMFees[i] > localData.amountsOutRaw[i]){
                 revert("Accrued fees exceed amounts out");
             }
-            hookAdjustedAmountsOutRaw[i] = localData.amountsOutRaw[i] - exitFee;
+            hookAdjustedAmountsOutRaw[i] =
+                localData.amountsOutRaw[i] - exitFee;
 
+            console.log("hookAdjustedAmountsOutRaw[i]");
+            console.log(Strings.toString(hookAdjustedAmountsOutRaw[i]));
             // Fees don't need to be transferred to the hook, because donation will redeposit them in the Vault.
             // In effect, we will transfer a reduced amount of tokensOut to the caller, and leave the remainder
             // in the pool balance.
         }
 
         if (localData.adminFeePercent > 0) {
+            console.log("addLiquidity[i]");
+            console.log(Strings.toString(localData.adminFeePercent));
+            console.log("localData.feeAmount");
+            console.log(Strings.toString(localData.feeAmount));
+            console.log("localData.feeAmount.mulDown(localData.adminFeePercent)");
+            console.log(Strings.toString(localData.feeAmount.mulDown(localData.adminFeePercent)));
+            console.log(Strings.toString((localData.feeAmount * localData.adminFeePercent) / 1e18));
             _vault.addLiquidity(
                 AddLiquidityParams({
                     pool: localData.pool,
@@ -576,7 +682,14 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             );
         }
 
+        console.log("attempting add");
         if (localData.adminFeePercent != 1e18) {
+            console.log("localData.accruedFees");
+            for(uint256 i; i < localData.accruedFees.length; ++i){
+                console.log("localData.accruedFees[i]");
+                console.log(Strings.toString(localData.accruedFees[i]));
+
+            }
             // Donates accrued fees back to LPs.
             _vault.addLiquidity(
                 AddLiquidityParams({
@@ -590,33 +703,13 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             );
         }
 
-        uint256[] memory residuals = new uint256[](localData.tokens.length);
-        bool hasResidual = false;
-
         for (uint256 i = 0; i < localData.tokens.length; ++i) {
-            uint256 bal = localData.tokens[i].balanceOf(address(this));
-            if (bal > 0) {
-                residuals[i] = bal;
-                hasResidual = true;
-            }
+            console.log("hookAdjustedAmountsOutRaw");
+            console.log(Strings.toString(hookAdjustedAmountsOutRaw[i]));
         }
-
-        if (hasResidual) {
-            _vault.addLiquidity(
-                AddLiquidityParams({
-                    pool: localData.pool,
-                    to: address(this), // donation
-                    maxAmountsIn: residuals,
-                    minBptAmountOut: 0,
-                    kind: AddLiquidityKind.DONATION,
-                    userData: bytes("")
-                })
-            );
-        }
-
         return (true, hookAdjustedAmountsOutRaw);
     }
-
+    
     /// @param _from the owner to transfer from
     /// @param _to the owner to transfer to
     /// @param _tokenID the token ID to transfer

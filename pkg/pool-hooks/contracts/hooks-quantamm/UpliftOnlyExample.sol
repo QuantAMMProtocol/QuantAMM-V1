@@ -594,7 +594,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         console.log(Strings.toString(bptAmountIn));
         console.log("localData.feeAmount");
         console.log(Strings.toString(localData.feeAmount));
-        localData.feePercentage = localData.feeAmount.divUp(bptAmountIn);
+        localData.feePercentage = localData.feeAmount.divDown(bptAmountIn);
         console.log("localData.feePercentage");
         console.log(Strings.toString(localData.feePercentage));
         hookAdjustedAmountsOutRaw = localData.amountsOutRaw;

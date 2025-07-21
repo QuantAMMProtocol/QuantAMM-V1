@@ -84,11 +84,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Ownab
         IVault vault,
         uint256 defaultMaxSurgeFeePercentage,
         uint256 defaultThresholdPercentage
-    )
-        SingletonAuthentication(vault)
-        VaultGuard(vault)
-        Ownable(msg.sender)
-    {
+    ) SingletonAuthentication(vault) VaultGuard(vault) Ownable(msg.sender) {
         _ensurePct(defaultMaxSurgeFeePercentage);
         _ensurePct(defaultThresholdPercentage);
         _defaultMaxSurgeFee = defaultMaxSurgeFeePercentage;
@@ -136,7 +132,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Ownab
         PoolSwapParams calldata p,
         address pool,
         uint256 staticSwapFee
-    ) public view override onlyVault returns (bool, uint256) {
+    ) public view override returns (bool, uint256) {
         PoolConfig memory cfg = _poolConfig[pool];
         if (cfg.pairIndex == 0) return (true, staticSwapFee);
 
@@ -169,10 +165,11 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Ownab
 
         uint256 surgeFee = staticSwapFee +
             (uint256(cfg.maxSurgeFeePercentage) - staticSwapFee).mulDown(
-                (deviation - uint256(cfg.thresholdPercentage)).divDown(
-                    uint256(cfg.thresholdPercentage).complement()
-                )
+                (deviation - uint256(cfg.thresholdPercentage)).divDown(uint256(cfg.thresholdPercentage).complement())
             );
+
+        //max/min surgeFee.
+
         return (true, surgeFee);
     }
 

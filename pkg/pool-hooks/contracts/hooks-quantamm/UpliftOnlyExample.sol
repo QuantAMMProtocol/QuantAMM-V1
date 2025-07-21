@@ -2,7 +2,6 @@
 
 pragma solidity >=0.8.24;
 
-import "forge-std/console.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
@@ -225,6 +224,25 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                                   Router Functions
     ***************************************************************************/
 
+    /**
+     * @notice Adds liquidity to a pool proportionally and mints an LP NFT for the depositor.
+     * @dev This function ensures that deposits are not made too frequently to prevent exploitation.
+     *      It also verifies that the number of deposits does not exceed the allowed limit.
+     *      The liquidity is added proportionally, and the LP token value is calculated using
+     *      registered oracles and update weight runners.
+     * @param pool The address of the pool to which liquidity is being added.
+     * @param maxAmountsIn The maximum amounts of tokens to be deposited into the pool.
+     * @param exactBptAmountOut The exact amount of BPT tokens to be minted for the liquidity addition.
+     * @param wethIsEth A boolean indicating whether WETH should be treated as ETH.
+     * @param userData Additional data provided by the user for the liquidity addition.
+     * @return amountsIn The actual amounts of tokens deposited into the pool.
+     * @custom:requirements 
+     * - The pool must be registered with the QuantAMM update weight runner.
+     * - The pool must be approved with oracles that provide the prices.
+     * @custom:errors 
+     * - `TooManyDeposits`: Thrown if the user has exceeded the maximum allowed deposits for the pool.
+     * - `TooFastDeposits`: Thrown if deposits are made too frequently within the same block.
+     */
     function addLiquidityProportional(
         address pool,
         uint256[] memory maxAmountsIn,
@@ -280,6 +298,18 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
 
         nftPool[tokenID] = pool;
     }
+    /**
+     * @notice Removes liquidity from the pool proportionally based on the provided BPT amount.
+     * @dev This function ensures that only the owner of the deposit can withdraw liquidity.
+     *      The tokens are sent to the caller (`msg.sender`) upon successful withdrawal.
+     * @param bptAmountIn The amount of BPT (Balancer Pool Tokens) to be redeemed for liquidity.
+     * @param minAmountsOut An array specifying the minimum amounts of each token expected to be withdrawn.
+     * @param wethIsEth A boolean indicating whether WETH should be unwrapped to ETH during withdrawal.
+     * @param pool The address of the pool from which liquidity is being removed.
+     * @return amountsOut An array containing the amounts of each token withdrawn from the pool.
+     * @custom:reverts WithdrawalByNonOwner If the caller has no deposits in the specified pool.
+     * @custom:modifier saveSender Ensures the sender's address is saved for internal tracking.
+     */
 
     function removeLiquidityProportional(
         uint256 bptAmountIn,
@@ -446,8 +476,29 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         uint256 adminFeePercent;
     }
 
-    
-    /// @inheritdoc BaseHooks
+    /**
+     * @notice Hook function triggered after liquidity is removed from a pool.
+     * @dev This function calculates and applies fees based on the uplift in pool value since the deposit,
+     *      and redistributes accrued fees back to liquidity providers or the admin, depending on the configuration.
+     * @param router The address of the router initiating the liquidity removal.
+     * @param pool The address of the pool from which liquidity is being removed.
+     * @param bptAmountIn The amount of BPT (Balancer Pool Tokens) being burned to remove liquidity.
+     * @param amountsOutRaw The raw amounts of tokens being withdrawn from the pool.
+     * @param userData Additional data provided by the user for the liquidity removal operation.
+     * @return success A boolean indicating whether the operation was successful.
+     * @return hookAdjustedAmountsOutRaw The adjusted amounts of tokens withdrawn after fees are applied.
+     * 
+     * @notice Fees are calculated based on the uplift in pool value since the deposit and are capped by 
+     *         `_MAX_UPLIFT_FEE_PERCENTAGE`. A minimum withdrawal fee (`minWithdrawalFeeBps`) is always applied.
+     * @notice Admin fees are redistributed to the admin's address, while other accrued fees are donated back to the pool.
+     * @notice This function ensures that fees do not exceed the amounts being withdrawn and reverts if this condition is violated.
+     * 
+     * @dev The function interacts with the Vault to add liquidity back to the pool for fee redistribution.
+     * @dev The function assumes that liquidity removal is only performed via the Router/Hook itself to ensure proper fee application.
+     * @dev Emits an `ExitFeeCharged` event when admin fees are charged.
+     * 
+     * @custom:security Only callable by the Vault and self-router to ensure controlled execution.
+     */
     function onAfterRemoveLiquidity(
         address router,
         address pool,
@@ -479,19 +530,11 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             adminFeePercent: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake()
         });
 
-
         // We only allow removeLiquidity via the Router/Hook itself so that fee is applied correctly.
         hookAdjustedAmountsOutRaw = amountsOutRaw;
-        console.log("hookAdjustedAmountsOutRaw");
-        for(uint256 i; i < hookAdjustedAmountsOutRaw.length; ++i){
-            console.log("hookAdjustedAmountsOutRaw[i]");
-            console.log(Strings.toString(hookAdjustedAmountsOutRaw[i]));
-        }
-        //this rounding faxvours the LP
-        localData.lpTokenDepositValueNow = getPoolLPTokenValue(localData.prices, pool, MULDIRECTION.MULDOWN);
 
-        console.log("localData.lpTokenDepositValueNow");
-        console.log(Strings.toString(localData.lpTokenDepositValueNow));
+        // Calculate the current value of the pool in USD, rounding down to favor LPs.
+        localData.lpTokenDepositValueNow = getPoolLPTokenValue(localData.prices, pool, MULDIRECTION.MULDOWN);
 
         FeeData[] storage feeDataArray = poolsFeeData[pool][userAddress];
         localData.feeDataArrayLength = feeDataArray.length;
@@ -499,72 +542,34 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
 
         for (uint256 i = localData.feeDataArrayLength - 1; i >= 0; --i) {
             localData.lpTokenDepositValue = feeDataArray[i].lpTokenDepositValue;
-
-            console.log("localData.lpTokenDepositValue");
-            console.log(Strings.toString(localData.lpTokenDepositValue));
             localData.lpTokenDepositValueChange =
                 ((int256(localData.lpTokenDepositValueNow) - int256(localData.lpTokenDepositValue)) * 1e18) /
                 int256(localData.lpTokenDepositValueNow);
 
-            console.log("localData.lpTokenDepositValueChange");
-            if(localData.lpTokenDepositValueChange > 0){
-                console.log(Strings.toString(uint256(localData.lpTokenDepositValueChange)));
-            }
-            else{
-                console.log("-");
-                console.log(Strings.toString(uint256(-localData.lpTokenDepositValueChange)));
-            }
-
             uint256 feePerLP;
 
-            // if the pool has increased in value since the deposit, the fee is calculated based on the deposit value
+            // Calculate fee based on uplift in pool value since deposit, ensuring minimum withdrawal fee is applied.
             if (localData.lpTokenDepositValueChange > 0) {
-
-                console.log("feeDataArray[i].upliftFeeBps");
-                console.log(Strings.toString(feeDataArray[i].upliftFeeBps));
-                feePerLP = (
-                    uint256(localData.lpTokenDepositValueChange).mulUp(uint256(feeDataArray[i].upliftFeeBps))
-                );
-                console.log("feePerLP");
-                console.log(Strings.toString(feePerLP));
+                feePerLP = (uint256(localData.lpTokenDepositValueChange).mulUp(uint256(feeDataArray[i].upliftFeeBps)));
             }
 
             if (feePerLP < uint256(minWithdrawalFeeBps)) {
-                console.log("minWithdrawalFeeBps");
-                console.log(Strings.toString(minWithdrawalFeeBps));
                 feePerLP = uint256(minWithdrawalFeeBps);
-                console.log("feePerLP");
-                console.log(Strings.toString(feePerLP));
             }
 
             if (feePerLP > uint256(_MAX_UPLIFT_FEE_PERCENTAGE)) {
-                console.log("_MAX_UPLIFT_FEE_PERCENTAGE");
-                console.log(Strings.toString(_MAX_UPLIFT_FEE_PERCENTAGE));
                 feePerLP = uint256(_MAX_UPLIFT_FEE_PERCENTAGE);
-                console.log("feePerLP");
-                console.log(Strings.toString(feePerLP));
             }
 
-            // if the deposit is less than the amount left to burn, burn the whole deposit and move on to the next
+            // Burn deposits sequentially (FILO) until the requested amount is fully withdrawn.
             if (feeDataArray[i].amount <= localData.amountLeft) {
-                console.log("feeDataArray[i].amount");
-                console.log(Strings.toString(feeDataArray[i].amount));
-                console.log("localData.amountLeft");
-                console.log(Strings.toString(localData.amountLeft));
                 uint256 withdrawAmount = feeDataArray[i].amount;
-                console.log("withdrawAmount");
-                console.log(Strings.toString(withdrawAmount));
+
                 localData.feeAmount += withdrawAmount.mulDown(feePerLP);
-                console.log("localData.feeAmount");
-                console.log(Strings.toString(localData.feeAmount));
                 localData.amountLeft -= feeDataArray[i].amount;
-                console.log("localData.amountLeft");
-                console.log(Strings.toString(localData.amountLeft));
 
                 lpNFT.burn(feeDataArray[i].tokenID);
 
-                console.log("feeDataArray[i].tokenID");
-                console.log(Strings.toString(feeDataArray[i].tokenID));
                 delete feeDataArray[i];
                 feeDataArray.pop();
 
@@ -572,98 +577,38 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                     break;
                 }
             } else {
-                console.log("localData.amountLeft");
-                console.log(Strings.toString(localData.amountLeft));
-                console.log("feeDataArray[i].amount");
-                console.log(Strings.toString(feeDataArray[i].amount));
                 feeDataArray[i].amount -= localData.amountLeft;
-                console.log("feeDataArray[i].amount");
-                console.log(Strings.toString(feeDataArray[i].amount));
-                console.log("feePerLP");
-                console.log(Strings.toString(feePerLP));
-                console.log("localData.amountLeft");
-                console.log(Strings.toString(localData.amountLeft));
                 localData.feeAmount += localData.amountLeft.mulDown(feePerLP);
-                console.log("localData.feeAmount");
-                console.log(Strings.toString(localData.feeAmount));
                 break;
             }
         }
 
-        console.log("bptAmountIn");
-        console.log(Strings.toString(bptAmountIn));
-        console.log("localData.feeAmount");
-        console.log(Strings.toString(localData.feeAmount));
         localData.feePercentage = localData.feeAmount.divDown(bptAmountIn);
-        console.log("localData.feePercentage");
-        console.log(Strings.toString(localData.feePercentage));
         hookAdjustedAmountsOutRaw = localData.amountsOutRaw;
-        console.log("localData.amountsOutRaw");
-        for(uint256 i; i < localData.amountsOutRaw.length; ++i){
-            console.log("localData.amountsOutRaw[i]");
-            console.log(Strings.toString(localData.amountsOutRaw[i]));
-        }
         localData.tokens = _vault.getPoolTokens(localData.pool);
 
         localData.adminFeePercent = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
 
-        console.log("localData.adminFeePercent");
-        console.log(Strings.toString(localData.adminFeePercent));
         // Charge fees proportional to the `amountOut` of each token.
         for (uint256 i = 0; i < localData.amountsOutRaw.length; i++) {
-            console.log("localData.amountsOutRaw[i]");
-            console.log(Strings.toString(localData.amountsOutRaw[i]));
-            console.log("localData.feePercentage");
-            console.log(Strings.toString(localData.feePercentage));
             uint256 exitFee = localData.amountsOutRaw[i].mulUp(localData.feePercentage);
-            console.log("exitFee");
-            console.log(Strings.toString(exitFee));
 
-            console.log("adminFeePercent");
-            console.log(Strings.toString(localData.adminFeePercent));
             if (localData.adminFeePercent > 0) {
                 localData.accruedQuantAMMFees[i] = exitFee.mulUp(localData.adminFeePercent);
-                console.log("localData.accruedQuantAMMFees[i]");
-                console.log(Strings.toString(localData.accruedQuantAMMFees[i]));
             }
 
-            console.log("localData.accruedQuantAMMFees[i]");
-            console.log(Strings.toString(localData.accruedQuantAMMFees[i]));
             localData.accruedFees[i] = exitFee - localData.accruedQuantAMMFees[i];
-            console.log("localData.accruedFees[i]");
-            console.log(Strings.toString(localData.accruedFees[i]));
-            console.log("localData.accruedFees[i]  + localData.accruedQuantAMMFees[i]");
-            console.log(Strings.toString(localData.accruedFees[i] + localData.accruedQuantAMMFees[i]));
-            console.log("localData.amountsOutRaw[i]  - exitFee");
-            console.log(Strings.toString(localData.accruedFees[i] + localData.accruedQuantAMMFees[i]));
-            console.log("localData.amountsOutRaw[i]");
-            console.log(Strings.toString(localData.amountsOutRaw[i]));
-            console.log("localData.accruedFees[i]  + localData.accruedQuantAMMFees[i]");
-            console.log(Strings.toString((localData.accruedFees[i]  + localData.accruedQuantAMMFees[i])));
-            console.log("localData.amountsOutRaw[i]");
-            console.log(Strings.toString((localData.amountsOutRaw[i])));
-
-            if(localData.accruedFees[i]  + localData.accruedQuantAMMFees[i] > localData.amountsOutRaw[i]){
+            if (localData.accruedFees[i] + localData.accruedQuantAMMFees[i] > localData.amountsOutRaw[i]) {
+                // Ensure fees do not exceed the amounts being withdrawn.
                 revert("Accrued fees exceed amounts out");
             }
-            hookAdjustedAmountsOutRaw[i] =
-                localData.amountsOutRaw[i] - exitFee;
+            hookAdjustedAmountsOutRaw[i] = localData.amountsOutRaw[i] - exitFee;
 
-            console.log("hookAdjustedAmountsOutRaw[i]");
-            console.log(Strings.toString(hookAdjustedAmountsOutRaw[i]));
             // Fees don't need to be transferred to the hook, because donation will redeposit them in the Vault.
-            // In effect, we will transfer a reduced amount of tokensOut to the caller, and leave the remainder
-            // in the pool balance.
         }
 
         if (localData.adminFeePercent > 0) {
-            console.log("addLiquidity[i]");
-            console.log(Strings.toString(localData.adminFeePercent));
-            console.log("localData.feeAmount");
-            console.log(Strings.toString(localData.feeAmount));
-            console.log("localData.feeAmount.mulDown(localData.adminFeePercent)");
-            console.log(Strings.toString(localData.feeAmount.mulDown(localData.adminFeePercent)));
-            console.log(Strings.toString((localData.feeAmount * localData.adminFeePercent) / 1e18));
+            // Redistribute admin fees back to the QuantAMM admin.
             _vault.addLiquidity(
                 AddLiquidityParams({
                     pool: localData.pool,
@@ -682,15 +627,8 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             );
         }
 
-        console.log("attempting add");
         if (localData.adminFeePercent != 1e18) {
-            console.log("localData.accruedFees");
-            for(uint256 i; i < localData.accruedFees.length; ++i){
-                console.log("localData.accruedFees[i]");
-                console.log(Strings.toString(localData.accruedFees[i]));
-
-            }
-            // Donates accrued fees back to LPs.
+            // Donate accrued fees back to LPs.
             _vault.addLiquidity(
                 AddLiquidityParams({
                     pool: localData.pool,
@@ -703,13 +641,9 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             );
         }
 
-        for (uint256 i = 0; i < localData.tokens.length; ++i) {
-            console.log("hookAdjustedAmountsOutRaw");
-            console.log(Strings.toString(hookAdjustedAmountsOutRaw[i]));
-        }
         return (true, hookAdjustedAmountsOutRaw);
     }
-    
+
     /// @param _from the owner to transfer from
     /// @param _to the owner to transfer to
     /// @param _tokenID the token ID to transfer

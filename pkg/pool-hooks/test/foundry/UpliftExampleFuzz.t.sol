@@ -843,23 +843,11 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
 
         BaseVaultTest.Balances memory after_ = getBalances(observer);
 
-        console.log("before.bobTokens[daiIdx]");
-        console.log(Strings.toString(before.bobTokens[daiIdx]));
-        console.log("before.bobTokens[usdcIdx]");
-        console.log(Strings.toString(before.bobTokens[usdcIdx]));
-        console.log("priceMulE18_");
-        console.log(Strings.toString(priceMulE18_));
-        console.log("withdrawalFeeBps_");
-        console.log(Strings.toString(withdrawalFeeBps_));
-
         // 3. fee percentage, 18 dec
         uint256 upliftFeePctE18 = (priceMulE18_ - 1e18).mulUp(1e18).divDown(priceMulE18_).mulUp(
             withdrawalFeeBps_ * 1e14
         );
-
-        console.log("upliftFeePctE18");
-        console.log(Strings.toString(upliftFeePctE18));
-
+        
         // 4. min 
         uint256 minFeePctE18 = uint256(upliftOnlyRouter.minWithdrawalFeeBps()); // 5 bps → 5 e14
         uint256 effectiveFeePctE18 = upliftFeePctE18 > minFeePctE18 ? upliftFeePctE18 : minFeePctE18;

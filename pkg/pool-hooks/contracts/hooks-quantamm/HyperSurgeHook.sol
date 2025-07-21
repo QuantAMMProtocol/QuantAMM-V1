@@ -39,14 +39,6 @@ library HyperPrice {
 
 /**
  * @title  HyperSurgeHook
- * @notice Dynamic-fee hook that “surges” when the pool price drifts from
- *         Hyperliquid’s spot price beyond a threshold.
- *
- * @dev Assumes a **two-token pool** in the form <volatileAsset, QuoteStable>
- *      e.g. <wBTC, USDC>.  Token 0 = volatile asset, Token 1 = quote.
- *
- *      If you plan to use multi-asset stable pools you will need to extend
- *      the `_poolImpliedPrice()` function accordingly.
  */
 contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Ownable {
     using FixedPoint for uint256;

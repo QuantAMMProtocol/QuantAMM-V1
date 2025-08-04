@@ -45,33 +45,34 @@ library HyperTokenInfo {
 }
 
 /// -----------------------------------------------------------------------
-/// Multitoken Hyper Surge Hook
+/// Multitoken Hyper Surge Hook — index-based config, packed per index
 /// -----------------------------------------------------------------------
 contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, Ownable {
     using FixedPoint for uint256;
     using SafeCast for uint256;
 
-    // ===== Events
-    event TokenPriceConfigured(address indexed pool, address indexed token, uint32 pairIndex, uint8 szDecimals, bool isUsdQuote);
+    // ===== Events (index-based)
+    event TokenPriceConfiguredIndex(address indexed pool, uint8 indexed tokenIndex, uint32 pairIndex, uint8 szDecimals, bool isUsdQuote);
     event MaxSurgeFeePercentageChanged(address indexed pool, uint256 newMaxSurgeFeePercentage);
     event ThresholdPercentageChanged(address indexed pool, uint256 newThresholdPercentage);
 
-    // ===== Minimal custom errors for config
+    // ===== Errors
     error InvalidArrayLengths();
-    error TokenNotConfigured();
+    error TokenIndexOutOfRange();
+    error NumTokensOutOfRange();
 
     // ===== Types
-    struct TokenPriceCfg {
-        uint32 pairIndex;   // Hyperliquid market id (0 allowed only when isUsdQuote = true)
-        uint8  szDecimals;  // cached from tokenInfo precompile
-        bool   isUsdQuote;  // if true, price is exactly 1e18
-    }
-
     struct PoolCfg {
         uint64 maxSurgeFeePercentage; // 18-dec
         uint64 thresholdPercentage;   // 18-dec
-        mapping(address => TokenPriceCfg) tokenCfg; // per-token cfg
-        address[] tokensByIndex;                    // index -> token (cached on register)
+        uint8  numTokens;             // 2..8 inclusive
+        // Packed token config per index (2..8 tokens used).
+        // For index i (0..7), layout in the 256-bit word:
+        // bits [31:0]   -> pairIndex (uint32)
+        // bits [39:32]  -> szDecimals (uint8)
+        // bit  [40]     -> isUsdQuote (bool)
+        // remaining bits reserved (zero)
+        uint256[8] tokenCfgPacked;    // one SLOAD per token index
         bool initialized;
     }
 
@@ -94,10 +95,8 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         f.shouldCallComputeDynamicSwapFee = true;
     }
 
-    // ===== Locals structs (per-function)
+    // ===== Single locals-struct kept (for stack depth)
     struct ComputeLocals {
-        address tokenIn;
-        address tokenOut;
         uint256 calcAmountScaled18;
         uint256 n;
         uint256[] newBalances;
@@ -113,168 +112,187 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         uint256 surgeFee;
     }
 
-    // ===== Vault lifecycle
-
+    // ===== Register: set numTokens, defaults
     function onRegister(
         address,
         address pool,
         TokenConfig[] memory tokenCfgs,
         LiquidityManagement calldata
     ) public override onlyVault returns (bool) {
-        _poolCfg[pool].maxSurgeFeePercentage = _defaultMaxSurgeFee.toUint64();
-        _poolCfg[pool].thresholdPercentage   = _defaultThreshold.toUint64();
-        _poolCfg[pool].initialized = true;
+        PoolCfg storage pc = _poolCfg[pool];
 
         uint256 n = tokenCfgs.length;
-        _poolCfg[pool].tokensByIndex = new address[](n);
-        for (uint256 i = 0; i < n; ++i) {
-            _poolCfg[pool].tokensByIndex[i] = address(tokenCfgs[i].token); // cache index -> token
-        }
+        if (n < 2 || n > 8) revert NumTokensOutOfRange();
+
+        pc.maxSurgeFeePercentage = _defaultMaxSurgeFee.toUint64();
+        pc.thresholdPercentage   = _defaultThreshold.toUint64();
+        pc.numTokens = uint8(n);
+        pc.initialized = true;
+
+        // No address->index mapping needed (indices are fixed by pool).
         return true;
     }
 
-    // ========= Owner configuration =========
-    /// @notice Configure a single token’s Hyperliquid mapping for a given pool.
-    function _setTokenPriceConfig(
-        address pool,
-        address token,
-        uint32 pairIdx,
-        bool isUsd
-    ) internal {
-        // No local storage refs; operate inline on mapping to keep locals minimal
-        if (isUsd) {
-            _poolCfg[pool].tokenCfg[token].pairIndex = 0;
-            _poolCfg[pool].tokenCfg[token].szDecimals = 0;
-            _poolCfg[pool].tokenCfg[token].isUsdQuote = true;
-        } else {
-            require(pairIdx != 0, "PAIRIDX");
-            uint8 sz = HyperTokenInfo.szDecimals(pairIdx); // may revert "dec"
-            _poolCfg[pool].tokenCfg[token].pairIndex  = pairIdx;
-            _poolCfg[pool].tokenCfg[token].szDecimals = sz;
-            _poolCfg[pool].tokenCfg[token].isUsdQuote = false;
-        }
+    // ========= Owner configuration (index-based) =========
 
-        emit TokenPriceConfigured(
-            pool,
-            token,
-            _poolCfg[pool].tokenCfg[token].pairIndex,
-            _poolCfg[pool].tokenCfg[token].szDecimals,
-            _poolCfg[pool].tokenCfg[token].isUsdQuote
-        );
-    }
-
-    /// @notice Configure a single token’s Hyperliquid mapping for a given pool.
-    function setTokenPriceConfig(
+    /// @notice Configure a single token’s Hyperliquid mapping for a given pool by token index (0..7).
+    function setTokenPriceConfigIndex(
         address pool,
-        address token,
+        uint8 tokenIndex,
         uint32 pairIdx,
         bool isUsd
     ) external onlyOwner {
-        if (token == address(0)) revert TokenNotConfigured(); // zero-address guard
-        _setTokenPriceConfig(pool, token, pairIdx, isUsd);
+        PoolCfg storage pc = _requirePool(pool);
+        if (tokenIndex >= pc.numTokens) revert TokenIndexOutOfRange();
+
+        uint8 sz = 0;
+        if (!isUsd) {
+            require(pairIdx != 0, "PAIRIDX");
+            sz = HyperTokenInfo.szDecimals(pairIdx); // may revert "dec"
+        }
+
+        // pack into 1 word for this index
+        pc.tokenCfgPacked[tokenIndex] = _packTokenCfg(pairIdx, sz, isUsd);
+
+        emit TokenPriceConfiguredIndex(pool, tokenIndex, pairIdx, sz, isUsd);
     }
 
-    /// @notice Batch version.
-    function setTokenPriceConfigBatch(
+    /// @notice Batch version (indices).
+    function setTokenPriceConfigBatchIndex(
         address pool,
-        address[] calldata tokens,
+        uint8[] calldata tokenIndices,
         uint32[] calldata pairIdx,
         bool[] calldata isUsd
     ) external onlyOwner {
-        if (tokens.length != pairIdx.length || tokens.length != isUsd.length) revert InvalidArrayLengths();
-        uint256 len = tokens.length;
+        PoolCfg storage pc = _requirePool(pool);
+
+        if (tokenIndices.length != pairIdx.length || tokenIndices.length != isUsd.length) revert InvalidArrayLengths();
+        uint256 len = tokenIndices.length;
         for (uint256 i = 0; i < len; ++i) {
-            _setTokenPriceConfig(pool, tokens[i], pairIdx[i], isUsd[i]);
+            uint8 idx = tokenIndices[i];
+            if (idx >= pc.numTokens) revert TokenIndexOutOfRange();
+            uint8 sz = 0;
+            if (!isUsd[i]) {
+                require(pairIdx[i] != 0, "PAIRIDX");
+                sz = HyperTokenInfo.szDecimals(pairIdx[i]);
+            }
+            pc.tokenCfgPacked[idx] = _packTokenCfg(pairIdx[i], sz, isUsd[i]);
+            emit TokenPriceConfiguredIndex(pool, idx, pairIdx[i], sz, isUsd[i]);
         }
     }
 
     function setMaxSurgeFeePercentage(address pool, uint256 pct) external onlyOwner {
         _ensurePct(pct);
-        _poolCfg[pool].maxSurgeFeePercentage = pct.toUint64();
+        PoolCfg storage pc = _poolCfg[pool];
+        pc.maxSurgeFeePercentage = pct.toUint64();
         emit MaxSurgeFeePercentageChanged(pool, pct);
     }
 
     function setSurgeThresholdPercentage(address pool, uint256 pct) external onlyOwner {
         _ensurePct(pct);
-        _poolCfg[pool].thresholdPercentage = pct.toUint64();
+        PoolCfg storage pc = _poolCfg[pool];
+        pc.thresholdPercentage = pct.toUint64();
         emit ThresholdPercentageChanged(pool, pct);
     }
 
-    // ========= Dynamic fee =========
+    // ========= Dynamic fee (unchanged logic; only config reads differ) =========
     function onComputeDynamicSwapFeePercentage(
         PoolSwapParams calldata p,
         address pool,
         uint256 staticSwapFee
     ) public view override returns (bool, uint256) {
-        if (!_poolCfg[pool].initialized) return (true, staticSwapFee);
+        PoolCfg storage pc = _poolCfg[pool];
+        if (!pc.initialized) return (true, staticSwapFee);
+        if (p.indexIn >= pc.numTokens || p.indexOut >= pc.numTokens) return (true, staticSwapFee);
 
-        ComputeLocals memory local;
-
-        // Resolve tokens by index (PoolSwapParams does not include tokens)
-        if (p.indexIn >= _poolCfg[pool].tokensByIndex.length || p.indexOut >= _poolCfg[pool].tokensByIndex.length) {
-            return (true, staticSwapFee);
-        }
-        local.tokenIn  = _poolCfg[pool].tokensByIndex[p.indexIn];
-        local.tokenOut = _poolCfg[pool].tokensByIndex[p.indexOut];
+        ComputeLocals memory L;
 
         // 1) Ask the Weighted pool to compute the counter-amount (external call)
         try WeightedPool(pool).onSwap(p) returns (uint256 amt) {
-            local.calcAmountScaled18 = amt;
+            L.calcAmountScaled18 = amt;
         } catch {
             return (true, staticSwapFee);
         }
 
         // 2) Build post-trade balances (scaled 1e18)
-        local.n = p.balancesScaled18.length;
-        local.newBalances = new uint256[](local.n);
-        for (uint256 i = 0; i < local.n; ++i) local.newBalances[i] = p.balancesScaled18[i];
+        L.n = p.balancesScaled18.length;
+        L.newBalances = new uint256[](L.n);
+        for (uint256 i = 0; i < L.n; ++i) L.newBalances[i] = p.balancesScaled18[i];
 
         if (p.kind == SwapKind.EXACT_IN) {
-            local.newBalances[p.indexIn]  += p.amountGivenScaled18;
-            local.newBalances[p.indexOut] -= local.calcAmountScaled18;
+            L.newBalances[p.indexIn]  += p.amountGivenScaled18;
+            L.newBalances[p.indexOut] -= L.calcAmountScaled18;
         } else {
-            local.newBalances[p.indexIn]  += local.calcAmountScaled18;
-            local.newBalances[p.indexOut] -= p.amountGivenScaled18;
+            L.newBalances[p.indexIn]  += L.calcAmountScaled18;
+            L.newBalances[p.indexOut] -= p.amountGivenScaled18;
         }
 
         // 3) Fetch normalized weights (external)
         try WeightedPool(pool).getNormalizedWeights() returns (uint256[] memory weights) {
-            local.w = weights;
+            L.w = weights;
         } catch {
             return (true, staticSwapFee);
         }
-        if (local.w.length <= p.indexIn || local.w.length <= p.indexOut) return (true, staticSwapFee);
+        if (L.w.length <= p.indexIn || L.w.length <= p.indexOut) return (true, staticSwapFee);
 
         // P_pool = (B_out/w_out) / (B_in/w_in) = (B_out * w_in) / (B_in * w_out)
-        local.poolPx = _pairSpotFromBalancesWeights(
-            local.newBalances[p.indexIn],  local.w[p.indexIn],
-            local.newBalances[p.indexOut], local.w[p.indexOut]
+        L.poolPx = _pairSpotFromBalancesWeights(
+            L.newBalances[p.indexIn],  L.w[p.indexIn],
+            L.newBalances[p.indexOut], L.w[p.indexOut]
         );
-        if (local.poolPx == 0) return (true, staticSwapFee);
+        if (L.poolPx == 0) return (true, staticSwapFee);
 
-        // 4) External prices (p_out / p_in), from Hyperliquid or USD peg
-        local.pxIn  = _extPrice18(_poolCfg[pool].tokenCfg[local.tokenIn]);   // may revert "price"/"dec"
-        local.pxOut = _extPrice18(_poolCfg[pool].tokenCfg[local.tokenOut]);  // may revert "price"/"dec"
-        if (local.pxIn == 0) return (true, staticSwapFee);
-        local.extPx = local.pxOut.divDown(local.pxIn);
-        if (local.extPx == 0) return (true, staticSwapFee);
+        // 4) External prices (p_out / p_in) using packed per-index config (2 SLOADs total)
+        uint256 cfgIn  = pc.tokenCfgPacked[p.indexIn];
+        uint256 cfgOut = pc.tokenCfgPacked[p.indexOut];
+        L.pxIn  = _extPrice18Packed(cfgIn);
+        L.pxOut = _extPrice18Packed(cfgOut);
+        if (L.pxIn == 0) return (true, staticSwapFee);
+        L.extPx = L.pxOut.divDown(L.pxIn);
+        if (L.extPx == 0) return (true, staticSwapFee);
 
         // 5) Deviation and complement-based ramp up to max cap (original curve)
-        local.deviation = _relAbsDiff(local.poolPx, local.extPx); // |pool - ext| / ext
-        local.threshold = uint256(_poolCfg[pool].thresholdPercentage);
-        if (local.deviation <= local.threshold) return (true, staticSwapFee);
-        if (local.threshold >= FixedPoint.ONE) return (true, staticSwapFee);
+        L.deviation = _relAbsDiff(L.poolPx, L.extPx); // |pool - ext| / ext
+        L.threshold = uint256(pc.thresholdPercentage);
+        if (L.deviation <= L.threshold) return (true, staticSwapFee);
+        if (L.threshold >= FixedPoint.ONE) return (true, staticSwapFee);
 
-        local.maxPct = uint256(_poolCfg[pool].maxSurgeFeePercentage);
-        local.increment = (local.maxPct - staticSwapFee)
-            .mulDown((local.deviation - local.threshold).divDown(local.threshold.complement()));
+        L.maxPct = uint256(pc.maxSurgeFeePercentage);
+        L.increment = (L.maxPct - staticSwapFee)
+            .mulDown((L.deviation - L.threshold).divDown(L.threshold.complement()));
 
-        local.surgeFee = staticSwapFee + local.increment;
-        if (local.surgeFee > local.maxPct) local.surgeFee = local.maxPct;
-        return (true, local.surgeFee);
+        L.surgeFee = staticSwapFee + L.increment;
+        if (L.surgeFee > L.maxPct) L.surgeFee = L.maxPct;
+        return (true, L.surgeFee);
     }
 
     // ===== Internals =====
+
+    // Pack fields into one 256-bit word:
+    // [31:0]  pairIndex (uint32)
+    // [39:32] szDecimals (uint8)
+    // [40]    isUsd (bool)
+    function _packTokenCfg(uint32 pairIdx, uint8 sz, bool isUsd) internal pure returns (uint256 w) {
+        w = uint256(pairIdx);
+        w |= uint256(sz) << 32;
+        if (isUsd) w |= (uint256(1) << 40);
+    }
+
+    // Unpack and compute external price (1e18).
+    function _extPrice18Packed(uint256 w) internal view returns (uint256 px18) {
+        bool isUsd = ((w >> 40) & 1) == 1;
+        if (isUsd) return 1e18;
+
+        uint32 pairIdx = uint32(w & 0xFFFFFFFF);
+        require(pairIdx != 0, "price");
+
+        uint8 s = uint8((w >> 32) & 0xFF);
+        require(s <= 6, "dec");
+
+        uint64 raw = HyperPrice.spot(pairIdx); // reverts "price" if precompile fails
+        uint256 divisor = 10 ** (6 - s);
+        px18 = (uint256(raw) * 1e18) / divisor;
+    }
 
     function _pairSpotFromBalancesWeights(
         uint256 bIn,  uint256 wIn,
@@ -282,25 +300,10 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
     ) internal pure returns (uint256) {
         require(bIn > 0, "bal0"); // original guard
         if (bOut == 0 || wIn == 0 || wOut == 0) return 0;
-
         uint256 num = bOut.mulDown(wIn);
         uint256 den = bIn.mulDown(wOut);
         if (den == 0) return 0;
         return num.divDown(den);
-    }
-
-    /// @dev Returns px18 = 1e18 if USD-quoted; otherwise converts Hyper spot to 1e18 scale.
-    ///      Uses original revert tags via the helper libraries (no try/catch).
-    function _extPrice18(TokenPriceCfg memory c) internal view returns (uint256 px18) {
-        if (c.isUsdQuote) return 1e18;
-        require(c.pairIndex != 0, "price"); // treat missing mapping as price failure
-
-        uint64 raw = HyperPrice.spot(c.pairIndex);  // reverts "price" on failure
-        uint8 s   = c.szDecimals;                  // set at config-time (may be zero if USD)
-        require(s <= 6, "dec");
-
-        uint256 divisor = 10 ** (6 - s);          // convert HL’s 6-dec format to 1e18
-        px18 = (uint256(raw) * 1e18) / divisor;
     }
 
     function _relAbsDiff(uint256 a, uint256 b) internal pure returns (uint256) {

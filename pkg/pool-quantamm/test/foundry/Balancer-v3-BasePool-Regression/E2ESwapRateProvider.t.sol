@@ -49,7 +49,7 @@ contract E2eSwapRateProviderWeightedTest is
         rateProviders[tokenAIdx] = IRateProvider(address(rateProviderTokenA));
         rateProviders[tokenBIdx] = IRateProvider(address(rateProviderTokenB));
 
-        (newPool, poolArgs)  = createQuantAMMPool(tokens, label, rateProviders, vault, lp);
+        (newPool, poolArgs)  = createMockQuantAMMPool(tokens, label, rateProviders, vault, lp, true);
         vm.label(newPool, label);
 
         // Cannot set the pool creator directly on a standard Balancer weighted pool factory.

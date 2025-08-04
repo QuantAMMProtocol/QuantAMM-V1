@@ -49,7 +49,7 @@ contract E2eSwapQuantAMMTest is E2eSwapTest, QuantAMMWeightedPoolContractsDeploy
     /// @notice Overrides BaseVaultTest _createPool(). This pool is used by FungibilityTest.
     function _createPool(address[] memory tokens, string memory label) internal override returns (address newPool, bytes memory poolArgs)  {
         IRateProvider[] memory rateProviders;
-        return createMockQuantAMMPool(tokens, label, rateProviders, vault, lp);
+        return createMockQuantAMMPool(tokens, label, rateProviders, vault, lp, true);
     }
 
     function setUpVariables() internal override {

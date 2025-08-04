@@ -13,8 +13,16 @@ contract MockQuantAMMWeightedPool is QuantAMMWeightedPool {
     // Local storage of weights, so that they can be changed for tests.
     uint256[] private _normalizedWeights;
 
+    //Some tests that use this mock pool want to use the base getters for weights, so they can test the base functionality.
+    //This is useful for testing the base functionality of the QuantAMMWeightedPool, without having to deploy a real QuantAMMWeightedPool.
+    bool public useBaseGets;
+
     constructor(NewPoolParams memory params, IVault vault) QuantAMMWeightedPool(params, vault) {
         _normalizedWeights = new uint256[](params.numTokens);
+    }
+
+    function setUseBaseGets(bool _useBaseGets) external {
+        useBaseGets = _useBaseGets;
     }
 
     function setNormalizedWeight(uint256 tokenIndex, uint256 newWeight) external {
@@ -31,7 +39,15 @@ contract MockQuantAMMWeightedPool is QuantAMMWeightedPool {
         _normalizedWeights[1] = newWeights[1];
     }
 
-    function _getNormalizedWeight(uint256 tokenIndex, uint256, uint256) internal view override returns (uint256) {
+    // Helper for most common case of setting weights - for two token pools.
+    function setNormalizedWeights(uint256[] memory newWeights) external {
+        _normalizedWeights = newWeights;
+    }
+
+    function _getNormalizedWeight(uint256 tokenIndex, uint256 x, uint256 y) internal view override returns (uint256) {
+        if (useBaseGets) {
+            return super._getNormalizedWeight(tokenIndex, x, y);
+        }
         if (tokenIndex < _normalizedWeights.length) {
             return _normalizedWeights[tokenIndex];
         } else {
@@ -40,6 +56,9 @@ contract MockQuantAMMWeightedPool is QuantAMMWeightedPool {
     }
 
     function _getNormalizedWeights() internal view override returns (uint256[] memory) {
+        if (useBaseGets) {
+            return super._getNormalizedWeights();
+        }
         return _normalizedWeights;
     }
 
@@ -49,9 +68,13 @@ contract MockQuantAMMWeightedPool is QuantAMMWeightedPool {
     function _getNormalisedWeightPair(
         uint256 tokenIndexOne,
         uint256 tokenIndexTwo,
-        uint256,
-        uint256
+        uint256 x,
+        uint256 y
     ) internal view override returns (QuantAMMNormalisedTokenPair memory) {
+        if (useBaseGets) {
+            return super._getNormalisedWeightPair(tokenIndexOne, tokenIndexTwo, x, y);
+        }
+
         if (tokenIndexOne < _normalizedWeights.length && tokenIndexTwo < _normalizedWeights.length) {
             return QuantAMMNormalisedTokenPair(_normalizedWeights[tokenIndexOne], _normalizedWeights[tokenIndexTwo]);
         } else {

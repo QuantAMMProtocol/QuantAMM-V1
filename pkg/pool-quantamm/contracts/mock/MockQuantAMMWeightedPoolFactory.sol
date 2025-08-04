@@ -150,7 +150,7 @@ contract MockQuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Versi
         require(params._poolSettings.rule.validParameters(params._poolSettings.ruleParameters), "INVRLEPRM"); //Invalid rule parameters
 
         //0 is hodl, 1 is trade whole pool which invariant doesnt let you do anyway
-        require(params._poolSettings.maxTradeSizeRatio > 0 && params._poolSettings.maxTradeSizeRatio <= 0.3e18, "INVMAXTRADE"); //Invalid max trade size
+        require(params._poolSettings.maxTradeSizeRatio > 0 && params._poolSettings.maxTradeSizeRatio <= 0.99e18, "INVMAXTRADE2"); //Invalid max trade size
 
         //checked copied from _setInitialWeights
 
@@ -215,7 +215,7 @@ contract MockQuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Versi
         _initialisationCheck(params);
 
         MockQuantAMMWeightedPool(pool).initialize(params);
-
+        MockQuantAMMWeightedPool(pool).setNormalizedWeights(params.normalizedWeights);
         _registerPoolWithVault(
             pool,
             params.tokens,
@@ -266,6 +266,7 @@ contract MockQuantAMMWeightedPoolFactory is IPoolVersion, BasePoolFactory, Versi
         _initialisationCheck(params);
         
         MockQuantAMMWeightedPool(pool).initialize(params);
+        MockQuantAMMWeightedPool(pool).setNormalizedWeights(params.normalizedWeights);
 
         _registerPoolWithVault(
             pool,

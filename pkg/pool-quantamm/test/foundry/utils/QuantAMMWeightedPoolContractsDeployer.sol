@@ -203,7 +203,7 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
                 lambdas,
                 0.2e18,
                 0.2e18,
-                0.3e18,
+                0.99e18,
                 parameters,
                 address(0)
             ),
@@ -247,7 +247,8 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         string memory label,
         IRateProvider[] memory rateProviders,
         IVaultMock vault,
-        address poolCreator
+        address poolCreator,
+        bool useBaseGetters
     ) internal returns (address newPoolAddress, bytes memory poolArgsRet) {        
         deployerFactory = address(deployMockQuantAMMWeightedPoolFactory(
             IVault(address(vault)),
@@ -260,6 +261,8 @@ contract QuantAMMWeightedPoolContractsDeployer is BaseContractsDeployer {
         
         (newPoolAddress, poolArgsRet) =  MockQuantAMMWeightedPoolFactory(deployerFactory).create(poolCreateSettings);
        
+        MockQuantAMMWeightedPool(newPoolAddress).setUseBaseGets(useBaseGetters);
+        
         vm.label(newPoolAddress, label);
 
         // Cannot set the pool creator directly on a standard Balancer stable pool factory.

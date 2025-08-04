@@ -27,8 +27,6 @@ import { PoolMock } from "../../contracts/test/PoolMock.sol";
 import { BaseVaultTest } from "./utils/BaseVaultTest.sol";
 
 contract VaultTokenTest is BaseVaultTest {
-    PoolFactoryMock poolFactory;
-
     ERC4626TestToken cDAI;
 
     // For two-token pools with waDAI/waUSDC, keep track of sorted token order.
@@ -43,8 +41,6 @@ contract VaultTokenTest is BaseVaultTest {
         BaseVaultTest.setUp();
 
         cDAI = new ERC4626TestToken(dai, "Wrapped cDAI", "cDAI", 18);
-
-        poolFactory = deployPoolFactoryMock(vault, 365 days);
 
         // Allow pools from factory poolFactory to use the hook PoolHooksMock.
         PoolHooksMock(poolHooksContract).allowFactory(address(poolFactory));
@@ -120,17 +116,17 @@ contract VaultTokenTest is BaseVaultTest {
         // Establish assets and supply so that buffer creation doesn't fail.
         vm.startPrank(alice);
 
-        dai.mint(alice, 2 * defaultAmount);
+        dai.mint(alice, 2 * DEFAULT_AMOUNT);
 
-        dai.approve(address(waDAI), defaultAmount);
-        waDAI.deposit(defaultAmount, alice);
+        dai.approve(address(waDAI), DEFAULT_AMOUNT);
+        waDAI.deposit(DEFAULT_AMOUNT, alice);
 
-        dai.approve(address(cDAI), defaultAmount);
-        cDAI.deposit(defaultAmount, alice);
+        dai.approve(address(cDAI), DEFAULT_AMOUNT);
+        cDAI.deposit(DEFAULT_AMOUNT, alice);
 
-        usdc.mint(alice, defaultAmount);
-        usdc.approve(address(waUSDC), defaultAmount);
-        waUSDC.deposit(defaultAmount, alice);
+        usdc.mint(alice, DEFAULT_AMOUNT);
+        usdc.approve(address(waUSDC), DEFAULT_AMOUNT);
+        waUSDC.deposit(DEFAULT_AMOUNT, alice);
         vm.stopPrank();
     }
 
@@ -150,6 +146,12 @@ contract VaultTokenTest is BaseVaultTest {
         LiquidityManagement memory liquidityManagement;
         PoolRoleAccounts memory roleAccounts;
 
-        poolFactory.registerPool(pool, tokenConfig, roleAccounts, poolHooksContract, liquidityManagement);
+        PoolFactoryMock(poolFactory).registerPool(
+            pool,
+            tokenConfig,
+            roleAccounts,
+            poolHooksContract,
+            liquidityManagement
+        );
     }
 }

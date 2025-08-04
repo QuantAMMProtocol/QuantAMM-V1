@@ -8,6 +8,7 @@ import { IAuthentication } from "@balancer-labs/v3-interfaces/contracts/solidity
 import { TokenConfig, PoolRoleAccounts } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 import { IPoolInfo } from "@balancer-labs/v3-interfaces/contracts/pool-utils/IPoolInfo.sol";
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
+import { IVaultExtension } from "@balancer-labs/v3-interfaces/contracts/vault/IVaultExtension.sol";
 import {
     IStablePool,
     AmplificationState,
@@ -30,6 +31,7 @@ contract StablePoolTest is BasePoolTest, StablePoolContractsDeployer {
     using CastingHelpers for address[];
     using ArrayHelpers for *;
 
+    string constant POOL_VERSION = "Pool v1";
     uint256 constant DEFAULT_AMP_FACTOR = 200;
     uint256 constant TOKEN_AMOUNT = 1e3 * 1e18;
 
@@ -42,12 +44,13 @@ contract StablePoolTest is BasePoolTest, StablePoolContractsDeployer {
         poolMaxSwapFeePercentage = 10e16;
     }
 
+    function createPoolFactory() internal override returns (address) {
+        return address(deployStablePoolFactory(IVault(address(vault)), 365 days, "Factory v1", POOL_VERSION));
+    }
+
     function createPool() internal override returns (address newPool, bytes memory poolArgs) {
         string memory name = "ERC20 Pool";
         string memory symbol = "ERC20POOL";
-        string memory poolVersion = "Pool v1";
-
-        factory = deployStablePoolFactory(IVault(address(vault)), 365 days, "Factory v1", poolVersion);
 
         TokenConfig[] memory tokenConfigs = new TokenConfig[](2);
         IERC20[] memory sortedTokens = InputHelpers.sortTokens(
@@ -61,10 +64,12 @@ contract StablePoolTest is BasePoolTest, StablePoolContractsDeployer {
         }
 
         PoolRoleAccounts memory roleAccounts;
-        // Allow pools created by `factory` to use poolHooksMock hooks
-        PoolHooksMock(poolHooksContract).allowFactory(address(factory));
+        roleAccounts.swapFeeManager = alice;
 
-        newPool = StablePoolFactory(address(factory)).create(
+        // Allow pools created by `factory` to use poolHooksMock hooks
+        PoolHooksMock(poolHooksContract).allowFactory(poolFactory);
+
+        newPool = StablePoolFactory(poolFactory).create(
             name,
             symbol,
             tokenConfigs,
@@ -83,7 +88,7 @@ contract StablePoolTest is BasePoolTest, StablePoolContractsDeployer {
                 name: name,
                 symbol: symbol,
                 amplificationParameter: DEFAULT_AMP_FACTOR,
-                version: poolVersion
+                version: POOL_VERSION
             }),
             vault
         );
@@ -116,6 +121,118 @@ contract StablePoolTest is BasePoolTest, StablePoolContractsDeployer {
         _testGetBptRate(invariantBefore, invariantAfter, amountsIn);
     }
 
+    function testAmplificationUpdateBySwapFeeManager() public {
+        // Ensure the swap manager was set for the pool.
+        assertEq(vault.getPoolRoleAccounts(pool).swapFeeManager, alice, "Wrong swap fee manager");
+
+        // Ensure the swap manager doesn't have permission through governance.
+        assertFalse(
+            authorizer.hasRole(
+                IAuthentication(pool).getActionId(StablePool.startAmplificationParameterUpdate.selector),
+                alice
+            ),
+            "Has governance-granted start permission"
+        );
+        assertFalse(
+            authorizer.hasRole(
+                IAuthentication(pool).getActionId(StablePool.stopAmplificationParameterUpdate.selector),
+                alice
+            ),
+            "Has governance-granted stop permission"
+        );
+
+        // Ensure the swap manager account can start/stop anyway.
+        uint256 currentTime = block.timestamp;
+        uint256 updateInterval = 5000 days;
+
+        uint256 endTime = currentTime + updateInterval;
+        uint256 newAmplificationParameter = DEFAULT_AMP_FACTOR * 2;
+
+        vm.startPrank(alice);
+        IStablePool(pool).startAmplificationParameterUpdate(newAmplificationParameter, endTime);
+
+        (, bool isUpdating, ) = IStablePool(pool).getAmplificationParameter();
+        assertTrue(isUpdating, "Amplification update not started");
+
+        IStablePool(pool).stopAmplificationParameterUpdate();
+        vm.stopPrank();
+
+        (, isUpdating, ) = IStablePool(pool).getAmplificationParameter();
+        assertFalse(isUpdating, "Amplification update not stopped");
+
+        // Grant to Bob via governance.
+        authorizer.grantRole(
+            IAuthentication(pool).getActionId(StablePool.startAmplificationParameterUpdate.selector),
+            bob
+        );
+
+        vm.startPrank(bob);
+        vm.expectRevert(IAuthentication.SenderNotAllowed.selector);
+        IStablePool(pool).startAmplificationParameterUpdate(newAmplificationParameter, endTime);
+    }
+
+    function testAmplificationUpdateByGovernance() public {
+        PoolRoleAccounts memory poolRoleAccounts = PoolRoleAccounts({
+            pauseManager: address(0x00),
+            swapFeeManager: address(0x00),
+            poolCreator: address(0x00)
+        });
+        vm.mockCall(
+            address(vault),
+            abi.encodeWithSelector(IVaultExtension.getPoolRoleAccounts.selector, pool),
+            abi.encode(poolRoleAccounts)
+        );
+
+        assertFalse(
+            authorizer.hasRole(
+                IAuthentication(pool).getActionId(StablePool.startAmplificationParameterUpdate.selector),
+                bob
+            ),
+            "Has governance-granted start permission"
+        );
+        assertFalse(
+            authorizer.hasRole(
+                IAuthentication(pool).getActionId(StablePool.stopAmplificationParameterUpdate.selector),
+                bob
+            ),
+            "Has governance-granted stop permission"
+        );
+
+        // Ensure the swap manager account can start/stop anyway.
+        uint256 currentTime = block.timestamp;
+        uint256 updateInterval = 5000 days;
+
+        uint256 endTime = currentTime + updateInterval;
+        uint256 newAmplificationParameter = DEFAULT_AMP_FACTOR * 2;
+
+        // Test that the swap manager can't start/stop the update.
+        vm.prank(bob);
+        vm.expectRevert(IAuthentication.SenderNotAllowed.selector);
+        IStablePool(pool).startAmplificationParameterUpdate(newAmplificationParameter, endTime);
+
+        // Grant to Bob via governance.
+        authorizer.grantRole(
+            IAuthentication(pool).getActionId(StablePool.startAmplificationParameterUpdate.selector),
+            bob
+        );
+        authorizer.grantRole(
+            IAuthentication(pool).getActionId(StablePool.stopAmplificationParameterUpdate.selector),
+            bob
+        );
+
+        vm.startPrank(bob);
+        IStablePool(pool).startAmplificationParameterUpdate(newAmplificationParameter, endTime);
+
+        (, bool isUpdating, ) = IStablePool(pool).getAmplificationParameter();
+        assertTrue(isUpdating, "Amplification update not started");
+
+        IStablePool(pool).stopAmplificationParameterUpdate();
+        vm.stopPrank();
+
+        (, isUpdating, ) = IStablePool(pool).getAmplificationParameter();
+        assertFalse(isUpdating, "Amplification update not stopped");
+    }
+
     function testGetAmplificationState() public {
         (AmplificationState memory ampState, uint256 precision) = IStablePool(pool).getAmplificationState();
 
@@ -125,19 +242,14 @@ contract StablePoolTest is BasePoolTest, StablePoolContractsDeployer {
         assertEq(ampState.startValue, DEFAULT_AMP_FACTOR * precision, "Wrong initial amp update start value");
         assertEq(ampState.endValue, DEFAULT_AMP_FACTOR * precision, "Wrong initial amp update end value");
 
-        authorizer.grantRole(
-            IAuthentication(pool).getActionId(StablePool.startAmplificationParameterUpdate.selector),
-            admin
-        );
-
         uint256 currentTime = block.timestamp;
         uint256 updateInterval = 5000 days;
 
         uint256 endTime = currentTime + updateInterval;
         uint256 newAmplificationParameter = DEFAULT_AMP_FACTOR * 2;
 
-        vm.prank(admin);
-        StablePool(pool).startAmplificationParameterUpdate(newAmplificationParameter, endTime);
+        vm.prank(alice);
+        IStablePool(pool).startAmplificationParameterUpdate(newAmplificationParameter, endTime);
 
         vm.warp(currentTime + updateInterval + 1);
 
@@ -186,7 +298,7 @@ contract StablePoolTest is BasePoolTest, StablePoolContractsDeployer {
         assertEq(data.staticSwapFeePercentage, BASE_MIN_SWAP_FEE, "Swap fee mismatch");
 
         for (uint256 i = 0; i < tokens.length; ++i) {
-            assertEq(data.balancesLiveScaled18[i], defaultAmount, "Live balance mismatch");
+            assertEq(data.balancesLiveScaled18[i], DEFAULT_AMOUNT, "Live balance mismatch");
             assertEq(data.tokenRates[i], tokenRates[i], "Token rate mismatch");
         }
     }

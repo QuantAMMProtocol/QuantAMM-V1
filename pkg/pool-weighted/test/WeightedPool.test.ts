@@ -30,7 +30,7 @@ import { TokenConfigStruct } from '../typechain-types/@balancer-labs/v3-interfac
 describe('WeightedPool', function () {
   const FACTORY_VERSION = 'Weighted Factory v1';
   const POOL_VERSION = 'Weighted Pool v1';
-  const ROUTER_VERSION = 'Router v9';
+  const ROUTER_VERSION = 'Router v11';
 
   const POOL_SWAP_FEE = fp(0.01);
   const TOKEN_AMOUNT = fp(100);
@@ -157,5 +157,10 @@ describe('WeightedPool', function () {
   it('returns weights', async () => {
     const weights = await pool.getNormalizedWeights();
     expect(weights).to.be.deep.eq(WEIGHTS);
+  });
+
+  it('is registered in the factory', async () => {
+    expect(await factory.getPoolCount()).to.be.eq(1);
+    expect(await factory.getPools()).to.be.deep.eq([await pool.getAddress()]);
   });
 });

@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 
 import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
+import { Errors } from "@openzeppelin/contracts/utils/Errors.sol";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -14,6 +15,7 @@ import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol"
 import { TokenConfig, TokenType, PoolRoleAccounts } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 
 import { ERC20TestToken } from "@balancer-labs/v3-solidity-utils/contracts/test/ERC20TestToken.sol";
+import { BaseSplitCodeFactory } from "@balancer-labs/v3-solidity-utils/contracts/helpers/BaseSplitCodeFactory.sol";
 
 import { VaultContractsDeployer } from "@balancer-labs/v3-vault/test/foundry/utils/VaultContractsDeployer.sol";
 import { VaultMock } from "@balancer-labs/v3-vault/contracts/test/VaultMock.sol";
@@ -108,7 +110,7 @@ contract WeightedPool8020FactoryTest is WeightedPoolContractsDeployer, VaultCont
         _createPool(tokenA, tokenB);
 
         // Should not be able to deploy identical pool
-        vm.expectRevert(Create2.Create2FailedDeployment.selector);
+        vm.expectRevert(Errors.FailedDeployment.selector);
         _createPool(tokenA, tokenB);
 
         TokenConfig[] memory tokenConfig = new TokenConfig[](2);
@@ -122,7 +124,7 @@ contract WeightedPool8020FactoryTest is WeightedPoolContractsDeployer, VaultCont
         tokenConfig[1].tokenType = TokenType.WITH_RATE;
 
         // Trying to create the same pool with same tokens but different token configs should revert
-        vm.expectRevert(Create2.Create2FailedDeployment.selector);
+        vm.expectRevert(Errors.FailedDeployment.selector);
         factory.create(tokenConfig[0], tokenConfig[1], roleAccounts, DEFAULT_SWAP_FEE);
     }
 

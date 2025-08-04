@@ -4,9 +4,9 @@ pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IEIP712 } from "permit2/src/interfaces/IEIP712.sol";
 
 import { IVaultErrors } from "@balancer-labs/v3-interfaces/contracts/vault/IVaultErrors.sol";
@@ -52,17 +52,17 @@ contract BalancerPoolTokenTest is BaseVaultTest {
 
     function testMint() public {
         vm.expectEmit();
-        emit IERC20.Transfer(address(0), user, defaultAmount);
+        emit IERC20.Transfer(address(0), user, DEFAULT_AMOUNT);
 
-        vault.mintERC20(address(poolToken), user, defaultAmount);
+        vault.mintERC20(address(poolToken), user, DEFAULT_AMOUNT);
 
-        assertEq(poolToken.balanceOf(user), defaultAmount, "balance mismatch");
+        assertEq(poolToken.balanceOf(user), DEFAULT_AMOUNT, "balance mismatch");
     }
 
     function testBurn() public {
-        uint256 burnAmount = defaultAmount - POOL_MINIMUM_TOTAL_SUPPLY;
+        uint256 burnAmount = DEFAULT_AMOUNT - POOL_MINIMUM_TOTAL_SUPPLY;
 
-        vault.mintERC20(pool, user, defaultAmount);
+        vault.mintERC20(pool, user, DEFAULT_AMOUNT);
 
         vm.expectEmit();
         emit IERC20.Transfer(user, address(0), burnAmount);
@@ -72,74 +72,74 @@ contract BalancerPoolTokenTest is BaseVaultTest {
     }
 
     function testApprove() public {
-        vault.mintERC20(pool, address(this), defaultAmount);
+        vault.mintERC20(pool, address(this), DEFAULT_AMOUNT);
 
         vm.expectEmit();
-        emit IERC20.Approval(address(this), user, defaultAmount);
-        assertTrue(poolToken.approve(user, defaultAmount), "approve failed");
+        emit IERC20.Approval(address(this), user, DEFAULT_AMOUNT);
+        assertTrue(poolToken.approve(user, DEFAULT_AMOUNT), "approve failed");
 
-        assertEq(poolToken.allowance(address(this), user), defaultAmount, "allowance mismatch");
+        assertEq(poolToken.allowance(address(this), user), DEFAULT_AMOUNT, "allowance mismatch");
     }
 
     function testTransfer() public {
-        vault.mintERC20(pool, address(this), defaultAmount);
+        vault.mintERC20(pool, address(this), DEFAULT_AMOUNT);
 
         vm.expectEmit();
-        emit IERC20.Transfer(address(this), user, defaultAmount);
-        assertTrue(poolToken.transfer(user, defaultAmount), "transfer failed");
-        assertEq(poolToken.totalSupply(), defaultAmount, "total supply mismatch");
+        emit IERC20.Transfer(address(this), user, DEFAULT_AMOUNT);
+        assertTrue(poolToken.transfer(user, DEFAULT_AMOUNT), "transfer failed");
+        assertEq(poolToken.totalSupply(), DEFAULT_AMOUNT, "total supply mismatch");
 
         assertEq(poolToken.balanceOf(address(this)), 0, "address(this) balance mismatch");
-        assertEq(poolToken.balanceOf(user), defaultAmount, "user balance mismatch");
+        assertEq(poolToken.balanceOf(user), DEFAULT_AMOUNT, "user balance mismatch");
     }
 
     function testTransferFrom() public {
         address from = address(0xABCD);
 
-        vault.mintERC20(pool, address(from), defaultAmount);
+        vault.mintERC20(pool, address(from), DEFAULT_AMOUNT);
 
         vm.prank(from);
-        poolToken.approve(address(this), defaultAmount);
+        poolToken.approve(address(this), DEFAULT_AMOUNT);
 
         vm.expectEmit();
         emit IERC20.Approval(from, address(this), 0);
 
         vm.expectEmit();
-        emit IERC20.Transfer(from, user, defaultAmount);
+        emit IERC20.Transfer(from, user, DEFAULT_AMOUNT);
 
-        assertTrue(poolToken.transferFrom(from, user, defaultAmount), "transferFrom failed");
+        assertTrue(poolToken.transferFrom(from, user, DEFAULT_AMOUNT), "transferFrom failed");
 
         assertEq(poolToken.allowance(from, user), 0, "allowance(from, user) isn't 0");
-        assertEq(poolToken.balanceOf(user), defaultAmount, "user balance mismatch");
+        assertEq(poolToken.balanceOf(user), DEFAULT_AMOUNT, "user balance mismatch");
         assertEq(poolToken.balanceOf(from), 0, "sender balance mismatch");
     }
 
     function testEmitTransfer() public {
         vm.expectEmit();
-        emit IERC20.Transfer(user, address(this), defaultAmount);
+        emit IERC20.Transfer(user, address(this), DEFAULT_AMOUNT);
 
         vm.prank(address(vault));
-        poolToken.emitTransfer(user, address(this), defaultAmount);
+        poolToken.emitTransfer(user, address(this), DEFAULT_AMOUNT);
     }
 
     function testEmitApproval() public {
         vm.expectEmit();
-        emit IERC20.Approval(user, address(this), defaultAmount);
+        emit IERC20.Approval(user, address(this), DEFAULT_AMOUNT);
 
         vm.prank(address(vault));
-        poolToken.emitApproval(user, address(this), defaultAmount);
+        poolToken.emitApproval(user, address(this), DEFAULT_AMOUNT);
     }
 
     function testEmitTransferRevertIfCallerIsNotVault() public {
         vm.expectRevert(abi.encodeWithSelector(IVaultErrors.SenderIsNotVault.selector, address(this)));
 
-        poolToken.emitTransfer(user, address(this), defaultAmount);
+        poolToken.emitTransfer(user, address(this), DEFAULT_AMOUNT);
     }
 
     function testEmitApprovalRevertIfCallerIsNotVault() public {
         vm.expectRevert(abi.encodeWithSelector(IVaultErrors.SenderIsNotVault.selector, address(this)));
 
-        poolToken.emitApproval(user, address(this), defaultAmount);
+        poolToken.emitApproval(user, address(this), DEFAULT_AMOUNT);
     }
 
     function testPermit() public {
@@ -147,15 +147,15 @@ contract BalancerPoolTokenTest is BaseVaultTest {
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE,
             block.timestamp,
             privateKey
         );
 
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v, r, s);
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v, r, s);
 
-        assertEq(poolToken.allowance(user, address(0xCAFE)), defaultAmount, "allowance mismatch");
+        assertEq(poolToken.allowance(user, address(0xCAFE)), DEFAULT_AMOUNT, "allowance mismatch");
         assertEq(poolToken.nonces(user), CURRENT_NONCE + 1, "nonce mismatch");
     }
 
@@ -164,20 +164,20 @@ contract BalancerPoolTokenTest is BaseVaultTest {
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE,
             block.timestamp,
             privateKey
         );
 
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v, r, s);
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v, r, s);
 
         vm.prank(user);
         poolToken.incrementNonce();
 
         // Note that `incrementNonce` doesn't affect allowances already granted by executed permits.
         // It just invalidates signatures for permits that have not yet been executed.
-        assertEq(poolToken.allowance(user, address(0xCAFE)), defaultAmount, "allowance mismatch");
+        assertEq(poolToken.allowance(user, address(0xCAFE)), DEFAULT_AMOUNT, "allowance mismatch");
 
         // Nonce should be incremented by 2 now.
         assertEq(poolToken.nonces(user), CURRENT_NONCE + 2, "nonce mismatch");
@@ -188,13 +188,13 @@ contract BalancerPoolTokenTest is BaseVaultTest {
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE,
             block.timestamp,
             privateKey
         );
 
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v, r, s);
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v, r, s);
 
         vm.prank(user);
         poolToken.incrementNonce();
@@ -206,23 +206,23 @@ contract BalancerPoolTokenTest is BaseVaultTest {
         vm.expectRevert(
             abi.encodeWithSelector(BalancerPoolToken.ERC2612InvalidSigner.selector, externallyComputedSigner, user)
         );
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v, r, s);
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v, r, s);
     }
 
     /// @dev Just test for general fail as it is hard to compute error arguments.
-    function testFailPermitBadNonce() public {
+    function testRevertsWhenPermitBadNonce() public {
         (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE + 1,
             block.timestamp,
             privateKey
         );
 
-        vm.expectRevert(bytes(""));
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v, r, s);
+        vm.expectRevert();
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v, r, s);
     }
 
     function testPermitRevokedNonce() public {
@@ -230,13 +230,13 @@ contract BalancerPoolTokenTest is BaseVaultTest {
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE,
             block.timestamp,
             privateKey
         );
 
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v, r, s);
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v, r, s);
 
         vm.prank(user);
         poolToken.incrementNonce();
@@ -245,21 +245,21 @@ contract BalancerPoolTokenTest is BaseVaultTest {
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE + 2,
             block.timestamp,
             privateKey
         );
         // Works with nonce + 2.
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v2, r2, s2);
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v2, r2, s2);
     }
 
-    function testFailPermitRevokedNonceV1() public {
+    function testRevertsWhenPermitRevokedNonceV1() public {
         (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE,
             block.timestamp,
             privateKey
@@ -268,16 +268,16 @@ contract BalancerPoolTokenTest is BaseVaultTest {
         vm.prank(user);
         poolToken.incrementNonce();
 
-        vm.expectRevert(bytes(""));
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v, r, s);
+        vm.expectRevert();
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v, r, s);
     }
 
-    function testFailPermitRevokedNonceV2() public {
+    function testRevertsWhenPermitRevokedNonceV2() public {
         (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE,
             block.timestamp,
             privateKey
@@ -290,62 +290,67 @@ contract BalancerPoolTokenTest is BaseVaultTest {
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE + 2,
             block.timestamp,
             privateKey
         );
+
+        vm.expectRevert();
         // Works with nonce + 2.
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v2, r2, s2);
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v2, r2, s2);
 
-        vm.expectRevert(bytes(""));
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v, r, s);
+        vm.expectRevert();
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v, r, s);
     }
 
     /// @dev Just test for general fail as it is hard to compute error arguments.
-    function testFailPermitBadDeadline() public {
+    function testRevertsWhenPermitBadDeadline() public {
         (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE,
             block.timestamp,
             privateKey
         );
 
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp + 1, v, r, s);
+        vm.expectRevert();
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp + 1, v, r, s);
     }
 
     /// @dev Just test for general fail as it is hard to compute error arguments.
-    function testFailPermitPastDeadline() public {
+    function testRevertsWhenPermitPastDeadline() public {
         (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE,
             block.timestamp,
             privateKey
         );
 
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp - 1, v, r, s);
+        vm.expectRevert();
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp - 1, v, r, s);
     }
 
     /// @dev Just test for general fail as it is hard to compute error arguments.
-    function testFailPermitReplay() public {
+    function testRevertsWhenPermitReplay() public {
         (uint8 v, bytes32 r, bytes32 s) = getPermitSignature(
             IEIP712(address(poolToken)),
             user,
             address(0xCAFE),
-            defaultAmount,
+            DEFAULT_AMOUNT,
             CURRENT_NONCE,
             block.timestamp,
             privateKey
         );
 
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v, r, s);
-        poolToken.permit(user, address(0xCAFE), defaultAmount, block.timestamp, v, r, s);
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v, r, s);
+        vm.expectRevert();
+        poolToken.permit(user, address(0xCAFE), DEFAULT_AMOUNT, block.timestamp, v, r, s);
     }
 
     function testPermit__Fuzz(uint248 privKey, address to, uint256 amount, uint256 deadline) public {
@@ -375,7 +380,7 @@ contract BalancerPoolTokenTest is BaseVaultTest {
     }
 
     /// @dev Just test for general fail as it is hard to compute error arguments.
-    function testFailPermitBadNonce__Fuzz(
+    function testRevertsWhenPermitBadNonce__Fuzz(
         uint256 privKey,
         address to,
         uint256 amount,
@@ -383,7 +388,8 @@ contract BalancerPoolTokenTest is BaseVaultTest {
         uint256 nonce
     ) public {
         deadline = bound(deadline, block.timestamp, MAX_UINT256);
-        vm.assume(privKey != 0);
+        // privKey cannot be greater than Secp256k1 curve order.
+        privKey = bound(privKey, 1, 115792089237316195423570985008687907852837564279074904382605163141518161494336);
         vm.assume(to != address(0));
         vm.assume(nonce != 0);
 
@@ -399,11 +405,17 @@ contract BalancerPoolTokenTest is BaseVaultTest {
             privKey
         );
 
+        vm.expectRevert();
         poolToken.permit(usr, to, amount, deadline, v, r, s);
     }
 
     /// @dev Just test for general fail as it is hard to compute error arguments.
-    function testFailPermitBadDeadline__Fuzz(uint248 privKey, address to, uint256 amount, uint256 deadline) public {
+    function testRevertsWhenPermitBadDeadline__Fuzz(
+        uint248 privKey,
+        address to,
+        uint256 amount,
+        uint256 deadline
+    ) public {
         deadline = bound(deadline, 0, block.timestamp - 1);
         vm.assume(privKey != 0);
         vm.assume(to != address(0));
@@ -420,6 +432,7 @@ contract BalancerPoolTokenTest is BaseVaultTest {
             privKey
         );
 
+        vm.expectRevert();
         poolToken.permit(usr, to, amount, deadline + 1, v, r, s);
     }
 
@@ -445,7 +458,7 @@ contract BalancerPoolTokenTest is BaseVaultTest {
     }
 
     /// @dev Just test for general fail as it is hard to compute error arguments.
-    function testFailPermitReplay__Fuzz(uint248 privKey, address to, uint256 amount, uint256 deadline) public {
+    function testRevertsWhenPermitReplay__Fuzz(uint248 privKey, address to, uint256 amount, uint256 deadline) public {
         vm.assume(privKey != 0);
         vm.assume(to != address(0));
         deadline = bound(deadline, block.timestamp, MAX_UINT256);
@@ -463,6 +476,7 @@ contract BalancerPoolTokenTest is BaseVaultTest {
         );
 
         poolToken.permit(usr, to, amount, deadline, v, r, s);
+        vm.expectRevert();
         poolToken.permit(usr, to, amount, deadline, v, r, s);
     }
 

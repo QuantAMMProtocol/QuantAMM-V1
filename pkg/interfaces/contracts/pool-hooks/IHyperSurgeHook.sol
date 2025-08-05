@@ -68,6 +68,11 @@ interface IHyperSurgeHook {
      */
     event LiquidityBlocked(address indexed pool, bool isAdd, uint256 beforeDev, uint256 afterDev, uint256 threshold);
 
+    /***
+     * @notice 
+     */
+    event CapDeviationPercentageChanged(address indexed pool, uint256 pct);
+
     // -------------------------------------------------------------------------
     // Configuration (external, permissioned by implementation)
     // -------------------------------------------------------------------------
@@ -108,6 +113,13 @@ interface IHyperSurgeHook {
      */
     function setSurgeThresholdPercentage(address pool, uint256 pct) external;
 
+    /**
+        @notice sets the deviation where the max fee kicks in
+        @param pool address of the pool
+        @param capDevPct the deviation to set the cap to in %
+    */
+    function setCapDeviationPercentage(address pool, uint256 capDevPct) external;
+    
     // -------------------------------------------------------------------------
     // Getters (read-only)
     // -------------------------------------------------------------------------

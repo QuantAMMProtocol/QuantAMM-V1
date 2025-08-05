@@ -1,7 +1,7 @@
-# HyperSurge Hook — README
+# HyperSurge Hook — README (current)
 
-> **Dynamic, market-aware swap fees for Balancer V3 pools (2–8 tokens) using Hyperliquid spot prices.**  
-> HyperSurge raises the swap fee when a pool’s *implied* price diverges from an *external* price signal, deterring toxic flow and compensating LPs during volatility.
+**Dynamic, oracle-aware swap fees for Balancer V3 weighted pools (2–8 tokens).**  
+HyperSurge raises swap fees when the pool’s **implied price** departs from an **external price** (Hyperliquid). This version introduces a configurable **cap deviation** so you can choose the deviation level at which the fee reaches the **max surge fee**, while preserving the stable-surge style **after-liquidity protections**.
 
 ---
 
@@ -13,23 +13,28 @@
 - [Configuration (by Index)](#configuration-by-index)
 - [Runtime Flow (Fee Computation)](#runtime-flow-fee-computation)
 - [Mathematics](#mathematics)
+  - [Pool & Oracle Prices](#pool--oracle-prices)
+  - [Deviation](#deviation)
+  - [Fee Ramp](#fee-ramp)
+  - [Pool‑Wide Deviation for Liquidity Checks](#poolwide-deviation-for-liquidity-checks)
 - [Error Handling & Fallbacks](#error-handling--fallbacks)
-- [Why Multitoken-by-Index](#why-multitokenbyindex)
-- [Gas-Efficiency Design](#gas-efficiency-design)
+- [Why Multitoken‑by‑Index](#why-multitokenbyindex)
+- [Gas‑Efficiency Design](#gas-efficiency-design)
 - [Security & Operational Notes](#security--operational-notes)
-- [Worked Example](#worked-example)
+- [Worked Examples](#worked-examples)
 - [Quick Start](#quick-start)
 - [Testing Notes](#testing-notes)
+- [Versioning & Changelog](#versioning--changelog)
 
 ---
 
 ## Core Concepts
 
-- **External Oracle (Hyperliquid):** Prices are read from Hyperliquid precompiles (6-decimal fixed point). Tokens can alternatively be flagged as **USD-quoted** (price ≡ 1e18).
-- **Pool Implied Price:** For tokenIn → tokenOut, the pool’s price is computed from **post-trade balances** and **normalized weights** (WeightedPool model).
-- **Deviation Trigger:** When the relative deviation between pool price and external price exceeds a configurable **threshold τ**, the swap fee increases above the pool’s **static fee** toward a **maximum cap**.
-- **Monotone, Capped Ramp:** Fee increment grows linearly with excess deviation and is clamped at the cap; no change when deviation ≤ τ.
-- **Multitoken-by-Index:** Pools with **2–8 tokens** are supported. Configuration is **by token index**, which is stable once the pool is created.
+**What problem this solves.**  
+In volatile markets, AMM balances can drift away from external prices. Traders can exploit mispricings (“toxic flow”), and LPs bear the cost. HyperSurge measures **how far** the pool’s implied price is from an external reference and **ramps up** fees as mispricing grows. The ramp is **linear** between a **threshold** (start of action) and a **cap deviation** (reach the max fee), then **clamped** at the max.
+
+**Why this design.**  
+A linear ramp gives predictable economics, avoids discontinuities, and is easy to reason about. The separate **cap deviation** lets operators decide **how early** the fee should saturate — e.g., reach the max at 20% deviation instead of 100% if you expect liquidity to thin out quickly. Finally, **after‑liquidity protections** prevent non‑proportional adds/removes from **worsening** a deviation that is already above threshold, without blocking corrective actions.
 
 ---
 
@@ -57,40 +62,43 @@
 
 ## Storage Model (Multitoken by Index)
 
-- **`PoolDetails`** *(packed into a single slot)*  
-  - `maxSurgeFeePercentage` (uint64, 18-dec)  
-  - `thresholdPercentage` (uint64, 18-dec) ≡ τ  
-  - `numTokens` (uint8) ∈ [2..8]  
-  - `initialized` (bool)
+Each pool has an entry with:
+- **PoolDetails:**  
+  - `maxSurgeFeePercentage` — cap on the dynamic fee.  
+  - `surgeThresholdPercentage` — deviation threshold **τ** where the ramp starts.  
+  - `capDeviationPercentage` — deviation **capDev** where the ramp ends (fee hits max).  
+  - `numTokens`, `initialized`.
+- **TokenPriceCfg[8] by token index (0..7):**  
+  - `isUsd` (1 = USD price),  
+  - `pairIndex` (Hyperliquid market id if not USD),  
+  - `priceDivisor` (cached scale factor so spot → 1e18).
 
-- **`TokenPriceCfg[8]`** *(one slot per index)*  
-  - `pairIndex` (uint32) — Hyperliquid market id (0 allowed only if `isUsd = 1`)  
-  - `szDecimals` (uint8) — cached once from tokenInfo  
-  - `isUsd` (uint8) — 1 if USD-quoted (price ≡ 1e18), else 0  
-  - `priceDivisor` (uint32) — **precomputed** `10^(6 − sz)` (one of `{1,10,100,1e3,1e4,1e5,1e6}`)
-
-- **Hot-Path SLOADs:**  
-  Exactly **3 SLOADs** per fee computation:
-  1) `details`  
-  2) `tokenCfg[indexIn]`  
-  3) `tokenCfg[indexOut]`
+**Why index‑based.**  
+Using pool token indices is compact and avoids mapping by address. Indices are canonical, stable for a given pool, and match Balancer’s internal representation.
 
 ---
 
 ## Configuration (by Index)
 
-- **Set token config**  
-  `setTokenPriceConfigIndex(pool, tokenIndex, pairIdx, isUsd)`  
-  - If `isUsd = true`: `(pairIndex=0, sz=0, isUsd=1, priceDivisor=1)`.
-  - Else: require `pairIdx != 0`; cache `sz = szDecimals(pairIdx)` with `sz ∈ [0..6]`; compute and store `priceDivisor = 10^(6 − sz)` via LUT.
+All setters are expected to be permissioned (e.g., governance / swap‑fee manager):
 
-- **Batch configuration** mirrors single-index configuration for multiple indices.
+- **Token prices**  
+  - `setTokenPriceConfigIndex(pool, tokenIndex, pairIdx, isUsd)`  
+  - `setTokenPriceConfigBatchIndex(pool, tokenIndices[], pairIdx[], isUsd[])`
+- **Fee parameters**  
+  - `setMaxSurgeFeePercentage(pool, pct)`  
+  - `setSurgeThresholdPercentage(pool, pct)` — must keep `pct < capDeviationPercentage`  
+  - `setCapDeviationPercentage(pool, capDevPct)` — must keep `capDevPct > surgeThresholdPercentage` and `≤ 1`
+- **Typical getters**  
+  - `getMaxSurgeFeePercentage(pool)`, `getSurgeThresholdPercentage(pool)`, `getCapDeviationPercentage(pool)`  
+  - Defaults (if exposed): `getDefaultMaxSurgeFeePercentage()`, `getDefaultSurgeThresholdPercentage()`, `getDefaultCapDeviationPercentage()`  
+  - Token configs: `getTokenPriceConfigIndex`, `getTokenPriceConfigs`  
+  - Pool state: `getNumTokens`, `isPoolInitialized`
+- **Events**  
+  - `TokenPriceConfiguredIndex`, `MaxSurgeFeePercentageChanged`, `ThresholdPercentageChanged`,  
+    `CapDeviationPercentageChanged`, `PoolRegistered`.
 
-- **Fee Parameters**  
-  - `setMaxSurgeFeePercentage(pool, pct)` with `pct ≤ 1e18`.  
-  - `setSurgeThresholdPercentage(pool, pct)` with `pct ≤ 1e18`.
-
-> Precomputing `priceDivisor` eliminates exponentiation in the hot path and confines `sz` validation to config time.
+---
 
 ---
 # Hyper Surge Hook — Theory of Deviation & Liquidity Checks
@@ -284,136 +292,157 @@ Then:
 
 ## Runtime Flow (Fee Computation)
 
-Given `PoolSwapParams p` and a pool address:
-
-1. **Early Exits**
-   - Not initialized → return `(true, staticFee)`.
-   - Index bounds: `p.indexIn`, `p.indexOut` `< numTokens` else **static**.
-   - If `maxFee ≤ staticFee` → **static** (no headroom).
-   - If `threshold ≥ 1e18` → **static** (no ramp).
-
-2. **Provisional Amount**
-   - Call `WeightedPool.onSwap(p)` to get the counter amount.
-   - Build **post-trade** balances for **only** the two indices:
-     - `EXACT_IN`:  
-       `bIn'  = bIn  + amountGiven`  
-       `bOut' = bOut − amountCalculated`
-     - `EXACT_OUT`:  
-       `bIn'  = bIn  + amountCalculated`  
-       `bOut' = bOut − amountGiven`
-
-3. **Weights & Pool Price**
-   - Read `wIn`, `wOut` from `getNormalizedWeights()`.
-   - Pool price (1e18 scale):  
-     `P_pool = (B_out' * w_in) / (B_in' * w_out)`  
-   - Guard: if `bIn' = 0` → revert `"bal0"`; if any factor is 0 → treat as no price (static).
-
-4. **External Price (Hyperliquid/USD)**
-   - If `isUsd = 1`: `px = 1e18`.  
-   - Else: `raw = HyperPrice.spot(pairIndex)` (1e6), then `px = (raw * 1e18) / priceDivisor`.  
-   - Pair price: `P_ext = px_out / px_in`.
-
-5. **Deviation & Fee Ramp**
-   - Relative deviation: `δ = |P_pool − P_ext| / P_ext`.
-   - If `δ ≤ τ` → fee = `static`.  
-   - Else:  
-     `increment = (f_max − f_static) * (δ − τ) / (1 − τ)`  
-     `fee = clamp(f_static + increment, ≤ f_max)`
-
-6. **Return**
-   - `(true, fee)`
-
-*Continuity:* ramp is continuous at `δ = τ` (within rounding).  
-*Monotonicity:* fee is non-decreasing in δ for fixed parameters.
+1. **Early exits.**  
+   Abort surge logic and return **static fee** if: pool not initialized; indexes out of range; `max ≤ static`; `τ ≥ 1`; missing weights; `px_in == 0` or `px_out/px_in == 0`. If `capDev ≤ τ` (misconfig), treat as `capDev = 1` defensively.
+2. **Post‑trade balances.**  
+   Call the pool’s `onSwap` to get the counter‑amount. Update only the two balances participating in the swap, using the exact `EXACT_IN`/`EXACT_OUT` rules that the pool expects.
+3. **Pool‑implied price.**  
+   Read normalized weights; compute the price implied by balances and weights (see math below).
+4. **External price.**  
+   Build per‑token prices (USD = 1e18 or Hyperliquid spot scaled by `priceDivisor`) and take the ratio.
+5. **Deviation and fee.**  
+   Compute relative deviation; if above threshold, apply the **linear ramp** over `[τ, capDev]`; clamp to `max`.
 
 ---
 
 ## Mathematics
 
-- **Scales:** internal math at **1e18**; HL spot at **1e6**; divisor converts 1e6 → 1e18.  
-- **Complement:** `1 − τ` computed directly; guarded by early exit when `τ = 1e18`.  
-- **Rounding:** uses fixed-point helpers (`mulDown`, `divDown`), bias toward zero.  
-- **Pool Price:** WeightedPool pairwise formula from post-trade balances and normalized weights.
+### Pool & Oracle Prices
+
+**Pool‑implied price** (for “j per i”, after the provisional trade) comes from balances and normalized weights:
+
+$$
+P_{\text{pool}}(j \rightarrow i) \;=\; \frac{B'_j/w_j}{B'_i/w_i}
+\;=\; \frac{B'_j \cdot w_i}{B'_i \cdot w_j}
+$$
+
+**External price ratio** uses per‑token oracle prices:
+
+$$
+P_{\text{ext}}(j \rightarrow i) \;=\; \frac{px_j}{px_i}
+$$
+
+### Deviation
+
+**Relative deviation** is measured as:
+
+$$
+\delta(j,i) \;=\; \frac{\left|\,P_{\text{pool}}(j \rightarrow i) - P_{\text{ext}}(j \rightarrow i)\,\right|}
+{P_{\text{ext}}(j \rightarrow i)}
+$$
+
+A value of $\delta = 0.10$ means the pool is 10% away from the oracle for that pair.
+
+### Fee Ramp
+
+Let `static` be the pool’s base fee, `max` the cap, `\tau` the threshold, and `capDev` the deviation at which the max fee is reached. For measured deviation $\delta$:
+
+- If $\delta \le \tau$, the fee remains the **static** fee.
+- Otherwise, compute a normalized progress and ramp linearly:
+
+```text
+span = capDev − τ                # > 0
+norm = (δ − τ) / span            # linear progress in [0, 1]
+norm = min(norm, 1)
+fee  = static + (max − static) * norm
+fee  = min(fee, max)
+```
+
+**Slope interpretation.**  
+The marginal slope in the active region is $(\text{max} - \text{static}) / (\text{capDev} - \tau)$.  
+Choosing smaller `capDev` reaches the max sooner; choosing larger `capDev` spreads the ramp over a wider range.
+
+### Pool‑Wide Deviation for Liquidity Checks
+
+For **multi‑token** pools, the liquidity checks use a conservative **max‑pair** deviation:
+
+1. Build 1e18‑scaled per‑token prices ($px_k$).
+2. For every pair $(i, j)$, compute $P_{\text{pool}}(j \rightarrow i)$ and $P_{\text{ext}}(j \rightarrow i)$, then $\delta(j,i)$.
+3. Take $\delta_{\max} = \max_{i<j} \delta(j,i)$.
+
+This captures the *worst* mispricing. It is cheap ($O(n^2)$ with $n \le 8$) and effective at preventing outlier‑token blowups.
 
 ---
 
 ## Error Handling & Fallbacks
 
-- **Static fee fallbacks** (non-reverting paths):
-  - Uninitialized or invalid indices.
-  - Pool `onSwap` / `getNormalizedWeights()` revert.
-  - Weights array too short for indices.
-  - Any zero/invalid intermediate implying no meaningful price.
-
-- **Precompile failures**:
-  - Short revert tags surface issues:
-    - `"price"` — Hyperliquid price failure or invalid `pairIndex` for non-USD.
-    - `"dec"` — invalid `szDecimals` (outside [0..6]) at config time.
-
-> If preferred, wrap precompile calls with try/catch to fall back to static instead of reverting.
+- **Fail‑open to static fee** on most uncertainty: uninitialized pool, bad indices, zero weights/price, or zero external ratio.  
+- **Defensive cap**: if `capDev ≤ τ`, fee logic treats `capDev = 1` for that computation; the setter enforces proper ordering so misconfig should be rare.  
+- **External calls**: if the underlying pool or precompiles revert, the transaction can still fail upstream; the hook avoids adding additional reverts beyond explicit `require`s for invalid configuration.
 
 ---
 
-## Why Multitoken-by-Index
+## Why Multitoken‑by‑Index
 
-- Matches the Vault’s swap interface, which addresses tokens by **index**.
-- Minimizes storage reads: **only two** token config slots per swap.
-- Clearer auditability vs. global bit-packing while keeping gas low.
+- **Compact and gas‑efficient**: indices avoid mapping by address and match Balancer’s internal ordering.
+- **Clear operational story**: pool operators think in “slot i” and “slot j” terms when configuring weightings and token lists.
+- **Deterministic layout**: fixed `TokenPriceCfg[8]` bounds the cost and simplifies scanning.
 
 ---
 
-## Gas-Efficiency Design
+## Gas‑Efficiency Design
 
-- **3 SLOADs per swap:** `details` + `tokenCfg[in]` + `tokenCfg[out]`.
-- **Precomputed `priceDivisor`:** no exponentiation in the hot path.
-- **Read only the needed data:** two balances & two weights (no full array copies).
-- **Early exits:** skip all external calls if no surge can occur.
-- **Local caching:** read storage once; use stack locals thereafter.
-- *(Optional)* Inline assembly for precompile calls to avoid ABI encode/decode overhead.
+- **Cached divisors**: convert Hyperliquid spot to 1e18 with a simple multiply/divide (no exponentiation).
+- **Two‑token hot path**: fee computation touches only the two swap tokens; no large array copies.
+- **O(n²) but n ≤ 8** for the pool‑wide deviation used in liquidity checks, keeping it practical.
+- **Guarded early returns**: most “bad state” cases exit early with the static fee, avoiding wasted work.
 
 ---
 
 ## Security & Operational Notes
 
-- **Access Control:** Ensure only governance or the configured `swapFeeManager` can update `τ` and the fee cap.
-- **Parameter Hygiene:** Excessive caps can make swaps uneconomical; very low τ can over-penalize benign flow.
-- **USD-Quoted Tokens:** Useful for stables/pegs; otherwise provide a valid Hyperliquid `pairIndex`.
-- **Oracle Availability:** If HL precompiles are unavailable, the hook may revert or fall back to static per integration policy.
+- **Access control**: setters should be protected (governance / fee manager). Consider timelocks or rate limits for parameter changes in production.
+- **Observability**: events fire on every parameter change and token price mapping update; consider complementing with metrics on how often after‑liquidity checks block.
+- **Policy clarity**: proportional liquidity is *always allowed*; non‑proportional is blocked *only* if it **worsens** deviation **and** the resulting deviation is **above** threshold — corrective actions are allowed.
 
 ---
 
-## Worked Example
+## Worked Examples
 
-- **Pool:** 3 tokens (A,B,C).  
-- **Config:**  
-  - A: `pairIndex=101`, `sz=2` → `priceDivisor=10,000`  
-  - B: USD (`isUsd=1`) → `price=1e18`  
-  - τ = 2% (`0.02e18`), `f_static = 0.2%`, `f_max = 1%`
-- **Swap:** A → B (EXACT_IN)
-  1. `onSwap` gives provisional amountOut.
-  2. Compute post-trade `bA'`, `bB'`.
-  3. Read `wA`, `wB`; compute `P_pool`.
-  4. `pxA = (spot(101) * 1e18) / 10,000`; `pxB = 1e18`; `P_ext = pxB/pxA`.
-  5. If `δ = 5%`: excess = 3%, complement = 98% → increment ≈ `(1% − 0.2%) * 3/98 ≈ 0.02449%` → fee ≈ `0.22449%` (≤ `1%` cap).
+### Example A — Reach max earlier
+
+Parameters:
+- `static = 0.30%`, `max = 2.00%`, `τ = 2%`, `capDev = 20%`.
+
+For measured deviation `δ = 11%`:
+
+```text
+span = 20% − 2% = 18%
+norm = (11% − 2%) / 18% = 0.50
+fee  = 0.30% + (2.00% − 0.30%) * 0.50
+     = 0.30% + 0.85% = 1.15%
+```
+
+At `δ ≥ 20%`, fee = `2.00%`.
+
+### Example B — Legacy behavior
+
+Set `capDev = 100%`.  
+You now reach `max` only when `δ ≈ 100%`; the ramp is flatter for the same `(max − static)` and `τ`.
 
 ---
 
 ## Quick Start
 
-1. **Register** the hook with a Weighted pool (Vault lifecycle).
-2. **Configure tokens (by index):**
-   - For stables: set `isUsd = true`.
-   - Otherwise: set `pairIndex`; the hook caches `szDecimals` and `priceDivisor`.
-3. **Set fee parameters:** `thresholdPercentage (τ)` and `maxSurgeFeePercentage`.
-4. **Monitor:** During volatility, deviation ↑ → realized fees ↑; otherwise fees revert to static.
+1. **Register** the pool with the hook (done by the Vault during pool creation).
+2. **Configure token prices by index**  
+   - USD tokens: `isUsd = true`.  
+   - Non‑USD tokens: find the Hyperliquid `pairIndex`, call `setTokenPriceConfigIndex` (or the batch variant). The hook caches the `priceDivisor`.
+3. **Set fee parameters**  
+   - `setMaxSurgeFeePercentage(pool, …)`  
+   - `setSurgeThresholdPercentage(pool, τ)`  
+   - `setCapDeviationPercentage(pool, capDev)` — choose capDev to control where max fees kick in.
+4. **Verify** with a dry‑run / simulation: small swaps around the threshold, then above `capDev` to confirm clamping at `max`.
 
 ---
 
 ## Testing Notes
 
-- Token count bounds **[2..8]**; index bounds for in/out.  
-- Admin guards: `max ≤ 1e18`, `threshold ≤ 1e18`; early exits when `max ≤ static` or `threshold = 1e18`.  
-- EXACT_IN/OUT post-trade math; weighted price formula correctness.  
-- USD vs. non-USD paths; divisor table `{1,10,100,1e3,1e4,1e5,1e6}`; precomputed divisor usage.  
-- Deviation properties: `δ ≤ τ` unchanged; monotone in δ; clamp at `f_max`.  
-- Fallbacks when pool calls revert or indices invalid; behavior on precompile failures per chosen policy.
+- **Guards**: uninitialized, bad indices, `max ≤ static`, `τ ≥ 1`, missing weights, missing or zero price, zero external ratio.  
+- **Swap math**: both `EXACT_IN` and `EXACT_OUT` branches update balances correctly for the chosen pool.  
+- **Ramp**: continuity at `δ = τ`, monotonic increase until `capDev`, clamped at `max`.  
+- **After‑liquidity**: proportional always allowed; non‑proportional blocked iff `(after > before) && (after > τ)`; array length mismatch and balance reconstruction under/overflow paths covered.  
+- **Edge cases**: `n = 2` and `n = 8`, tiny weights, a token with zero balance, USD‑quoted tokens mixed with non‑USD.
+
+
+---

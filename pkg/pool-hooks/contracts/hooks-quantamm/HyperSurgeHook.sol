@@ -71,6 +71,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
     struct PoolDetails {
         uint64 maxSurgeFeePercentage; // 18-dec
         uint64 thresholdPercentage; // 18-dec
+        uint64 capDeviationPercentage; //18-dec
         uint8 numTokens; // 2..8 inclusive
         bool initialized;
     }
@@ -83,6 +84,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
     mapping(address => PoolCfg) private _poolCfg;
     uint256 private immutable _defaultMaxSurgeFee;
     uint256 private immutable _defaultThreshold;
+    uint256 private immutable _defaultCapDeviation;
 
     constructor(
         IVault vault,
@@ -94,6 +96,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         _ensureValidPct(defaultThresholdPercentage);
         _defaultMaxSurgeFee = defaultMaxSurgeFeePercentage;
         _defaultThreshold = defaultThresholdPercentage;
+        _defaultCapDeviation = FixedPoint.ONE; // 1.0 (100%) preserves existing behavior
     }
 
     ///@inheritdoc IHooks
@@ -101,21 +104,6 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         hookFlags.shouldCallComputeDynamicSwapFee = true;
         hookFlags.shouldCallAfterAddLiquidity = true;
         hookFlags.shouldCallAfterRemoveLiquidity = true;
-    }
-
-    // ===== Single locals-struct (for stack depth)
-    struct ComputeLocals {
-        uint256 calcAmountScaled18;
-        uint256 poolPx;
-        uint256 pxIn;
-        uint256 pxOut;
-        uint256 extPx;
-        uint256 deviation;
-        uint256 threshold;
-        uint256 maxPct;
-        uint256 increment;
-        uint256 surgeFee;
-        PoolDetails poolDetails;
     }
 
     // ===== Register: set numTokens, defaults (index-only config)
@@ -133,6 +121,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
 
         pc.details.maxSurgeFeePercentage = _defaultMaxSurgeFee.toUint64();
         pc.details.thresholdPercentage = _defaultThreshold.toUint64();
+        pc.details.capDeviationPercentage = uint64(_defaultCapDeviation);
         pc.details.numTokens = uint8(n);
         pc.details.initialized = true;
 
@@ -230,17 +219,37 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
     }
 
     ///@inheritdoc IHyperSurgeHook
-    function setMaxSurgeFeePercentage(address pool, uint256 pct) external override onlySwapFeeManagerOrGovernance(pool) {
+    function setMaxSurgeFeePercentage(
+        address pool,
+        uint256 pct
+    ) external override onlySwapFeeManagerOrGovernance(pool) {
         _ensureValidPct(pct);
         _poolCfg[pool].details.maxSurgeFeePercentage = pct.toUint64();
         emit MaxSurgeFeePercentageChanged(pool, pct);
     }
 
     ///@inheritdoc IHyperSurgeHook
-    function setSurgeThresholdPercentage(address pool, uint256 pct) external override onlySwapFeeManagerOrGovernance(pool) {
-        _ensureValidPct(pct);
+    function setSurgeThresholdPercentage(
+        address pool,
+        uint256 pct
+    ) external override onlySwapFeeManagerOrGovernance(pool) {
+        _ensureValidPct(pct); // keep a valid ramp span: threshold < capDev ≤ 1
+        uint256 capDev = uint256(_poolCfg[pool].details.capDeviationPercentage);
+        require(capDev == 0 || pct < capDev, "cap<=thr");
         _poolCfg[pool].details.thresholdPercentage = pct.toUint64();
         emit ThresholdPercentageChanged(pool, pct);
+    }
+
+    /// @inheritdoc IHyperSurgeHook
+    function setCapDeviationPercentage(
+        address pool,
+        uint256 capDevPct
+    ) external override onlySwapFeeManagerOrGovernance(pool) {
+        _ensureValidPct(capDevPct);
+        uint256 thr = uint256(_poolCfg[pool].details.thresholdPercentage);
+        require(capDevPct > thr, "cap<=thr");
+        _poolCfg[pool].details.capDeviationPercentage = capDevPct.toUint64();
+        emit CapDeviationPercentageChanged(pool, capDevPct);
     }
 
     // =========================================================================
@@ -456,7 +465,22 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         return uint256(_poolCfg[pool].details.thresholdPercentage);
     }
 
-    // ========= Dynamic fee (optimized hot path) =========
+    // ===== Single locals-struct (for stack depth)
+    struct ComputeLocals {
+        uint256 calcAmountScaled18;
+        uint256 poolPx;
+        uint256 pxIn;
+        uint256 pxOut;
+        uint256 extPx;
+        uint256 deviation;
+        uint256 threshold;
+        uint256 maxPct;
+        uint256 increment;
+        uint256 surgeFee;
+        uint256 capDevPct;
+        PoolDetails poolDetails;
+    }
+
     function onComputeDynamicSwapFeePercentage(
         PoolSwapParams calldata p,
         address pool,
@@ -469,12 +493,18 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         if (p.indexIn >= locals.poolDetails.numTokens || p.indexOut >= locals.poolDetails.numTokens)
             return (true, staticSwapFee);
 
-        // (5) Early return when no surcharge is possible.
+        // Early return when no surcharge is possible.
         uint256 maxPct = uint256(locals.poolDetails.maxSurgeFeePercentage);
         if (maxPct <= staticSwapFee) return (true, staticSwapFee);
+        locals.threshold = uint256(locals.poolDetails.thresholdPercentage);
         if (locals.threshold >= FixedPoint.ONE) return (true, staticSwapFee);
 
-        // 1) Ask the Weighted pool to compute the counter-amount (external call; keep try/catch for safety)
+        locals.capDevPct = uint256(locals.poolDetails.capDeviationPercentage);
+        if (locals.capDevPct == 0 || locals.capDevPct <= locals.threshold) {
+            locals.capDevPct = FixedPoint.ONE; // preserves legacy behavior
+        }
+
+        // 1) Ask the Weighted pool to compute the counter-amount (external call).
         locals.calcAmountScaled18 = WeightedPool(pool).onSwap(p);
 
         // 2) Use only two balances (no array copy)
@@ -489,6 +519,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
             bOut -= p.amountGivenScaled18;
         }
 
+        // Fetch weights and guard indices as in original.
         uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
         if (weights.length <= p.indexIn || weights.length <= p.indexOut) return (true, staticSwapFee);
         uint256 wIn = weights[p.indexIn];
@@ -527,19 +558,21 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         locals.extPx = locals.pxOut.divDown(locals.pxIn);
         if (locals.extPx == 0) return (true, staticSwapFee);
 
-        // 5) Deviation and complement-based ramp up to max cap (original curve)
+        // 5) Deviation
         locals.deviation = _relAbsDiff(locals.poolPx, locals.extPx); // |pool - ext| / ext
-        locals.threshold = uint256(locals.poolDetails.thresholdPercentage);
         if (locals.deviation <= locals.threshold) return (true, staticSwapFee);
 
-        // use cached maxPct from early check
+        // Use cached maxPct from early check.
         locals.maxPct = maxPct;
-        locals.increment = (locals.maxPct - staticSwapFee).mulDown(
-            (locals.deviation - locals.threshold).divDown(locals.threshold.complement())
-        );
 
+        uint256 span = locals.capDevPct - locals.threshold; // > 0 by fallback above
+        uint256 norm = (locals.deviation - locals.threshold).divDown(span);
+        if (norm > FixedPoint.ONE) norm = FixedPoint.ONE;
+
+        locals.increment = (locals.maxPct - staticSwapFee).mulDown(norm);
         locals.surgeFee = staticSwapFee + locals.increment;
         if (locals.surgeFee > locals.maxPct) locals.surgeFee = locals.maxPct;
+
         return (true, locals.surgeFee);
     }
 

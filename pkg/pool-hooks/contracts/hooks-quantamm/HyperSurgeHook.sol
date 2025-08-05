@@ -17,6 +17,7 @@ import {
 import { BaseHooks } from "@balancer-labs/v3-vault/contracts/BaseHooks.sol";
 import { VaultGuard } from "@balancer-labs/v3-vault/contracts/VaultGuard.sol";
 import { SingletonAuthentication } from "@balancer-labs/v3-vault/contracts/SingletonAuthentication.sol";
+import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Version.sol";
 
 import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol";
 import { WeightedPool } from "@balancer-labs/v3-pool-weighted/contracts/WeightedPool.sol";
@@ -47,7 +48,7 @@ library HyperTokenInfo {
 /// -----------------------------------------------------------------------
 /// Multitoken Hyper Surge Hook — struct-per-index configuration
 /// -----------------------------------------------------------------------
-contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, Ownable {
+contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, Version {
     using FixedPoint for uint256;
     using SafeCast for uint256;
 
@@ -88,16 +89,19 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
     constructor(
         IVault vault,
         uint256 defaultMaxSurgeFeePercentage,
-        uint256 defaultThresholdPercentage
-    ) SingletonAuthentication(vault) VaultGuard(vault) Ownable(msg.sender) {
-        _ensurePct(defaultMaxSurgeFeePercentage);
-        _ensurePct(defaultThresholdPercentage);
+        uint256 defaultThresholdPercentage,
+        string memory version
+    ) SingletonAuthentication(vault) VaultGuard(vault) Version(version) {
+        _ensureValidPct(defaultMaxSurgeFeePercentage);
+        _ensureValidPct(defaultThresholdPercentage);
         _defaultMaxSurgeFee = defaultMaxSurgeFeePercentage;
         _defaultThreshold   = defaultThresholdPercentage;
     }
 
-    function getHookFlags() public pure override returns (HookFlags memory f) {
-        f.shouldCallComputeDynamicSwapFee = true;
+    function getHookFlags() public pure override returns (HookFlags memory hookFlags) {
+        hookFlags.shouldCallComputeDynamicSwapFee = true;
+        hookFlags.shouldCallAfterAddLiquidity = true;
+        hookFlags.shouldCallAfterRemoveLiquidity = true;
     }
 
     // ===== Single locals-struct (for stack depth)
@@ -144,7 +148,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         uint8 tokenIndex,
         uint32 pairIdx,
         bool isUsd
-    ) external onlyOwner {
+    ) external onlySwapFeeManagerOrGovernance(pool) {
         PoolDetails memory details = _poolCfg[pool].details;
         require(details.initialized, "POOL");
         if (tokenIndex >= details.numTokens) revert TokenIndexOutOfRange();
@@ -170,52 +174,59 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         emit TokenPriceConfiguredIndex(pool, tokenIndex, tempCfg.pairIndex, sz, tempCfg.isUsd == 1);
     }
 
+    struct SetBatchConfigs {
+        uint8 idx;
+        uint8 sz;
+        TokenPriceCfg tempCfg;
+        uint256 i;
+        uint256 len;
+    }
+    
     /// @notice Batch version (indices).
     function setTokenPriceConfigBatchIndex(
         address pool,
         uint8[] calldata tokenIndices,
         uint32[] calldata pairIdx,
         bool[] calldata isUsd
-    ) external onlyOwner {
+    ) external onlySwapFeeManagerOrGovernance(pool) {
         PoolDetails memory detail = _poolCfg[pool].details;
         require(detail.initialized, "POOL");
-
+        SetBatchConfigs memory cfg;
         if (tokenIndices.length != pairIdx.length || tokenIndices.length != isUsd.length) revert InvalidArrayLengths();
-        uint256 len = tokenIndices.length;
-        for (uint256 i = 0; i < len; ) {
-            uint8 idx = tokenIndices[i];
-            if (idx >= detail.numTokens) revert TokenIndexOutOfRange();
-            TokenPriceCfg memory tempCfg;
-            uint8 sz = 0; // default for USD quoted
-            if (isUsd[i]) {
-                tempCfg.pairIndex    = 0;
-                tempCfg.isUsd        = 1;
-                tempCfg.priceDivisor = 1;
+        cfg.len = tokenIndices.length;
+        for (cfg.i = 0; cfg.i < cfg.len; ) {
+            cfg.idx = tokenIndices[cfg.i];
+            if (cfg.idx >= detail.numTokens) revert TokenIndexOutOfRange();
+            cfg.sz = 0; // default for USD quoted
+            if (isUsd[cfg.i]) {
+                cfg.tempCfg.pairIndex    = 0;
+                cfg.tempCfg.isUsd        = 1;
+                cfg.tempCfg.priceDivisor = 1;
             } else {
-                require(pairIdx[i] != 0, "PAIRIDX");
-                sz = HyperTokenInfo.szDecimals(pairIdx[i]); // may revert "dec"
-                require(sz <= 6, "dec");
+                require(pairIdx[cfg.i] != 0, "PAIRIDX");
+                cfg.sz = HyperTokenInfo.szDecimals(pairIdx[cfg.i]); // may revert "dec"
+                require(cfg.sz <= 6, "dec");
 
-                tempCfg.pairIndex    = pairIdx[i];
-                tempCfg.isUsd        = 0;
-                tempCfg.priceDivisor = _divisorFromSz(sz);
+                cfg.tempCfg.pairIndex    = pairIdx[cfg.i];
+                cfg.tempCfg.isUsd        = 0;
+                cfg.tempCfg.priceDivisor = _divisorFromSz(cfg.sz);
             }
 
-            _poolCfg[pool].tokenCfg[idx] = tempCfg;
+            _poolCfg[pool].tokenCfg[cfg.idx] = cfg.tempCfg;
 
-            emit TokenPriceConfiguredIndex(pool, idx, tempCfg.pairIndex, sz, tempCfg.isUsd == 1);
-            unchecked { ++i; }
+            emit TokenPriceConfiguredIndex(pool, cfg.idx, cfg.tempCfg.pairIndex, cfg.sz, cfg.tempCfg.isUsd == 1);
+            unchecked { ++cfg.i; }
         }
     }
 
-    function setMaxSurgeFeePercentage(address pool, uint256 pct) external onlyOwner {
-        _ensurePct(pct);
+    function setMaxSurgeFeePercentage(address pool, uint256 pct) external onlySwapFeeManagerOrGovernance(pool) {
+        _ensureValidPct(pct);
         _poolCfg[pool].details.maxSurgeFeePercentage = pct.toUint64();
         emit MaxSurgeFeePercentageChanged(pool, pct);
     }
 
-    function setSurgeThresholdPercentage(address pool, uint256 pct) external onlyOwner {
-        _ensurePct(pct);
+    function setSurgeThresholdPercentage(address pool, uint256 pct) external onlySwapFeeManagerOrGovernance(pool) {
+        _ensureValidPct(pct);
         _poolCfg[pool].details.thresholdPercentage = pct.toUint64();
         emit ThresholdPercentageChanged(pool, pct);
     }
@@ -225,7 +236,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         PoolSwapParams calldata p,
         address pool,
         uint256 staticSwapFee
-    ) public view override returns (bool, uint256) {
+    ) public view override onlyVault returns (bool, uint256) {
         PoolCfg storage pc = _poolCfg[pool];
         ComputeLocals memory locals;
         locals.poolDetails = pc.details;
@@ -340,7 +351,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         return 1;
     }
 
-    function _ensurePct(uint256 pct) private pure {
+    function _ensureValidPct(uint256 pct) private pure {
         if (pct > FixedPoint.ONE) revert("pct");
     }
 }

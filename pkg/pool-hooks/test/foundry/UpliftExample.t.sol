@@ -59,6 +59,8 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
     uint256 internal constant DEFAULT_AMP_FACTOR = 200;
 
+    PoolFactoryMock internal factoryMock;
+    
     MockUpdateWeightRunner internal updateWeightRunner;
 
     UpliftOnlyExample internal upliftOnlyRouter;
@@ -193,6 +195,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testAddLiquidity() public {
+        uint256 bptAmount;
         BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -247,6 +250,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testAddLiquidityMultipleDeposits() public {
+        uint256 bptAmount;
         BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -335,6 +339,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testAddLiquidityThrowOnLimitDeposits() public {
+        uint256 bptAmount;
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.startPrank(bob);
         uint256 bptAmountDeposit = bptAmount / 150;
@@ -353,6 +358,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testTransferDepositsAtRandom(uint256 seed, uint256 depositLength) public {
+        uint256 bptAmount;
         uint256 depositBound = bound(depositLength, 1, 10);
         /**
          * This can be changed to the max 98 however it takes some time!
@@ -431,6 +437,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testRemoveLiquidityNoPriceChange() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
 
@@ -526,6 +533,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testRemoveLiquidityNegativePriceChange() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -626,6 +634,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testRemoveLiquidityDoublePositivePriceChange() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -735,6 +744,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testRemoveWithNonOwner() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -750,6 +760,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testAddFromExternalRouter() public {
+        uint256 bptAmount;
         // Add fails because it must be done via NftLiquidityPositionExample.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.expectRevert(abi.encodeWithSelector(UpliftOnlyExample.CannotUseExternalRouter.selector, router));
@@ -770,6 +781,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testOnAfterRemoveLiquidityFromExternalRouterWithRealDepositor() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -793,6 +805,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testOnAfterRemoveLiquidityFromExternalRouterWithRandomExternal() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -816,6 +829,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testOnBeforeAddLiquidityFromExternalRouterWithRealDepositor() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -838,6 +852,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testOnBeforeAddLiquidityFromExternalRouterWithRandomExternal() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -860,6 +875,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testAfterUpdateFromExternalRouterWithRealDepositor() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -872,6 +888,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testAfterUpdateFromExternalRouterWithRandomExternal() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -885,6 +902,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testAfterUpdateFromExternalRouterWithRouter() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -897,6 +915,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testAfterUpdateFromNFTInvalidTokenID() public {
+        uint256 bptAmount;
         // Add liquidity so bob has BPT to remove liquidity.
         uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
@@ -1115,6 +1134,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testRemoveLiquidityWithProtocolTakeNoPriceChange() public {
+        uint256 bptAmount;
         vm.prank(address(vaultAdmin));
         updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
         vm.stopPrank();
@@ -1222,6 +1242,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testRemoveLiquidityWithProtocolTakeNegativePriceChange() public {
+        uint256 bptAmount;
         vm.prank(address(vaultAdmin));
         updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
         vm.stopPrank();
@@ -1330,6 +1351,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testRemoveLiquidityWithProtocolTakeDoublePositivePriceChange() public {
+        uint256 bptAmount;
         vm.prank(address(vaultAdmin));
         updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
         vm.stopPrank();

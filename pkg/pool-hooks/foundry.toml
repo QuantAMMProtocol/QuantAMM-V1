@@ -13,6 +13,7 @@ fs_permissions = [
 remappings = [
     'vault/=../vault/',
     'pool-weighted/=../pool-weighted/',
+    'pool-quantamm/=../pool-quantamm/',
     'solidity-utils/=../solidity-utils/',
     'ds-test/=../../node_modules/forge-std/lib/ds-test/src/',
     'forge-std/=../../node_modules/forge-std/src/',

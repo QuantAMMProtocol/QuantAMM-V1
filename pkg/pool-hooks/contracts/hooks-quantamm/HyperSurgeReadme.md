@@ -93,6 +93,194 @@
 > Precomputing `priceDivisor` eliminates exponentiation in the hot path and confines `sz` validation to config time.
 
 ---
+# Hyper Surge Hook — Theory of Deviation & Liquidity Checks
+
+This document explains the reasoning and math behind:
+
+- `_computeOracleDeviationPct` — how the hook measures “how far the pool’s implied prices are from external/oracle prices.”
+- `onAfterAddLiquidity` / `onAfterRemoveLiquidity` — how the hook decides whether a non-proportional liquidity action should be **blocked** to avoid worsening a surge.
+
+The goal is to **discourage actions that *increase* price deviation when the pool is already beyond a configured surge threshold**, while allowing neutral or corrective actions.
+
+---
+
+## Notation & Scaling
+
+- **Balances:** `balancesScaled18[i]` — token *i*’s balance in 18-decimals.
+- **Weights:** `w[i]` — normalized weights from the weighted pool (`getNormalizedWeights()`), scaled to 1e18.
+- **External price:** `px[i]` — 1e18-scaled external price for token *i*:
+  - If `isUsd == 1`, then `px[i] = 1e18` (USD unit price).
+  - Else `px[i] = (HyperPrice.spot(pairIndex) * 1e18) / priceDivisor`.
+- **Fixed point:** All ratios are 1e18-scaled (Balancers’s `FixedPoint` math).
+- **Threshold:** `threshold` is a 1e18-scaled fraction (e.g., `0.10e18` = 10%).
+
+---
+
+## `_computeOracleDeviationPct` — Measuring Pool-vs-Oracle Deviation
+
+### Intuition
+
+A weighted pool determines relative prices from **balances and weights**. For any two tokens _i_ and _j_, the **pool-implied price** for “j per i” is proportional to:
+\[
+P_{\text{pool}}(j \!\to\! i) \;=\; \frac{B_j / w_j}{B_i / w_i}
+\;=\; \frac{B_j \cdot w_i}{B_i \cdot w_j}
+\]
+The **external price** from the oracle for “j per i” is:
+\[
+P_{\text{ext}}(j \!\to\! i) \;=\; \frac{px[j]}{px[i]}
+\]
+
+We define **relative deviation** as:
+\[
+\text{dev}(i,j) \;=\;
+\frac{|P_{\text{pool}}(j \!\to\! i) - P_{\text{ext}}(j \!\to\! i)|}{P_{\text{ext}}(j \!\to\! i)}
+\]
+
+The function returns the **maximum** deviation across **all pairs** (i<j). Using the max catches the worst mispricing the pool is exhibiting relative to the oracle and is simple to reason about under risk constraints.
+
+### Algorithm (high level)
+
+1. **Preconditions & bounds**
+   - If the pool is not initialized or `n < 2`, return `0`.
+   - Use `n = min(numTokens, balances.length, weights.length)`.
+
+2. **Fetch weights** once from the weighted pool.
+
+3. **Build external prices `px[i]`** for each token (1e18-scaled).  
+   - If any price is unavailable (`0`) or a balance/weight is `0`, **skip** that pair rather than reverting.
+
+4. **Pairwise loop** over `i<j`:
+   - Compute `P_pool(j→i) = (B_j * w_i) / (B_i * w_j)`.
+   - Compute `P_ext(j→i) = px[j] / px[i]`.
+   - Compute `dev(i,j) = |P_pool - P_ext| / P_ext`.
+   - Track `maxDev = max(maxDev, dev(i,j))`.
+
+5. **Return `maxDev`** (1e18-scaled fraction).
+
+### Why “max pairwise deviation”?
+
+- **Conservative**: protects against the single worst skew that can be exploited.
+- **Stable**: avoids over-reacting to noise in tokens that are already in line (only the worst offender drives the decision).
+- **Simple**: O(n²) for `n ≤ 8` is cheap and robust.
+
+### Edge cases & safeguards
+
+- **Zero or missing inputs** (balances, weights, or prices) ⇒ pair is **skipped**.
+- **Arithmetic** uses Balancer fixed-point helpers (`mulDown/divDown`), consistent with fee logic.
+- **No valid pairs** ⇒ returns `0`.
+
+---
+
+## Liquidity Checks: `onAfterAddLiquidity` & `onAfterRemoveLiquidity`
+
+### Goal
+
+Block **non-proportional** liquidity changes **only when** they **worsen** deviation and the **resulting** deviation is **above** the surge threshold. This mirrors the stable surge hook policy:
+
+- **Proportional** add/remove: **always allowed**.
+- **Non-proportional** add/remove:
+  - Reconstruct **pre-change** balances.
+  - Compare **before** vs **after** deviation.
+  - **Block** only if:
+    1. `afterDeviation > beforeDeviation`, **and**
+    2. `afterDeviation > threshold`.
+
+This ensures we don’t block helpful rebalancing that reduces deviation, and we ignore small deviations below the threshold.
+
+### Proportional vs Non-Proportional
+
+- A **proportional** add/remove scales all token balances by the same factor — it **does not** change relative prices implied by the constant-value formula, so we allow it.
+- The Vault passes `kind` (`PROPORTIONAL` or not), so we **trust** the classification and skip any extra ratio checks.
+
+### Reconstructing pre-change balances
+
+- **Add liquidity**  
+  Post-add balances: `B' = B_old + Δ`.  
+  Reconstruct `B_old = B' - Δ`.  
+  If any `Δ > B'` (underflow risk), **allow** (don’t block by mistake).
+
+- **Remove liquidity**  
+  Post-remove balances: `B' = B_old - Δ`.  
+  Reconstruct `B_old = B' + Δ`.  
+  If `B' + Δ` overflows (wrap), **allow**.
+
+### Decision rule
+
+Let:
+- `beforeDev = _computeOracleDeviationPct(pool, B_old)`
+- `afterDev  = _computeOracleDeviationPct(pool, B')`
+- `threshold = getSurgeThresholdPercentage(pool)`
+
+Then:
+
+- **Block** iff `afterDev > beforeDev && afterDev > threshold`.
+- **Allow** otherwise.
+
+### Why compare “after > before”?
+
+- Prevents **worsening** of an existing surge.  
+- Allows actions that **reduce** or **maintain** deviation, even when above the threshold (helpful rebalancing).
+
+### Why require “after > threshold”?
+
+- Avoids blocking normal operations for small, benign deviations.
+- The hook only intervenes during meaningful surges (configurable via `threshold`).
+
+### Returned values
+
+- Both functions return `(bool success, uint256[] memory hookAdjustedAmountsRaw)`.
+- This implementation **does not modify** amounts; it only **allows or blocks**.  
+  - On allow: `success = true`, amounts returned unchanged.  
+  - On block: `success = false`, amounts returned unchanged (the Vault should abort the op).
+
+### Edge cases & safety
+
+- **Mismatched array lengths** (deltas vs balances): **allow** (defensive).
+- **Small pools** (`n < 2`): **allow**.
+- **Missing prices/weights/balances** for a pair: that pair is **ignored** in deviation.  
+  If no pairs are usable, deviation is `0`, so the action will not be blocked.
+- **Rounding** uses `mulDown/divDown` consistently with the fee path.
+
+---
+
+## How This Interacts With Dynamic Swap Fees
+
+- The **dynamic swap fee** uses the same deviation measure (pool vs oracle) to ramp from a static fee up to `maxSurgeFeePercentage` once deviation exceeds `threshold`.
+- The **liquidity checks** ensure LP actions do not **increase** that deviation when it is already above the threshold.  
+  Together, they:
+  - Charge traders more during mispricing (discourage taking imbalance-increasing routes).
+  - Prevent LPs from worsening imbalance with non-proportional liquidity changes.
+  - Allow corrective actions that bring the pool back toward oracle prices.
+
+---
+
+## Complexity
+
+- `_computeOracleDeviationPct`: **O(n²)** pairwise over `n ≤ 8` tokens (cheap).
+- `onAfter*`: one or two calls to `_computeOracleDeviationPct` + linear reconstruction of `B_old`.
+
+---
+
+## Practical Configuration Tips
+
+- **Threshold** (`thresholdPercentage`):
+  - Lower values make the system more sensitive; higher values reduce interventions.
+  - Typical ranges: 2%–20% depending on pool volatility.
+
+- **Oracle coverage**:
+  - Ensure every token has a sensible `px` mapping (or is USD). Missing prices reduce sensitivity.
+
+- **Weights**:
+  - Extremely small weights make the pool-implied price more sensitive to balance changes; consider caps consistent with pool design.
+
+---
+
+## Summary
+
+- `_computeOracleDeviationPct` measures **worst pairwise** mispricing between pool-implied prices and the external oracle.
+- `onAfterAddLiquidity` / `onAfterRemoveLiquidity` **block only** non-proportional liquidity that **worsens** deviation and ends **above** the threshold.
+- Proportional changes are **always allowed** because they do not change relative prices.
+- This mirrors the **stable surge hook** protections while adapting the signal to **oracle-based deviation** for weighted, multi-token pools.
 
 ## Runtime Flow (Fee Computation)
 

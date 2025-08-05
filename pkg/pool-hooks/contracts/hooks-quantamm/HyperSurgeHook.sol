@@ -291,8 +291,9 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
                 }
             }
 
-            locals.beforeDev = _computeOracleDeviationPct(pool, locals.oldBalances);
-            locals.afterDev = _computeOracleDeviationPct(pool, balancesScaled18);
+            uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
+            locals.beforeDev = _computeOracleDeviationPct(pool, locals.oldBalances, weights);
+            locals.afterDev = _computeOracleDeviationPct(pool, balancesScaled18, weights);
             locals.threshold = getSurgeThresholdPercentage(pool);
 
             // Block only if deviation worsens AND exceeds threshold after the change.
@@ -346,8 +347,9 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
                 }
             }
 
-            locals.beforeDev = _computeOracleDeviationPct(pool, locals.oldBalances);
-            locals.afterDev = _computeOracleDeviationPct(pool, balancesScaled18);
+            uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
+            locals.beforeDev = _computeOracleDeviationPct(pool, locals.oldBalances, weights);
+            locals.afterDev = _computeOracleDeviationPct(pool, balancesScaled18, weights);
             locals.threshold = getSurgeThresholdPercentage(pool);
 
             locals.isWorseningSurge = (locals.afterDev > locals.beforeDev) && (locals.afterDev > locals.threshold);
@@ -356,7 +358,6 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
 
         struct ComputeOracleDeviationLocals {
             uint256 n;
-            uint256[] w;
             uint256[8] px;
             uint256 maxDev;
             uint64 raw;
@@ -378,7 +379,8 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         ///      Uses the same spot & external price conventions as the swap-fee compute.
         function _computeOracleDeviationPct(
             address pool,
-            uint256[] memory balancesScaled18
+            uint256[] memory balancesScaled18,
+            uint256[] memory w
         ) internal view returns (uint256 maxDev) {
             ComputeOracleDeviationLocals memory locals;
 
@@ -391,8 +393,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
             if (balancesScaled18.length < locals.n) locals.n = balancesScaled18.length; // defensive bound
 
             // Fetch normalized weights from the Weighted pool.
-            locals.w = WeightedPool(pool).getNormalizedWeights();
-            if (locals.w.length < locals.n) return 0;
+            if (w.length < locals.n) return 0;
 
             // Build external prices per token (1e18). Missing/zero -> mark as 0 (skipped).
             for (locals.i = 0; locals.i < locals.n; ++locals.i) {
@@ -413,12 +414,12 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
             // Pairwise check (O(n^2), n<=8).
             for (locals.i = 0; locals.i < locals.n; ++locals.i) {
                 locals.bi = balancesScaled18[locals.i];
-                locals.wi = locals.w[locals.i];
+                locals.wi = w[locals.i];
                 locals.pxi = locals.px[locals.i];
                 if (locals.bi == 0 || locals.wi == 0 || locals.pxi == 0) continue;
                 for (locals.j = locals.i + 1; locals.j < locals.n; ++locals.j) {
                     locals.bj = balancesScaled18[locals.j];
-                    locals.wj = locals.w[locals.j];
+                    locals.wj = w[locals.j];
                     locals.pxj = locals.px[locals.j];
                     if (locals.bj == 0 || locals.wj == 0 || locals.pxj == 0) continue;
 

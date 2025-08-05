@@ -64,6 +64,8 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
     );
     event MaxSurgeFeePercentageChanged(address indexed pool, uint256 newMaxSurgeFeePercentage);
     event ThresholdPercentageChanged(address indexed pool, uint256 newThresholdPercentage);
+    event LiquidityBlocked(address indexed pool, bool isAdd, uint256 beforeDev, uint256 afterDev, uint256 threshold);
+
 
     // ===== Errors
     error InvalidArrayLengths();
@@ -264,7 +266,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
             uint256, // lpAmount (unused)
             uint256[] memory balancesScaled18,
             bytes memory // userData (unused)
-        ) public view override returns (bool success, uint256[] memory hookAdjustedAmountsInRaw) {
+        ) public override returns (bool success, uint256[] memory hookAdjustedAmountsInRaw) {
             AddLiquidityLocals memory locals;
 
             // Proportional add is always allowed.
@@ -298,6 +300,11 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
 
             // Block only if deviation worsens AND exceeds threshold after the change.
             locals.isWorseningSurge = (locals.afterDev > locals.beforeDev) && (locals.afterDev > locals.threshold);
+
+            if (locals.isWorseningSurge) {
+                emit LiquidityBlocked(pool, /*isAdd=*/true, locals.beforeDev, locals.afterDev, locals.threshold);                
+            }
+
             return (!locals.isWorseningSurge, amountsInRaw);
         }
 
@@ -320,7 +327,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
             uint256[] memory amountsOutRaw,
             uint256[] memory balancesScaled18,
             bytes memory // userData (unused)
-        ) public view override returns (bool success, uint256[] memory hookAdjustedAmountsOutRaw) {
+        ) public override returns (bool success, uint256[] memory hookAdjustedAmountsOutRaw) {
             RemoveLiquidityLocals memory locals;
 
             // Proportional remove is always allowed.
@@ -353,6 +360,11 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
             locals.threshold = getSurgeThresholdPercentage(pool);
 
             locals.isWorseningSurge = (locals.afterDev > locals.beforeDev) && (locals.afterDev > locals.threshold);
+
+            if (locals.isWorseningSurge) {
+                emit LiquidityBlocked(pool, false, locals.beforeDev, locals.afterDev, locals.threshold);                
+            }
+
             return (!locals.isWorseningSurge, amountsOutRaw);
         }
 

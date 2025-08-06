@@ -51,7 +51,7 @@ library HyperTokenInfo {
 /// -----------------------------------------------------------------------
 /// Multitoken Hyper Surge Hook — struct-per-index configuration
 /// -----------------------------------------------------------------------
-contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, Version, IHyperSurgeHook {
+contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Version, IHyperSurgeHook {
     using FixedPoint for uint256;
     using SafeCast for uint256;
 
@@ -611,7 +611,7 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
         return 1;
     }
 
-    function _ensureValidPct(uint256 pct) private pure {
+    function _ensureValidPct(uint256 pct) internal pure {
         if (pct > FixedPoint.ONE) revert("pct");
     }
 
@@ -671,5 +671,9 @@ contract HyperSurgeHookMulti is BaseHooks, VaultGuard, SingletonAuthentication, 
     ///@inheritdoc IHyperSurgeHook
     function getDefaultSurgeThresholdPercentage() external view override returns (uint256) {
         return _defaultThreshold;
+    }
+
+    function getCapDeviationPercentage(address pool) external view override returns (uint256) {
+        return uint256(_poolCfg[pool].details.capDeviationPercentage);
     }
 }

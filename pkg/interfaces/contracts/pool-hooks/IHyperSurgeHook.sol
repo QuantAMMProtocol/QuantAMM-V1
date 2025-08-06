@@ -119,28 +119,36 @@ interface IHyperSurgeHook {
         @param capDevPct the deviation to set the cap to in %
     */
     function setCapDeviationPercentage(address pool, uint256 capDevPct) external;
-    
+
     // -------------------------------------------------------------------------
     // Getters (read-only)
     // -------------------------------------------------------------------------
 
     /**
      * @notice Current per-pool surge threshold percentage (1e18 = 100%).
+     * @param pool Pool address
+     * @return pct The surge threshold percentage (1e18 = 100%).
      */
     function getSurgeThresholdPercentage(address pool) external view returns (uint256);
 
     /**
      * @notice Current per-pool maximum surge fee percentage (1e18 = 100%).
+     * @param pool Pool address
+     * @return pct The maximum surge fee percentage (1e18 = 100%).
      */
     function getMaxSurgeFeePercentage(address pool) external view returns (uint256);
 
     /**
      * @notice Number of tokens configured for the pool (2..8).
+     * @param pool Pool address
+     * @return numTokens Number of tokens in the pool (2..8)
      */
     function getNumTokens(address pool) external view returns (uint8);
 
     /**
      * @notice Whether the pool has been initialized/registered with this hook.
+     * @param pool Pool address
+     * @return True if the pool is registered, false otherwise.
      */
     function isPoolInitialized(address pool) external view returns (bool);
 
@@ -184,11 +192,20 @@ interface IHyperSurgeHook {
 
     /**
      * @notice Default max surge fee percentage used for new pools (1e18 = 100%).
+     * @return pct The default max surge fee percentage (1e18 = 100%)
      */
-    function getDefaultMaxSurgeFeePercentage() external view returns (uint256);
+    function getDefaultMaxSurgeFeePercentage() external view returns (uint256 pct);
 
     /**
      * @notice Default surge threshold percentage used for new pools (1e18 = 100%).
+     * @return pct The default surge threshold percentage (1e18 = 100%)
      */
-    function getDefaultSurgeThresholdPercentage() external view returns (uint256);
+    function getDefaultSurgeThresholdPercentage() external view returns (uint256 pct);
+
+    /**
+     * @notice Default cap deviation percentage used for new pools (1e18 = 100%).
+     * @param pool Pool address
+     * @return capDevPct The cap deviation percentage (1e18 = 100%)
+     */
+    function getCapDeviationPercentage(address pool) external view returns (uint256);
 }

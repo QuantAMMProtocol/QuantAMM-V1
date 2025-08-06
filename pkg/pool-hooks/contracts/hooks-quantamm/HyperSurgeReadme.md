@@ -1,7 +1,7 @@
-# HyperSurge Hook — README (current)
+# HyperSurge Hook — README $current$
 
 **Dynamic, oracle-aware swap fees for Balancer V3 weighted pools (2–8 tokens).**  
-HyperSurge raises swap fees when the pool’s **implied price** departs from an **external price** (Hyperliquid). This version introduces a configurable **cap deviation** so you can choose the deviation level at which the fee reaches the **max surge fee**, while preserving the stable-surge style **after-liquidity protections**.
+HyperSurge raises swap fees when the pool’s **implied price** departs from an **external price** $Hyperliquid$. This version introduces a configurable **cap deviation** so you can choose the deviation level at which the fee reaches the **max surge fee**, while preserving the stable-surge style **after-liquidity protections**.
 
 ---
 
@@ -41,13 +41,13 @@ A linear ramp gives predictable economics, avoids discontinuities, and is easy t
 ## Dependencies & Assumptions
 
 - **Balancer V3 Vault + WeightedPool**
-  - Uses `WeightedPool.onSwap(PoolSwapParams)` to compute the counter amount.
+  - Uses `WeightedPool.onSwap$PoolSwapParams$` to compute the counter amount.
   - Uses `WeightedPool.getNormalizedWeights()` for weights.
   - `PoolSwapParams` (no token addresses): `kind`, `amountGivenScaled18`, `balancesScaled18[]`, `indexIn`, `indexOut`, `router`, `userData`.
 
 - **Hyperliquid Precompiles**
-  - **Price:** `HyperPrice.spot(pairIndex) → uint64` scaled **1e6**.
-  - **Token Info:** `HyperTokenInfo.szDecimals(pairIndex) → uint8` in **[0..6]**.
+  - **Price:** `HyperPrice.spot$pairIndex$ → uint64` scaled **1e6**.
+  - **Token Info:** `HyperTokenInfo.szDecimals$pairIndex$ → uint8` in **[0..6]**.
 
 - **Precision Conventions**
   - Pool math uses **1e18** fixed point.
@@ -90,7 +90,7 @@ All setters are expected to be permissioned (e.g., governance / swap‑fee manag
   - `setSurgeThresholdPercentage(pool, pct)` — must keep `pct < capDeviationPercentage`  
   - `setCapDeviationPercentage(pool, capDevPct)` — must keep `capDevPct > surgeThresholdPercentage` and `≤ 1`
 - **Typical getters**  
-  - `getMaxSurgeFeePercentage(pool)`, `getSurgeThresholdPercentage(pool)`, `getCapDeviationPercentage(pool)`  
+  - `getMaxSurgeFeePercentage$pool$`, `getSurgeThresholdPercentage$pool$`, `getCapDeviationPercentage$pool$`  
   - Defaults (if exposed): `getDefaultMaxSurgeFeePercentage()`, `getDefaultSurgeThresholdPercentage()`, `getDefaultCapDeviationPercentage()`  
   - Token configs: `getTokenPriceConfigIndex`, `getTokenPriceConfigs`  
   - Pool state: `getNumTokens`, `isPoolInitialized`
@@ -101,7 +101,7 @@ All setters are expected to be permissioned (e.g., governance / swap‑fee manag
 ---
 
 ---
-# Hyper Surge Hook — Theory of Deviation & Liquidity Checks
+# Hyper Surge Hook — Theory of Deviation & Add/Remove Liquidity Checks
 
 This document explains the reasoning and math behind:
 
@@ -118,7 +118,7 @@ The goal is to **discourage actions that *increase* price deviation when the poo
 - **Weights:** `w[i]` — normalized weights from the weighted pool (`getNormalizedWeights()`), scaled to 1e18.
 - **External price:** `px[i]` — 1e18-scaled external price for token *i*:
   - If `isUsd == 1`, then `px[i] = 1e18` (USD unit price).
-  - Else `px[i] = (HyperPrice.spot(pairIndex) * 1e18) / priceDivisor`.
+  - Else `px[i] = (HyperPrice.spot$pairIndex$ * 1e18) / priceDivisor`.
 - **Fixed point:** All ratios are 1e18-scaled (Balancers’s `FixedPoint` math).
 - **Threshold:** `threshold` is a 1e18-scaled fraction (e.g., `0.10e18` = 10%).
 
@@ -127,22 +127,28 @@ The goal is to **discourage actions that *increase* price deviation when the poo
 ## `_computeOracleDeviationPct` — Measuring Pool-vs-Oracle Deviation
 
 ### Intuition
+A weighted pool determines relative prices from balances and weights. For any two tokens *i* and *j*, the **pool-implied price** for “j per i” is:
 
-A weighted pool determines relative prices from **balances and weights**. For any two tokens _i_ and _j_, the **pool-implied price** for “j per i” is proportional to:
-\[
-P_{\text{pool}}(j \!\to\! i) \;=\; \frac{B_j / w_j}{B_i / w_i}
-\;=\; \frac{B_j \cdot w_i}{B_i \cdot w_j}
-\]
-The **external price** from the oracle for “j per i” is:
-\[
-P_{\text{ext}}(j \!\to\! i) \;=\; \frac{px[j]}{px[i]}
-\]
+$$
+P_{\text{pool}}(j \rightarrow i)
+= \frac{B_j / w_j}{B_i / w_i}
+= \frac{B_j \cdot w_i}{B_i \cdot w_j}.
+$$
 
-We define **relative deviation** as:
-\[
-\text{dev}(i,j) \;=\;
-\frac{|P_{\text{pool}}(j \!\to\! i) - P_{\text{ext}}(j \!\to\! i)|}{P_{\text{ext}}(j \!\to\! i)}
-\]
+The **external $oracle$ price** for “j per i” is:
+
+$$
+P_{\text{ext}}(j \rightarrow i) = \frac{px_j}{px_i}.
+$$
+
+We define the **relative deviation** as:
+
+$$
+\operatorname{dev}(i,j) =
+\frac{\left| P_{\text{pool}}(j \rightarrow i) - P_{\text{ext}}(j \rightarrow i) \right|}
+     {P_{\text{ext}}(j \rightarrow i)}.
+$$
+
 
 The function returns the **maximum** deviation across **all pairs** (i<j). Using the max catches the worst mispricing the pool is exhibiting relative to the oracle and is simple to reason about under risk constraints.
 
@@ -210,14 +216,14 @@ This ensures we don’t block helpful rebalancing that reduces deviation, and we
 - **Remove liquidity**  
   Post-remove balances: `B' = B_old - Δ`.  
   Reconstruct `B_old = B' + Δ`.  
-  If `B' + Δ` overflows (wrap), **allow**.
+  If `B' + Δ` overflows $wrap$, **allow**.
 
 ### Decision rule
 
 Let:
 - `beforeDev = _computeOracleDeviationPct(pool, B_old)`
 - `afterDev  = _computeOracleDeviationPct(pool, B')`
-- `threshold = getSurgeThresholdPercentage(pool)`
+- `threshold = getSurgeThresholdPercentage$pool$`
 
 Then:
 
@@ -243,7 +249,7 @@ Then:
 
 ### Edge cases & safety
 
-- **Mismatched array lengths** (deltas vs balances): **allow** (defensive).
+- **Mismatched array lengths** (deltas vs balances): **allow** $defensive$.
 - **Small pools** (`n < 2`): **allow**.
 - **Missing prices/weights/balances** for a pair: that pair is **ignored** in deviation.  
   If no pairs are usable, deviation is `0`, so the action will not be blocked.
@@ -264,7 +270,7 @@ Then:
 
 ## Complexity
 
-- `_computeOracleDeviationPct`: **O(n²)** pairwise over `n ≤ 8` tokens (cheap).
+- `_computeOracleDeviationPct`: **O(n²)** pairwise over `n ≤ 8` tokens $cheap$.
 - `onAfter*`: one or two calls to `_computeOracleDeviationPct` + linear reconstruction of `B_old`.
 
 ---
@@ -293,7 +299,7 @@ Then:
 ## Runtime Flow (Fee Computation)
 
 1. **Early exits.**  
-   Abort surge logic and return **static fee** if: pool not initialized; indexes out of range; `max ≤ static`; `τ ≥ 1`; missing weights; `px_in == 0` or `px_out/px_in == 0`. If `capDev ≤ τ` (misconfig), treat as `capDev = 1` defensively.
+   Abort surge logic and return **static fee** if: pool not initialized; indexes out of range; `max ≤ static`; `τ ≥ 1`; missing weights; `px_in == 0` or `px_out/px_in == 0`. If `capDev ≤ τ` $misconfig$, treat as `capDev = 1` defensively.
 2. **Post‑trade balances.**  
    Call the pool’s `onSwap` to get the counter‑amount. Update only the two balances participating in the swap, using the exact `EXACT_IN`/`EXACT_OUT` rules that the pool expects.
 3. **Pool‑implied price.**  
@@ -335,7 +341,7 @@ A value of $\delta = 0.10$ means the pool is 10% away from the oracle for that p
 
 ### Fee Ramp
 
-Let `static` be the pool’s base fee, `max` the cap, `\tau` the threshold, and `capDev` the deviation at which the max fee is reached. For measured deviation $\delta$:
+Let `static` be the pool’s base fee, `max` the cap, $\tau$ the threshold, and `capDev` the deviation at which the max fee is reached. For measured deviation $\delta$:
 
 - If $\delta \le \tau$, the fee remains the **static** fee.
 - Otherwise, compute a normalized progress and ramp linearly:
@@ -352,7 +358,7 @@ fee  = min(fee, max)
 The marginal slope in the active region is $(\text{max} - \text{static}) / (\text{capDev} - \tau)$.  
 Choosing smaller `capDev` reaches the max sooner; choosing larger `capDev` spreads the ramp over a wider range.
 
-### Pool‑Wide Deviation for Liquidity Checks
+### Pool‑Wide Deviation for Add/Remove Liquidity Checks
 
 For **multi‑token** pools, the liquidity checks use a conservative **max‑pair** deviation:
 

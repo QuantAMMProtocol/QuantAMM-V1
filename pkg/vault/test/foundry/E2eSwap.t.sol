@@ -46,30 +46,23 @@ contract E2eSwapTest is BaseVaultTest {
     uint256 internal minSwapAmountTokenB;
     uint256 internal maxSwapAmountTokenB;
 
+    uint256 internal exactInOutDecimalsErrorMultiplier = 1;
+    uint256 internal amountInExactInOutError = 2e12;
+
     // We theoretically support the full range of token decimals, but tokens with extreme values don't tend to perform
     // well in AMMs, due to precision issues with their math. The lowest decimal value in common use would be 6,
     // used by many centralized stable coins (e.g., USDC). Some popular wrapped tokens have 8 (e.g., WBTC).
     uint256 private constant _LOW_DECIMAL_LIMIT = 6;
 
+    // Number of parameters specific to the pool type to be fuzzed. Raising this parameter will lower the amount of
+    // tested scenarios, so raise with caution.
+    uint256 internal constant POOL_SPECIFIC_PARAMS_SIZE = 5;
+
     function setUp() public virtual override {
-        // We will use min trade amount in this test.
-        vaultMockMinTradeAmount = PRODUCTION_MIN_TRADE_AMOUNT;
+        // We'll do best effort to be around the minimum trade amount, but things should work nonetheless.
+        vaultMockMinTradeAmount = 0;
 
         BaseVaultTest.setUp();
-
-        // Tokens must be set before other variables, so the variables can be calculated based on tokens.
-        setUpTokens();
-        decimalsTokenA = IERC20Metadata(address(tokenA)).decimals();
-        decimalsTokenB = IERC20Metadata(address(tokenB)).decimals();
-
-        (tokenAIdx, tokenBIdx) = getSortedIndexes(address(tokenA), address(tokenB));
-
-        // Pool Init Amount values are needed to set up variables that rely on the initial pool state.
-        setPoolInitAmounts();
-
-        setUpVariables();
-        calculateMinAndMaxSwapAmounts();
-        createAndInitCustomPool();
 
         // Donate tokens to vault as a shortcut to change the pool balances without the need to pass through add/remove
         // liquidity operations. (No need to deal with BPTs, pranking LPs, guardrails, etc).
@@ -102,16 +95,30 @@ contract E2eSwapTest is BaseVaultTest {
      * by BaseTest (like dai and usdc) cannot be used. If it runs after, we don't know which tokens are used by
      * createPool and initPool. So, the solution is to create a parallel function to create and initialize a custom
      * pool after the BaseVaultTest setUp finishes.
-
      */
-    function createAndInitCustomPool() internal virtual {
+    function createPool() internal virtual override returns (address newPool, bytes memory poolArgs) {
+        // Tokens must be set before other variables, so the variables can be calculated based on tokens.
+        setUpTokens();
+        decimalsTokenA = IERC20Metadata(address(tokenA)).decimals();
+        decimalsTokenB = IERC20Metadata(address(tokenB)).decimals();
+
+        (tokenAIdx, tokenBIdx) = getSortedIndexes(address(tokenA), address(tokenB));
+
+        // Pool Init Amount values are needed to set up variables that rely on the initial pool state.
+        setPoolInitAmounts();
+
+        setUpVariables();
+        calculateMinAndMaxSwapAmounts();
+
         address[] memory tokens = new address[](2);
         tokens[tokenAIdx] = address(tokenA);
         tokens[tokenBIdx] = address(tokenB);
-        (pool, ) = _createPool(tokens, "custom-pool");
+        (newPool, poolArgs) = _createPool(tokens, "custom-pool");
 
         setPoolInitAmounts();
+    }
 
+    function initPool() internal override {
         uint256[] memory initAmounts = new uint256[](2);
         initAmounts[tokenAIdx] = poolInitAmountTokenA;
         initAmounts[tokenBIdx] = poolInitAmountTokenB;
@@ -180,22 +187,41 @@ contract E2eSwapTest is BaseVaultTest {
         maxSwapAmountTokenB = poolInitAmountTokenB.mulDown(99e16);
     }
 
-    /// @notice Donate tokens to vault, so liquidity tests are possible.
-    function _donateToVault() internal virtual {
-        tokenA.mint(address(vault), 100 * poolInitAmountTokenA);
-        tokenB.mint(address(vault), 100 * poolInitAmountTokenB);
-        // Override vault liquidity, to make sure the extra liquidity is registered.
-        vault.manualSetReservesOf(tokenA, 100 * poolInitAmountTokenA);
-        vault.manualSetReservesOf(tokenB, 100 * poolInitAmountTokenB);
-    }
-
     /// @dev Override this function to introduce custom rates and rate providers.
     function getRate(IERC20) internal view virtual returns (uint256) {
         return FixedPoint.ONE;
     }
 
-    function testDoUndoExactInSwapAmount__Fuzz(uint256 exactAmountIn) public {
+    /**
+     * @notice Fuzz specific pool parameters.
+     * @dev Override this function to fuzz test parameters that are specific to a kind of pool.
+     * This function is executed after setting pool balances. Some pools may require different swap limits based on
+     * the chosen parameters for the pool state.
+     * Set `minSwapAmountTokenA`, `maxSwapAmountTokenA`, `minSwapAmountTokenB` and `maxSwapAmountTokenB` to the values
+     * that are expected to be used in the pool, and return `true` to signal that these values shall be used as
+     * limits whenever needed.
+     */
+    function fuzzPoolParams(
+        uint256[POOL_SPECIFIC_PARAMS_SIZE] memory params
+    ) internal virtual returns (bool overrideSwapLimits) {
+        // solhint-disable-previous-line no-empty-blocks
+    }
+
+    function testDoUndoExactInSwapAmount__Fuzz(uint256 exactAmountIn) public virtual {
         DoUndoLocals memory testLocals;
+        testLocals.shouldTestSwapAmount = true;
+
+        testDoUndoExactInBase(exactAmountIn, testLocals);
+    }
+
+    function testDoUndoExactInSwapAmountSpecific__Fuzz(
+        uint256 exactAmountIn,
+        uint256[POOL_SPECIFIC_PARAMS_SIZE] memory params
+    ) public {
+        DoUndoLocals memory testLocals;
+        testLocals.shouldTestSwapAmount = true;
+        testLocals.shouldFuzzPoolParams = true;
+        testLocals.poolParams = params;
 
         testDoUndoExactInBase(exactAmountIn, testLocals);
     }
@@ -211,10 +237,25 @@ contract E2eSwapTest is BaseVaultTest {
         testDoUndoExactInBase(exactAmountIn, testLocals);
     }
 
-    function testDoUndoExactInFees__Fuzz(uint256 poolSwapFeePercentage) public {
+    function testDoUndoExactInFees__Fuzz(uint256 poolSwapFeePercentage) public virtual {
         DoUndoLocals memory testLocals;
         testLocals.shouldTestFee = true;
         testLocals.poolSwapFeePercentage = poolSwapFeePercentage;
+
+        uint256 exactAmountIn = maxSwapAmountTokenA;
+
+        testDoUndoExactInBase(exactAmountIn, testLocals);
+    }
+
+    function testDoUndoExactInFeesSpecific__Fuzz(
+        uint256 poolSwapFeePercentage,
+        uint256[POOL_SPECIFIC_PARAMS_SIZE] memory params
+    ) public {
+        DoUndoLocals memory testLocals;
+        testLocals.shouldTestFee = true;
+        testLocals.shouldFuzzPoolParams = true;
+        testLocals.poolSwapFeePercentage = poolSwapFeePercentage;
+        testLocals.poolParams = params;
 
         uint256 exactAmountIn = maxSwapAmountTokenA;
 
@@ -226,6 +267,23 @@ contract E2eSwapTest is BaseVaultTest {
         testLocals.shouldTestDecimals = true;
         testLocals.newDecimalsTokenA = newDecimalsTokenA;
         testLocals.newDecimalsTokenB = newDecimalsTokenB;
+
+        uint256 exactAmountIn = maxSwapAmountTokenA;
+
+        testDoUndoExactInBase(exactAmountIn, testLocals);
+    }
+
+    function testDoUndoExactInDecimalsSpecific__Fuzz(
+        uint256 newDecimalsTokenA,
+        uint256 newDecimalsTokenB,
+        uint256[POOL_SPECIFIC_PARAMS_SIZE] memory params
+    ) public {
+        DoUndoLocals memory testLocals;
+        testLocals.shouldTestDecimals = true;
+        testLocals.shouldFuzzPoolParams = true;
+        testLocals.newDecimalsTokenA = newDecimalsTokenA;
+        testLocals.newDecimalsTokenB = newDecimalsTokenB;
+        testLocals.poolParams = params;
 
         uint256 exactAmountIn = maxSwapAmountTokenA;
 
@@ -254,8 +312,41 @@ contract E2eSwapTest is BaseVaultTest {
         testDoUndoExactInBase(exactAmountIn, testLocals);
     }
 
-    function testDoUndoExactOutSwapAmount__Fuzz(uint256 exactAmountOut) public {
+    function testDoUndoExactInCompleteSpecific__Fuzz(
+        uint256 exactAmountIn,
+        uint256 poolSwapFeePercentage,
+        uint256 newDecimalsTokenA,
+        uint256 newDecimalsTokenB,
+        uint256[POOL_SPECIFIC_PARAMS_SIZE] memory params
+    ) public {
         DoUndoLocals memory testLocals;
+        testLocals.shouldTestDecimals = true;
+        testLocals.shouldTestSwapAmount = true;
+        testLocals.shouldTestFee = true;
+        testLocals.shouldFuzzPoolParams = true;
+        testLocals.newDecimalsTokenA = newDecimalsTokenA;
+        testLocals.newDecimalsTokenB = newDecimalsTokenB;
+        testLocals.poolSwapFeePercentage = poolSwapFeePercentage;
+        testLocals.poolParams = params;
+
+        testDoUndoExactInBase(exactAmountIn, testLocals);
+    }
+
+    function testDoUndoExactOutSwapAmount__Fuzz(uint256 exactAmountOut) public virtual {
+        DoUndoLocals memory testLocals;
+        testLocals.shouldTestSwapAmount = true;
+
+        testDoUndoExactOutBase(exactAmountOut, testLocals);
+    }
+
+    function testDoUndoExactOutSwapAmountSpecific__Fuzz(
+        uint256 exactAmountOut,
+        uint256[POOL_SPECIFIC_PARAMS_SIZE] memory params
+    ) public {
+        DoUndoLocals memory testLocals;
+        testLocals.shouldTestSwapAmount = true;
+        testLocals.shouldFuzzPoolParams = true;
+        testLocals.poolParams = params;
 
         testDoUndoExactOutBase(exactAmountOut, testLocals);
     }
@@ -271,10 +362,25 @@ contract E2eSwapTest is BaseVaultTest {
         testDoUndoExactOutBase(exactAmountOut, testLocals);
     }
 
-    function testDoUndoExactOutFees__Fuzz(uint256 poolSwapFeePercentage) public {
+    function testDoUndoExactOutFees__Fuzz(uint256 poolSwapFeePercentage) public virtual {
         DoUndoLocals memory testLocals;
         testLocals.shouldTestFee = true;
         testLocals.poolSwapFeePercentage = poolSwapFeePercentage;
+
+        uint256 exactAmountOut = maxSwapAmountTokenB;
+
+        testDoUndoExactOutBase(exactAmountOut, testLocals);
+    }
+
+    function testDoUndoExactOutFeesSpecific__Fuzz(
+        uint256 poolSwapFeePercentage,
+        uint256[POOL_SPECIFIC_PARAMS_SIZE] memory params
+    ) public {
+        DoUndoLocals memory testLocals;
+        testLocals.shouldTestFee = true;
+        testLocals.shouldFuzzPoolParams = true;
+        testLocals.poolSwapFeePercentage = poolSwapFeePercentage;
+        testLocals.poolParams = params;
 
         uint256 exactAmountOut = maxSwapAmountTokenB;
 
@@ -286,6 +392,23 @@ contract E2eSwapTest is BaseVaultTest {
         testLocals.shouldTestDecimals = true;
         testLocals.newDecimalsTokenA = newDecimalsTokenA;
         testLocals.newDecimalsTokenB = newDecimalsTokenB;
+
+        uint256 exactAmountOut = maxSwapAmountTokenB;
+
+        testDoUndoExactOutBase(exactAmountOut, testLocals);
+    }
+
+    function testDoUndoExactOutDecimalsSpecific__Fuzz(
+        uint256 newDecimalsTokenA,
+        uint256 newDecimalsTokenB,
+        uint256[POOL_SPECIFIC_PARAMS_SIZE] memory params
+    ) public {
+        DoUndoLocals memory testLocals;
+        testLocals.shouldTestDecimals = true;
+        testLocals.shouldFuzzPoolParams = true;
+        testLocals.newDecimalsTokenA = newDecimalsTokenA;
+        testLocals.newDecimalsTokenB = newDecimalsTokenB;
+        testLocals.poolParams = params;
 
         uint256 exactAmountOut = maxSwapAmountTokenB;
 
@@ -314,16 +437,33 @@ contract E2eSwapTest is BaseVaultTest {
         testDoUndoExactOutBase(exactAmountOut, testLocals);
     }
 
+    function testDoUndoExactOutCompleteSpecific__Fuzz(
+        uint256 exactAmountOut,
+        uint256 poolSwapFeePercentage,
+        uint256 newDecimalsTokenA,
+        uint256 newDecimalsTokenB,
+        uint256[POOL_SPECIFIC_PARAMS_SIZE] memory params
+    ) public {
+        DoUndoLocals memory testLocals;
+        testLocals.shouldTestDecimals = true;
+        testLocals.shouldTestSwapAmount = true;
+        testLocals.shouldTestFee = true;
+        testLocals.shouldFuzzPoolParams = true;
+        testLocals.newDecimalsTokenA = newDecimalsTokenA;
+        testLocals.newDecimalsTokenB = newDecimalsTokenB;
+        testLocals.poolSwapFeePercentage = poolSwapFeePercentage;
+        testLocals.poolParams = params;
+
+        testDoUndoExactOutBase(exactAmountOut, testLocals);
+    }
+
+    // We don't deal with decimals here, as it leads to many edge cases that are not worth testing.
     function testExactInRepeatExactOutVariableFees__Fuzz(
         uint256 exactAmountIn,
         uint256 poolSwapFeePercentage,
-        uint256 newDecimalsTokenA,
-        uint256 newDecimalsTokenB
+        uint256[POOL_SPECIFIC_PARAMS_SIZE] memory params
     ) public {
-        decimalsTokenA = bound(newDecimalsTokenA, _LOW_DECIMAL_LIMIT, 18);
-        decimalsTokenB = bound(newDecimalsTokenB, _LOW_DECIMAL_LIMIT, 18);
-
-        _setTokenDecimalsInPool();
+        fuzzPoolParams(params);
 
         exactAmountIn = bound(exactAmountIn, minSwapAmountTokenA, maxSwapAmountTokenA);
 
@@ -343,6 +483,8 @@ contract E2eSwapTest is BaseVaultTest {
             bytes("")
         );
 
+        vm.assume(exactAmountOut > 0);
+
         vm.revertTo(snapshotId);
         uint256 exactAmountInSwap = router.swapSingleTokenExactOut(
             pool,
@@ -356,30 +498,15 @@ contract E2eSwapTest is BaseVaultTest {
         );
         vm.stopPrank();
 
-        if (decimalsTokenA != decimalsTokenB || exactAmountIn < PRODUCTION_MIN_TRADE_AMOUNT) {
-            // If tokens have different decimals, an error is introduced in the computeBalance in the order of the
-            // difference of the decimals.
-            uint256 tolerance;
-            if (decimalsTokenA < decimalsTokenB) {
-                // Add 3 to give some extra tolerance for weighted pools (multiply by 1000).
-                tolerance = 10 ** (decimalsTokenB - decimalsTokenA + 3);
-            } else {
-                // Add 3 to give some extra tolerance for weighted pools (multiply by 1000).
-                tolerance = 10 ** (decimalsTokenA - decimalsTokenB + 3);
-            }
-
-            assertApproxEqAbs(
-                exactAmountIn,
-                exactAmountInSwap,
-                tolerance,
-                "ExactOut and ExactIn amountsIn should match"
-            );
-        } else {
-            // Accepts an error of 0.0002% between amountIn from ExactOut and ExactIn swaps. This error is caused by
-            // differences in the computeInGivenOut and computeOutGivenIn functions of the pool math (for small
-            // amounts the error can be a bit above 0.0001%).
-            assertApproxEqRel(exactAmountIn, exactAmountInSwap, 2e12, "ExactOut and ExactIn amountsIn should match");
-        }
+        // Accepts an error of 0.0002% between amountIn from ExactOut and ExactIn swaps (or whatever pool
+        // specializations override this value to). This error is caused by differences in the computeInGivenOut and
+        // computeOutGivenIn functions of the pool math (for small amounts the error can be a bit above 0.0001%).
+        assertApproxEqRel(
+            exactAmountIn,
+            exactAmountInSwap,
+            amountInExactInOutError,
+            "ExactOut and ExactIn amountsIn should match"
+        );
     }
 
     struct DoUndoLocals {
@@ -387,11 +514,13 @@ contract E2eSwapTest is BaseVaultTest {
         bool shouldTestLiquidity;
         bool shouldTestSwapAmount;
         bool shouldTestFee;
+        bool shouldFuzzPoolParams;
         uint256 liquidityTokenA;
         uint256 liquidityTokenB;
         uint256 newDecimalsTokenA;
         uint256 newDecimalsTokenB;
         uint256 poolSwapFeePercentage;
+        uint256[POOL_SPECIFIC_PARAMS_SIZE] poolParams;
     }
 
     function testDoUndoExactInBase(uint256 exactAmountIn, DoUndoLocals memory testLocals) internal {
@@ -416,6 +545,13 @@ contract E2eSwapTest is BaseVaultTest {
             );
 
             maxAmountIn = _setPoolBalancesAndGetAmountIn(testLocals.liquidityTokenA, testLocals.liquidityTokenB);
+        }
+
+        if (testLocals.shouldFuzzPoolParams) {
+            bool shouldOverrideSwapLimits = fuzzPoolParams(testLocals.poolParams);
+            if (shouldOverrideSwapLimits) {
+                maxAmountIn = maxSwapAmountTokenA;
+            }
         }
 
         if (testLocals.shouldTestSwapAmount) {
@@ -533,6 +669,13 @@ contract E2eSwapTest is BaseVaultTest {
             maxAmountOut = _setPoolBalancesAndGetAmountOut(testLocals.liquidityTokenA, testLocals.liquidityTokenB);
         }
 
+        if (testLocals.shouldFuzzPoolParams) {
+            bool shouldOverrideSwapLimits = fuzzPoolParams(testLocals.poolParams);
+            if (shouldOverrideSwapLimits) {
+                maxAmountOut = maxSwapAmountTokenB;
+            }
+        }
+
         if (testLocals.shouldTestSwapAmount) {
             // If the liquidity is very small for one of the tokens and decimals are small too, the maxAmountOut may be
             // smaller than minSwapAmount (usually 10^7), so just overwrite it.
@@ -580,6 +723,13 @@ contract E2eSwapTest is BaseVaultTest {
                     testLocals.poolSwapFeePercentage.complement()
                 ) > vaultMockMinTradeAmount
             );
+        }
+
+        {
+            // `exactAmountInDo` could be bigger than the actual balance of the pool, since the first swap paid fees
+            // and pool creator is 100% (no LP fees).
+            BaseVaultTest.Balances memory balancesMiddle = getBalances(sender, Rounding.ROUND_DOWN);
+            vm.assume(exactAmountInDo < balancesMiddle.poolTokens[tokenAIdx]);
         }
 
         // In the first swap, the trade was exactAmountInDo => exactAmountOut (tokenB) + feesTokenA (tokenA). So, if
@@ -753,5 +903,14 @@ contract E2eSwapTest is BaseVaultTest {
         // pool liquidity.
         poolInitAmountTokenA = poolInitAmount.mulDown(10 ** (decimalsTokenA)).divDown(rateTokenA);
         poolInitAmountTokenB = poolInitAmount.mulDown(10 ** (decimalsTokenB)).divDown(rateTokenB);
+    }
+
+    /// @notice Donate tokens to vault, so liquidity tests are possible.
+    function _donateToVault() internal virtual {
+        tokenA.mint(address(vault), 100 * poolInitAmountTokenA);
+        tokenB.mint(address(vault), 100 * poolInitAmountTokenB);
+        // Override vault liquidity, to make sure the extra liquidity is registered.
+        vault.manualSetReservesOf(tokenA, 100 * poolInitAmountTokenA);
+        vault.manualSetReservesOf(tokenB, 100 * poolInitAmountTokenB);
     }
 }

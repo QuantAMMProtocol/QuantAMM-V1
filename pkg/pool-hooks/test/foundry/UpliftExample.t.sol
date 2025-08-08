@@ -47,6 +47,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
     uint256 internal daiIdx;
     uint256 internal usdcIdx;
+    uint256 internal bptAmount = 2e3 * 1e18;
 
     address internal owner;
     address internal addr1;
@@ -58,6 +59,8 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     uint64 private constant _MAX_UPLIFT_WITHDRAWAL_FEE = 20e16; // 20%
 
     uint256 internal constant DEFAULT_AMP_FACTOR = 200;
+
+    PoolFactoryMock internal factoryMock;
 
     MockUpdateWeightRunner internal updateWeightRunner;
 
@@ -935,7 +938,9 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     }
 
     function testSetHookPassGreaterThanMaxFail(uint64 poolHookAmount) public {
-        uint64 boundFeeAmount = uint64(bound(poolHookAmount, uint64(_MAX_SWAP_FEE_PERCENTAGE) + 1, uint64(type(uint64).max)));
+        uint64 boundFeeAmount = uint64(
+            bound(poolHookAmount, uint64(_MAX_SWAP_FEE_PERCENTAGE) + 1, uint64(type(uint64).max))
+        );
 
         vm.startPrank(owner);
         vm.expectRevert("Above _MAX_SWAP_FEE_PERCENTAGE");

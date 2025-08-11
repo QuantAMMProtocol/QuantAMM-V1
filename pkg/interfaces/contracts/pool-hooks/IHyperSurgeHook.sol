@@ -13,6 +13,11 @@ pragma solidity ^0.8.24;
  *   and are intentionally not duplicated here.
  */
 interface IHyperSurgeHook {
+    enum TradeType {
+        ARBITRAGE,
+        NOISE
+    }
+
     // -------------------------------------------------------------------------
     // Events
     // -------------------------------------------------------------------------
@@ -45,16 +50,26 @@ interface IHyperSurgeHook {
      * @dev 1e18-scaled (e.g., 1e17 = 10%).
      * @param pool   Pool address
      * @param pct    New max surge fee percentage (1e18 scale)
+     * @param tradeType which direction the fee should be charged in
      */
-    event MaxSurgeFeePercentageChanged(address indexed pool, uint256 pct);
+    event MaxSurgeFeePercentageChanged(address indexed pool, uint256 pct, TradeType tradeType);
 
     /**
      * @notice Emitted when the per-pool surge threshold percentage is changed.
      * @dev 1e18-scaled (e.g., 5e16 = 5%).
      * @param pool   Pool address
      * @param pct    New threshold percentage (1e18 scale)
+     * @param tradeType which direction the fee should be charged in
      */
-    event ThresholdPercentageChanged(address indexed pool, uint256 pct);
+    event ThresholdPercentageChanged(address indexed pool, uint256 pct, TradeType tradeType);
+
+    /***
+     * @notice Emitted when the per pool cap deviation is changed
+     * @param pool address of the pool
+     * @param pct the fee in pct 1e18 scale
+     * @param tradeType which direction the fee should be charged in
+     */
+    event CapDeviationPercentageChanged(address indexed pool, uint256 pct, TradeType tradeType);
 
     /***
      * @notice Emitted when a pool's liquidity is blocked for surge fee collection.
@@ -67,11 +82,6 @@ interface IHyperSurgeHook {
      * @param threshold The threshold amount that was used to block the liquidity
      */
     event LiquidityBlocked(address indexed pool, bool isAdd, uint256 beforeDev, uint256 afterDev, uint256 threshold);
-
-    /***
-     * @notice 
-     */
-    event CapDeviationPercentageChanged(address indexed pool, uint256 pct);
 
     // -------------------------------------------------------------------------
     // Configuration (external, permissioned by implementation)
@@ -105,20 +115,20 @@ interface IHyperSurgeHook {
      * @notice Set the per-pool maximum surge fee percentage (cap).
      * @dev 1e18-scaled (e.g., 0.20e18 = 20%).
      */
-    function setMaxSurgeFeePercentage(address pool, uint256 pct) external;
+    function setMaxSurgeFeePercentage(address pool, uint256 pct, TradeType tradeType) external;
 
     /**
      * @notice Set the per-pool surge threshold percentage (deviation level at which fees start ramping).
      * @dev 1e18-scaled (e.g., 0.05e18 = 5%).
      */
-    function setSurgeThresholdPercentage(address pool, uint256 pct) external;
+    function setSurgeThresholdPercentage(address pool, uint256 pct, TradeType tradeType) external;
 
     /**
         @notice sets the deviation where the max fee kicks in
         @param pool address of the pool
         @param capDevPct the deviation to set the cap to in %
     */
-    function setCapDeviationPercentage(address pool, uint256 capDevPct) external;
+    function setCapDeviationPercentage(address pool, uint256 capDevPct, TradeType tradeType) external;
 
     // -------------------------------------------------------------------------
     // Getters (read-only)
@@ -129,15 +139,22 @@ interface IHyperSurgeHook {
      * @param pool Pool address
      * @return pct The surge threshold percentage (1e18 = 100%).
      */
-    function getSurgeThresholdPercentage(address pool) external view returns (uint256);
+    function getSurgeThresholdPercentage(address pool, TradeType tradeType) external view returns (uint256);
 
     /**
      * @notice Current per-pool maximum surge fee percentage (1e18 = 100%).
      * @param pool Pool address
      * @return pct The maximum surge fee percentage (1e18 = 100%).
      */
-    function getMaxSurgeFeePercentage(address pool) external view returns (uint256);
+    function getMaxSurgeFeePercentage(address pool, TradeType tradeType) external view returns (uint256);
 
+    /**
+     * @notice Default cap deviation percentage used for new pools (1e18 = 100%).
+     * @param pool Pool address
+     * @return capDevPct The cap deviation percentage (1e18 = 100%)
+     */
+    function getCapDeviationPercentage(address pool, TradeType tradeType) external view returns (uint256);
+    
     /**
      * @notice Number of tokens configured for the pool (2..8).
      * @param pool Pool address
@@ -201,11 +218,4 @@ interface IHyperSurgeHook {
      * @return pct The default surge threshold percentage (1e18 = 100%)
      */
     function getDefaultSurgeThresholdPercentage() external view returns (uint256 pct);
-
-    /**
-     * @notice Default cap deviation percentage used for new pools (1e18 = 100%).
-     * @param pool Pool address
-     * @return capDevPct The cap deviation percentage (1e18 = 100%)
-     */
-    function getCapDeviationPercentage(address pool) external view returns (uint256);
 }

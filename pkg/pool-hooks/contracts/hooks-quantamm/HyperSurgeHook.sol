@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 import { IHooks } from "@balancer-labs/v3-interfaces/contracts/vault/IHooks.sol";
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
@@ -60,7 +59,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     error TokenIndexOutOfRange();
     error NumTokensOutOfRange();
 
-
     // ===== Types
     struct TokenPriceCfg {
         uint32 pairIndex; // Hyperliquid market id (0 allowed only when isUsd = 1)
@@ -70,12 +68,12 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     }
 
     struct PoolDetails {
-        uint32 arbMaxSurgeFeePercentage; 
-        uint32 arbThresholdPercentage; 
-        uint32 arbCapDeviationPercentage; 
-        uint32 noiseMaxSurgeFeePercentage; 
-        uint32 noiseThresholdPercentage; 
-        uint32 noiseCapDeviationPercentage; 
+        uint32 arbMaxSurgeFeePercentage;
+        uint32 arbThresholdPercentage;
+        uint32 arbCapDeviationPercentage;
+        uint32 noiseMaxSurgeFeePercentage;
+        uint32 noiseThresholdPercentage;
+        uint32 noiseCapDeviationPercentage;
         uint8 numTokens; // 2..8 inclusive
         bool initialized;
     }
@@ -228,11 +226,11 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     ///@inheritdoc IHyperSurgeHook
     function setMaxSurgeFeePercentage(
         address pool,
-        uint256 pct, 
+        uint256 pct,
         TradeType tradeType
     ) external override onlySwapFeeManagerOrGovernance(pool) {
         _ensureValidPct(pct);
-        if(tradeType == TradeType.ARBITRAGE){
+        if (tradeType == TradeType.ARBITRAGE) {
             _poolCfg[pool].details.arbMaxSurgeFeePercentage = pct.toUint32();
         } else {
             _poolCfg[pool].details.noiseMaxSurgeFeePercentage = pct.toUint32();
@@ -243,16 +241,15 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     ///@inheritdoc IHyperSurgeHook
     function setSurgeThresholdPercentage(
         address pool,
-        uint256 pct, 
+        uint256 pct,
         TradeType tradeType
     ) external override onlySwapFeeManagerOrGovernance(pool) {
         _ensureValidPct(pct); // keep a valid ramp span: threshold < capDev ≤ 1
         uint256 capDev;
-        if(tradeType == TradeType.ARBITRAGE){
+        if (tradeType == TradeType.ARBITRAGE) {
             _poolCfg[pool].details.arbThresholdPercentage = pct.toUint32();
             capDev = uint256(_poolCfg[pool].details.arbCapDeviationPercentage);
-        }
-        else{
+        } else {
             _poolCfg[pool].details.noiseThresholdPercentage = pct.toUint32();
             capDev = uint256(_poolCfg[pool].details.noiseCapDeviationPercentage);
         }
@@ -264,16 +261,15 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     /// @inheritdoc IHyperSurgeHook
     function setCapDeviationPercentage(
         address pool,
-        uint256 capDevPct, 
+        uint256 capDevPct,
         TradeType tradeType
     ) external override onlySwapFeeManagerOrGovernance(pool) {
         _ensureValidPct(capDevPct);
         uint256 thr;
-        if(tradeType == TradeType.ARBITRAGE){
+        if (tradeType == TradeType.ARBITRAGE) {
             _poolCfg[pool].details.arbCapDeviationPercentage = capDevPct.toUint32();
             thr = uint256(_poolCfg[pool].details.arbThresholdPercentage);
-        }
-        else{
+        } else {
             _poolCfg[pool].details.noiseCapDeviationPercentage = capDevPct.toUint32();
             thr = uint256(_poolCfg[pool].details.noiseThresholdPercentage);
         }
@@ -492,30 +488,27 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     /// @notice Getter to read the pool-specific surge threshold (1e18 = 100%).
     function getSurgeThresholdPercentage(address pool, TradeType tradeType) public view returns (uint256) {
-        if(tradeType == TradeType.ARBITRAGE){
+        if (tradeType == TradeType.ARBITRAGE) {
             return uint256(_poolCfg[pool].details.arbThresholdPercentage) * 1e9;
-        }
-        else{
+        } else {
             return uint256(_poolCfg[pool].details.noiseThresholdPercentage) * 1e9;
         }
     }
 
     ///@inheritdoc IHyperSurgeHook
     function getMaxSurgeFeePercentage(address pool, TradeType tradeType) external view override returns (uint256) {
-        if(tradeType == TradeType.ARBITRAGE){
+        if (tradeType == TradeType.ARBITRAGE) {
             return uint256(_poolCfg[pool].details.arbMaxSurgeFeePercentage) * 1e9;
-        }
-        else{
+        } else {
             return uint256(_poolCfg[pool].details.noiseMaxSurgeFeePercentage) * 1e9;
         }
     }
 
     ///@inheritdoc IHyperSurgeHook
     function getCapDeviationPercentage(address pool, TradeType tradeType) external view override returns (uint256) {
-        if(tradeType == TradeType.ARBITRAGE){
+        if (tradeType == TradeType.ARBITRAGE) {
             return uint256(_poolCfg[pool].details.arbCapDeviationPercentage) * 1e9;
-        }
-        else{
+        } else {
             return uint256(_poolCfg[pool].details.noiseCapDeviationPercentage) * 1e9;
         }
     }
@@ -548,7 +541,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
         //TODO should it return false to not allow the swap?
         if (!locals.poolDetails.initialized) return (true, staticSwapFee);
-        
+
         if (p.indexIn >= locals.poolDetails.numTokens || p.indexOut >= locals.poolDetails.numTokens)
             return (true, staticSwapFee);
 
@@ -571,10 +564,10 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             bIn += locals.calcAmountScaled18;
             bOut -= p.amountGivenScaled18;
         }
-        
+
         //TODO overkill check? wont it just throw if the index is out of bounds?
         if (weights.length <= p.indexIn || weights.length <= p.indexOut) return (true, staticSwapFee);
-        
+
         uint256 wIn = weights[p.indexIn];
         uint256 wOut = weights[p.indexOut];
 
@@ -583,7 +576,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         if (locals.poolPx == 0) return (true, staticSwapFee);
 
         // 4) External prices (p_out / p_in), struct-per-index with cached divisor
-    
+
         TokenPriceCfg memory pInCfg = pc.tokenCfg[p.indexIn];
         if (pInCfg.isUsd == 1) {
             locals.pxIn = 1e18;
@@ -594,7 +587,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             // divisor precomputed at config time
             locals.pxIn = (uint256(rawIn) * 1e18) / uint256(pInCfg.priceDivisor);
         }
-    
+
         TokenPriceCfg memory pOutCfg = pc.tokenCfg[p.indexOut];
         if (pOutCfg.isUsd == 1) {
             locals.pxOut = 1e18;
@@ -612,33 +605,25 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         // 5) Deviation
         locals.deviation = _relAbsDiff(locals.poolPx, locals.extPx); // |pool - ext| / ext
 
-        if((locals.poolPx > locals.poolPxBefore))
-        {
-            if(locals.poolPxBefore < locals.extPx)
-            {
+        if ((locals.poolPx > locals.poolPxBefore)) {
+            if (locals.poolPxBefore < locals.extPx) {
                 // If the pool price is increasing, we are in an arbitrage situation
                 locals.capDevPct = uint256(locals.poolDetails.arbCapDeviationPercentage);
                 locals.maxPct = uint256(locals.poolDetails.arbMaxSurgeFeePercentage);
                 locals.threshold = uint256(locals.poolDetails.arbThresholdPercentage);
-            }
-            else
-            {
+            } else {
                 // If the pool price is decreasing, we are in a noise situation
                 locals.capDevPct = uint256(locals.poolDetails.noiseCapDeviationPercentage);
                 locals.maxPct = uint256(locals.poolDetails.noiseMaxSurgeFeePercentage);
                 locals.threshold = uint256(locals.poolDetails.noiseThresholdPercentage);
             }
-        }
-        else{
-            if(locals.poolPxBefore < locals.extPx)
-            {
+        } else {
+            if (locals.poolPxBefore < locals.extPx) {
                 // If the pool price is increasing, we are in a noise situation
                 locals.capDevPct = uint256(locals.poolDetails.noiseCapDeviationPercentage);
                 locals.maxPct = uint256(locals.poolDetails.noiseMaxSurgeFeePercentage);
                 locals.threshold = uint256(locals.poolDetails.noiseThresholdPercentage);
-            }
-            else
-            {
+            } else {
                 // If the pool price is decreasing, we are in an arbitrage situation
                 locals.capDevPct = uint256(locals.poolDetails.arbCapDeviationPercentage);
                 locals.maxPct = uint256(locals.poolDetails.arbMaxSurgeFeePercentage);

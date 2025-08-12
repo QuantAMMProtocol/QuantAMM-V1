@@ -559,6 +559,16 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         //already in 1e18 no need to convert
         return _defaultThreshold;
     }
+    
+    ///@inheritdoc IHyperSurgeHook
+    function getNumTokens(address pool) external view override returns (uint8) {
+        return _poolCfg[pool].details.numTokens;
+    }
+
+    ///@inheritdoc IHyperSurgeHook
+    function isPoolInitialized(address pool) external view override returns (bool) {
+        return _poolCfg[pool].details.initialized;
+    }
 
     struct ComputeSurgeFeeLocals {
         uint256 calcAmountScaled18;
@@ -567,6 +577,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256 pxIn;
         uint256 pxOut;
         uint256 extPx;
+        uint256 deviationBefore;
         uint256 deviation;
         uint256 threshold;
         uint256 maxPct;
@@ -584,6 +595,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         PoolDetails poolDetails;
     }
 
+    /// @inheritdoc IHooks
     function onComputeDynamicSwapFeePercentage(
         PoolSwapParams calldata p,
         address pool,
@@ -593,10 +605,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         ComputeSurgeFeeLocals memory locals;
         locals.poolDetails = pc.details;
 
-        uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
-        locals.wIn = weights[p.indexIn];
-        locals.wOut = weights[p.indexOut];
-
         if (!locals.poolDetails.initialized) {
             return (false, staticSwapFee);
         }
@@ -605,6 +613,10 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         if (p.indexIn >= locals.poolDetails.numTokens || p.indexOut >= locals.poolDetails.numTokens) {
             return (true, staticSwapFee);
         }
+
+        uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
+        locals.wIn = weights[p.indexIn];
+        locals.wOut = weights[p.indexOut];
 
         //TODO overkill check? wont it just throw if the index is out of bounds?
         if (weights.length <= p.indexIn || weights.length <= p.indexOut) {
@@ -633,12 +645,22 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         return _computeSurgeFee(locals, p, staticSwapFee);
     }
 
+    /// @notice pure function to compute surge fee
+    /// @param locals the locals struct containing all the necessary variables
+    /// @param p swap parameters
+    /// @param staticSwapFee the static swap fee from the pool
     function _computeSurgeFee(
         ComputeSurgeFeeLocals memory locals,
         PoolSwapParams calldata p,
         uint256 staticSwapFee
     ) internal pure returns (bool ok, uint256 surgeFee) {
+        locals.extPx = locals.pxOut.divDown(locals.pxIn);
+
+        //Do not block if there is an issue with the hyperliquid price
+        if (locals.extPx == 0) return (true, staticSwapFee);
+
         locals.poolPxBefore = _pairSpotFromBalancesWeights(locals.bIn, locals.wIn, locals.bOut, locals.wOut);
+        locals.deviationBefore = _relAbsDiff(locals.poolPx, locals.extPx);
 
         if (p.kind == SwapKind.EXACT_IN) {
             locals.bIn += p.amountGivenScaled18;
@@ -652,38 +674,21 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         locals.poolPx = _pairSpotFromBalancesWeights(locals.bIn, locals.wIn, locals.bOut, locals.wOut);
         if (locals.poolPx == 0) return (true, staticSwapFee);
 
-        locals.extPx = locals.pxOut.divDown(locals.pxIn);
-
-        //Do not block if there is an issue with the hyperliquid price
-        if (locals.extPx == 0) return (true, staticSwapFee);
 
         // 5) Deviation
         locals.deviation = _relAbsDiff(locals.poolPx, locals.extPx); // |pool - ext| / ext
 
-        if ((locals.poolPx > locals.poolPxBefore)) {
-            if (locals.poolPxBefore < locals.extPx) {
+        if (locals.deviation > locals.deviationBefore) {
                 // If the pool price is increasing, we are in an arbitrage situation
                 locals.capDevPct = uint256(locals.poolDetails.arbCapDeviationPercentage);
                 locals.maxPct = uint256(locals.poolDetails.arbMaxSurgeFeePercentage);
                 locals.threshold = uint256(locals.poolDetails.arbThresholdPercentage);
-            } else {
+        } 
+        else {
                 // If the pool price is decreasing, we are in a noise situation
                 locals.capDevPct = uint256(locals.poolDetails.noiseCapDeviationPercentage);
                 locals.maxPct = uint256(locals.poolDetails.noiseMaxSurgeFeePercentage);
                 locals.threshold = uint256(locals.poolDetails.noiseThresholdPercentage);
-            }
-        } else {
-            if (locals.poolPxBefore < locals.extPx) {
-                // If the pool price is increasing, we are in a noise situation
-                locals.capDevPct = uint256(locals.poolDetails.noiseCapDeviationPercentage);
-                locals.maxPct = uint256(locals.poolDetails.noiseMaxSurgeFeePercentage);
-                locals.threshold = uint256(locals.poolDetails.noiseThresholdPercentage);
-            } else {
-                // If the pool price is decreasing, we are in an arbitrage situation
-                locals.capDevPct = uint256(locals.poolDetails.arbCapDeviationPercentage);
-                locals.maxPct = uint256(locals.poolDetails.arbMaxSurgeFeePercentage);
-                locals.threshold = uint256(locals.poolDetails.arbThresholdPercentage);
-            }
         }
 
         // convert to 1e18 scale
@@ -748,15 +753,5 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     function _ensureValidPct(uint256 pct) internal pure {
         if (pct > 1e9) revert("pct");
-    }
-
-    ///@inheritdoc IHyperSurgeHook
-    function getNumTokens(address pool) external view override returns (uint8) {
-        return _poolCfg[pool].details.numTokens;
-    }
-
-    ///@inheritdoc IHyperSurgeHook
-    function isPoolInitialized(address pool) external view override returns (bool) {
-        return _poolCfg[pool].details.initialized;
     }
 }

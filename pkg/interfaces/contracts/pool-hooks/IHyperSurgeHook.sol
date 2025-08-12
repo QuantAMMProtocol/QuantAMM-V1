@@ -33,43 +33,44 @@ interface IHyperSurgeHook {
      * @notice Emitted when a token's external price configuration is set by token index.
      * @param pool         Pool address being configured
      * @param tokenIndex   Token index within the pool (0-based)
-     * @param pairIndex    Hyperliquid pair/market index (0 if `isUsdQuote` = true)
-     * @param szDecimals   Hyperliquid size-decimals for that pair (ignored if `isUsdQuote` = true)
-     * @param isUsdQuote   True if the token is treated as USD-quoted (px = 1e18)
+     * @param pairIndex    Hyperliquid pair/market index 
+     * @param szDecimals   Hyperliquid size-decimals for that pair
      */
     event TokenPriceConfiguredIndex(
         address indexed pool,
         uint8 indexed tokenIndex,
         uint32 pairIndex,
-        uint8 szDecimals,
-        bool isUsdQuote
+        uint8 szDecimals
     );
 
     /**
      * @notice Emitted when the per-pool maximum surge fee percentage is changed.
      * @dev 1e18-scaled (e.g., 1e17 = 10%).
+     * @param sender address of the sender
      * @param pool   Pool address
      * @param pct    New max surge fee percentage (1e18 scale)
      * @param tradeType which direction the fee should be charged in
      */
-    event MaxSurgeFeePercentageChanged(address indexed pool, uint256 pct, TradeType tradeType);
+    event MaxSurgeFeePercentageChanged(address indexed sender, address indexed pool, uint256 pct, TradeType tradeType);
 
     /**
      * @notice Emitted when the per-pool surge threshold percentage is changed.
      * @dev 1e18-scaled (e.g., 5e16 = 5%).
+     * @param sender address of the sender
      * @param pool   Pool address
      * @param pct    New threshold percentage (1e18 scale)
      * @param tradeType which direction the fee should be charged in
      */
-    event ThresholdPercentageChanged(address indexed pool, uint256 pct, TradeType tradeType);
+    event ThresholdPercentageChanged(address indexed sender, address indexed pool, uint256 pct, TradeType tradeType);
 
     /***
      * @notice Emitted when the per pool cap deviation is changed
+     * @param sender address of the sender
      * @param pool address of the pool
      * @param pct the fee in pct 1e18 scale
      * @param tradeType which direction the fee should be charged in
      */
-    event CapDeviationPercentageChanged(address indexed pool, uint256 pct, TradeType tradeType);
+    event CapDeviationPercentageChanged(address indexed sender, address indexed pool, uint256 pct, TradeType tradeType);
 
     /***
      * @notice Emitted when a pool's liquidity is blocked for surge fee collection.
@@ -81,7 +82,7 @@ interface IHyperSurgeHook {
      * @param afterDev  The liquidity amount after blocking
      * @param threshold The threshold amount that was used to block the liquidity
      */
-    event LiquidityBlocked(address indexed pool, bool isAdd, uint256 beforeDev, uint256 afterDev, uint256 threshold);
+    event LiquidityBlocked(address indexed sender, address indexed pool, bool isAdd, uint256 beforeDev, uint256 afterDev, uint256 threshold);
 
     // -------------------------------------------------------------------------
     // Configuration (external, permissioned by implementation)
@@ -90,25 +91,22 @@ interface IHyperSurgeHook {
     /**
      * @notice Configure a single token’s external price mapping by token index for a given pool.
      * @dev
-     * - If `isUsd` is true, the token is treated as USD-quoted (px = 1e18) and `pairIdx` is ignored.
-     * - Otherwise, `pairIdx` must be nonzero and map to a valid Hyperliquid market.
+     * - `pairIdx` must be nonzero and map to a valid Hyperliquid market.
      */
     function setTokenPriceConfigIndex(
         address pool,
         uint8 tokenIndex,
-        uint32 pairIdx,
-        bool isUsd
+        uint32 pairIdx
     ) external;
 
     /**
      * @notice Batch configure multiple tokens’ external price mapping by token index for a given pool.
-     * @dev Array lengths must match: tokenIndices.length == pairIdx.length == isUsd.length.
+     * @dev Array lengths must match: tokenIndices.length == pairIdx.length.
      */
     function setTokenPriceConfigBatchIndex(
         address pool,
         uint8[] calldata tokenIndices,
-        uint32[] calldata pairIdx,
-        bool[] calldata isUsd
+        uint32[] calldata pairIdx
     ) external;
 
     /**
@@ -174,7 +172,6 @@ interface IHyperSurgeHook {
      * @param pool        Pool address
      * @param tokenIndex  Token index (0-based)
      * @return pairIndex     Hyperliquid market/pair index (0 if USD-quoted)
-     * @return isUsd         True if token is treated as USD (px = 1e18)
      * @return priceDivisor  Precomputed divisor used to scale Hyperliquid spot into 1e18
      */
     function getTokenPriceConfigIndex(
@@ -185,7 +182,6 @@ interface IHyperSurgeHook {
         view
         returns (
             uint32 pairIndex,
-            bool isUsd,
             uint32 priceDivisor
         );
 
@@ -193,7 +189,6 @@ interface IHyperSurgeHook {
      * @notice Read all token price configurations for a pool (length = numTokens).
      * @dev Arrays are aligned by index; entry i corresponds to token index i.
      * @return pairIndexArr     Array of Hyperliquid pair indices (0 if USD-quoted)
-     * @return isUsdArr         Array of USD flags
      * @return priceDivisorArr  Array of price divisors for scaling spot into 1e18
      */
     function getTokenPriceConfigs(
@@ -203,7 +198,6 @@ interface IHyperSurgeHook {
         view
         returns (
             uint32[] memory pairIndexArr,
-            bool[] memory isUsdArr,
             uint32[] memory priceDivisorArr
         );
 

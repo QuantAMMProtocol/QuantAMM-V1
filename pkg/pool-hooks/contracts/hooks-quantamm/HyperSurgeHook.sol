@@ -597,12 +597,12 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         locals.wIn = weights[p.indexIn];
         locals.wOut = weights[p.indexOut];
 
-        if (!locals.poolDetails.initialized){
-             return (false, staticSwapFee);
+        if (!locals.poolDetails.initialized) {
+            return (false, staticSwapFee);
         }
 
         //TODO overkill check? wont it just throw if the index is out of bounds?
-        if (p.indexIn >= locals.poolDetails.numTokens || p.indexOut >= locals.poolDetails.numTokens){
+        if (p.indexIn >= locals.poolDetails.numTokens || p.indexOut >= locals.poolDetails.numTokens) {
             return (true, staticSwapFee);
         }
 
@@ -630,11 +630,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         locals.bIn = p.balancesScaled18[p.indexIn];
         locals.bOut = p.balancesScaled18[p.indexOut];
 
-        return _computeSurgeFee(
-            locals,
-            p,
-            staticSwapFee
-        );
+        return _computeSurgeFee(locals, p, staticSwapFee);
     }
 
     function _computeSurgeFee(

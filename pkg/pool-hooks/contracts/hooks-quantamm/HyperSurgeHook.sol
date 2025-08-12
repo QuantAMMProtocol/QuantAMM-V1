@@ -560,8 +560,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         return _defaultThreshold;
     }
 
-    // ===== Single locals-struct (for stack depth)
-    struct ComputeLocals {
+    struct ComputeSurgeFeeLocals {
         uint256 calcAmountScaled18;
         uint256 poolPxBefore;
         uint256 poolPx;
@@ -576,8 +575,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256 capDevPct;
         uint256 bIn;
         uint256 bOut;
-        uint32 pairIdxIn;
-        uint32 pairIdxOut;
         uint64 rawIn;
         uint64 rawOut;
         uint256 wIn;
@@ -593,41 +590,59 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256 staticSwapFee
     ) public view override onlyVault returns (bool, uint256) {
         PoolCfg storage pc = _poolCfg[pool];
-        ComputeLocals memory locals;
+        ComputeSurgeFeeLocals memory locals;
         locals.poolDetails = pc.details;
 
         uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
+        locals.wIn = weights[p.indexIn];
+        locals.wOut = weights[p.indexOut];
 
-        //TODO should it return false to not allow the swap?
-        if (!locals.poolDetails.initialized) return (true, staticSwapFee);
+        if (!locals.poolDetails.initialized){
+             return (false, staticSwapFee);
+        }
 
         //TODO overkill check? wont it just throw if the index is out of bounds?
-        if (p.indexIn >= locals.poolDetails.numTokens || p.indexOut >= locals.poolDetails.numTokens)
+        if (p.indexIn >= locals.poolDetails.numTokens || p.indexOut >= locals.poolDetails.numTokens){
             return (true, staticSwapFee);
+        }
 
         //TODO overkill check? wont it just throw if the index is out of bounds?
-        if (weights.length <= p.indexIn || weights.length <= p.indexOut) return (true, staticSwapFee);
+        if (weights.length <= p.indexIn || weights.length <= p.indexOut) {
+            return (true, staticSwapFee);
+        }
 
         locals.calcAmountScaled18 = WeightedPool(pool).onSwap(p);
 
         TokenPriceCfg memory pInCfg = pc.tokenCfg[p.indexIn];
         TokenPriceCfg memory pOutCfg = pc.tokenCfg[p.indexOut];
 
-        locals.pairIdxIn = pInCfg.pairIndex;
-        locals.pairIdxOut = pOutCfg.pairIndex;
+        locals.rawIn = HyperPrice.spot(pInCfg.pairIndex);
+        locals.rawOut = HyperPrice.spot(pOutCfg.pairIndex);
 
-        locals.rawOut = HyperPrice.spot(locals.pairIdxOut); // "price" on failure
-        locals.rawIn = HyperPrice.spot(locals.pairIdxIn); // "price" on failure
+        locals.pxIn = (uint256(locals.rawIn) * 1e18) / uint256(pInCfg.priceDivisor);
+        locals.pxOut = (uint256(locals.rawOut) * 1e18) / uint256(pOutCfg.priceDivisor);
+
+        //Do not block if there is an issue with the hyperliquid price
+        if (locals.pxIn == 0 || locals.pxOut == 0) {
+            return (true, staticSwapFee);
+        }
 
         locals.bIn = p.balancesScaled18[p.indexIn];
         locals.bOut = p.balancesScaled18[p.indexOut];
 
-        locals.poolPxBefore = _pairSpotFromBalancesWeights(
-            locals.bIn,
-            weights[p.indexIn],
-            locals.bOut,
-            weights[p.indexOut]
+        return _computeSurgeFee(
+            locals,
+            p,
+            staticSwapFee
         );
+    }
+
+    function _computeSurgeFee(
+        ComputeSurgeFeeLocals memory locals,
+        PoolSwapParams calldata p,
+        uint256 staticSwapFee
+    ) internal pure returns (bool ok, uint256 surgeFee) {
+        locals.poolPxBefore = _pairSpotFromBalancesWeights(locals.bIn, locals.wIn, locals.bOut, locals.wOut);
 
         if (p.kind == SwapKind.EXACT_IN) {
             locals.bIn += p.amountGivenScaled18;
@@ -637,22 +652,9 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             locals.bOut -= p.amountGivenScaled18;
         }
 
-        locals.wIn = weights[p.indexIn];
-        locals.wOut = weights[p.indexOut];
-
         // P_pool = (B_out/w_out) / (B_in/w_in) = (B_out * w_in) / (B_in * w_out)
         locals.poolPx = _pairSpotFromBalancesWeights(locals.bIn, locals.wIn, locals.bOut, locals.wOut);
         if (locals.poolPx == 0) return (true, staticSwapFee);
-
-        // 4) External prices (p_out / p_in), struct-per-index with cached divisor
-
-        // divisor precomputed at config time
-        locals.pxIn = (uint256(locals.rawIn) * 1e18) / uint256(pInCfg.priceDivisor);
-
-        locals.pxOut = (uint256(locals.rawOut) * 1e18) / uint256(pOutCfg.priceDivisor);
-
-        //Do not block if there is an issue with the hyperliquid price
-        if (locals.pxIn == 0) return (true, staticSwapFee);
 
         locals.extPx = locals.pxOut.divDown(locals.pxIn);
 

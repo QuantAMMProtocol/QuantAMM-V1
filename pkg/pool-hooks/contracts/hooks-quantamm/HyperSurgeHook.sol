@@ -660,7 +660,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         if (locals.extPx == 0) return (true, staticSwapFee);
 
         locals.poolPxBefore = _pairSpotFromBalancesWeights(locals.bIn, locals.wIn, locals.bOut, locals.wOut);
-        locals.deviationBefore = _relAbsDiff(locals.poolPx, locals.extPx);
+        locals.deviationBefore = _relAbsDiff(locals.poolPxBefore, locals.extPx);
 
         if (p.kind == SwapKind.EXACT_IN) {
             locals.bIn += p.amountGivenScaled18;

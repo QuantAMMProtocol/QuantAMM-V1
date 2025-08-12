@@ -329,11 +329,6 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
         assertEq(hook.getCapDeviationPercentage(address(pool), tradeType), ONE);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                       INDEX-BASED CONFIG (n-token)
-    //////////////////////////////////////////////////////////////*/
-
-    // idx >= n must revert (USD path shown)
     function testFuzz_setTokenPriceConfigIndex_rejects_out_of_range(uint8 n, uint8 idx) public {
         _registerBasePoolWithN(n);
         uint8 N = uint8(bound(n, 2, 8));
@@ -341,20 +336,18 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
 
         vm.startPrank(admin);
         vm.expectRevert();
-        hook.setTokenPriceConfigIndex(address(pool), idx, 0, true);
+        hook.setTokenPriceConfigIndex(address(pool), idx, 0);
         vm.stopPrank();
     }
 
-    // idx < n should succeed for both USD and non-USD mapping
-    function testFuzz_setTokenPriceConfigIndex_accepts_usd_and_pair(uint8 n, uint8 idx, uint32 pairIdx) public {
+    function testFuzz_setTokenPriceConfigIndex_accepts(uint8 n, uint8 idx, uint32 pairIdx) public {
         _registerBasePoolWithN(n);
         uint8 N = uint8(bound(n, 2, 8));
         idx = uint8(bound(idx, 0, N - 1));
         pairIdx = uint32(bound(pairIdx, 1, type(uint32).max)); // non-zero for pair mapping
 
         vm.startPrank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), idx, 0, true); // USD mapping
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, false); // pair mapping
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx); // pair mapping
         vm.stopPrank();
     }
 
@@ -416,7 +409,7 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
         // OOB index must revert
         vm.startPrank(admin);
         vm.expectRevert();
-        hook.setTokenPriceConfigIndex(address(pool), idx, /*pairIdx*/ 0, /*isUsd*/ true);
+        hook.setTokenPriceConfigIndex(address(pool), idx, /*pairIdx*/ 0);
         vm.stopPrank();
     }
 
@@ -431,28 +424,11 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
 
         vm.startPrank(admin);
 
-        // USD path (pairIdx ignored)
-        hook.setTokenPriceConfigIndex(address(pool), idx, /*pairIdx*/ 0, /*isUsd*/ true);
-
-        // Non-USD path — seed szDecimals so hook can read divisor successfully
         uint32 pairIdx = 1;
         _hlSetSzDecimals(pairIdx, 6);
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, /*isUsd*/ false);
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx);
 
         vm.stopPrank();
-    }
-
-    function testFuzz_setTokenPriceConfigIndex_usd_path(uint8 numTokens, uint8 idx) public {
-        numTokens = uint8(bound(numTokens, 2, 8));
-        idx = uint8(bound(idx, 0, numTokens - 1));
-
-        TokenConfig[] memory cfg = new TokenConfig[](numTokens);
-        LiquidityManagement memory lm;
-        vm.prank(address(vault));
-        assertTrue(hook.onRegister(poolFactory, address(pool), cfg, lm), "onRegister failed");
-
-        vm.prank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), idx, /*pairIdx*/ 0, /*isUsd*/ true);
     }
 
     function testFuzz_setTokenPriceConfigIndex_pairIdx_nonzero(uint8 numTokens, uint8 idx, uint32 pairIdx) public {
@@ -469,7 +445,7 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
         _hlSetSzDecimals(pairIdx, 6);
 
         vm.prank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, /*isUsd*/ false);
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx);
     }
 
     function testFuzz_setTokenPriceConfigIndex_szDecimals_and_divisor(uint8 sz) public {
@@ -486,7 +462,7 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
         _hlSetSzDecimals(pairIdx, sz);
 
         vm.prank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, /*isUsd*/ false); // should not revert
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx); // should not revert
     }
 
     function testFuzz_setTokenPriceConfigIndex_szDecimals_over_6(uint8 sz) public {
@@ -504,7 +480,7 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
 
         vm.startPrank(admin);
         vm.expectRevert();
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, /*isUsd*/ false);
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx);
         vm.stopPrank();
     }
 
@@ -523,14 +499,12 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
 
         uint8[] memory indices = new uint8[](a);
         uint32[] memory pairs = new uint32[](b);
-        bool[] memory isUsd = new bool[](c);
 
         for (uint256 i = 0; i < a; ++i) indices[i] = uint8(i % 4);
         for (uint256 i = 0; i < b; ++i) {
             pairs[i] = uint32((i % 2) + 1);
             _hlSetSzDecimals(pairs[i], 6);
         }
-        for (uint256 i = 0; i < c; ++i) isUsd[i] = (i % 2 == 0);
 
         // Use low-level call so test won't fail if the batch function doesn't exist;
         // we assert success==false when lengths differ.
@@ -540,8 +514,7 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
                 "setTokenPriceConfigBatch(address,uint8[],uint32[],bool[])",
                 address(pool),
                 indices,
-                pairs,
-                isUsd
+                pairs
             )
         );
         // If arrays are mismatched, expect the hook (when present) to fail; if the
@@ -658,7 +631,6 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
         vm.stopPrank();
 
         // --- configure external price sources for the two indices we’ll swap
-        // indexIn = 0 (USD), indexOut = chosen in [1..n-1] (HL pair)
         params.indexIn = 0;
         params.indexOut = uint8(bound(outSeed, 1, uint8(params.n - 1)));
 
@@ -667,8 +639,8 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
         _hlSetSpot(params.pairIdx, params.raw);
 
         vm.startPrank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), params.indexIn, 0, true); // USD
-        hook.setTokenPriceConfigIndex(address(pool), params.indexOut, params.pairIdx, false); // HL pair
+        hook.setTokenPriceConfigIndex(address(pool), params.indexIn, params.pairIdx);
+        hook.setTokenPriceConfigIndex(address(pool), params.indexOut, params.pairIdx); // HL pair
         vm.stopPrank();
 
         // --- balancesScaled18 with length N (simple increasing balances)
@@ -751,8 +723,8 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
         _hlSetSpot(params.pairIdx, params.raw);
 
         vm.startPrank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), params.indexIn, 0, true); // USD
-        hook.setTokenPriceConfigIndex(address(pool), params.indexOut, params.pairIdx, false); // HL pair
+        hook.setTokenPriceConfigIndex(address(pool), params.indexIn, params.pairIdx); 
+        hook.setTokenPriceConfigIndex(address(pool), params.indexOut, params.pairIdx); // HL pair
         vm.stopPrank();
 
         // --- balancesScaled18 length N
@@ -847,13 +819,12 @@ contract HyperSurgeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolCo
         s.pairIdx = 2; // any non-zero pair id for HL
         s.sz = uint8((marker >> 16) % 7); // 0..6
 
-        // USD on indexIn, HL pair on indexOut — but HL spot=0 to hit guard path
         _hlSetSzDecimals(s.pairIdx, s.sz);
         _hlSetSpot(s.pairIdx, 0);
 
         vm.startPrank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), s.indexIn, 0, true); // USD
-        hook.setTokenPriceConfigIndex(address(pool), s.indexOut, s.pairIdx, false); // HL (spot=0)
+        hook.setTokenPriceConfigIndex(address(pool), s.indexIn, s.pairIdx);
+        hook.setTokenPriceConfigIndex(address(pool), s.indexOut, s.pairIdx); // HL (spot=0)
         vm.stopPrank();
 
         // 5) Balances array of length N (ascending 1e18, 2e18, ...)

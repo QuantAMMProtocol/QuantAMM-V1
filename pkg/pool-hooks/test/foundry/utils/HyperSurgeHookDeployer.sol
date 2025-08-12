@@ -11,12 +11,14 @@ abstract contract HyperSurgeHookDeployer {
         IVault vault,
         uint256 defaultMaxSurgeFeePercentage,
         uint256 defaultThresholdPercentage,
+        uint256 defaultCapDeviation,
         string memory version
     ) internal returns (HyperSurgeHookMock hook) {
         hook = new HyperSurgeHookMock(
             vault,
             defaultMaxSurgeFeePercentage,
             defaultThresholdPercentage,
+            defaultCapDeviation,
             version
         );
     }

@@ -212,4 +212,10 @@ interface IHyperSurgeHook {
      * @return pct The default surge threshold percentage (1e18 = 100%)
      */
     function getDefaultSurgeThresholdPercentage() external view returns (uint256 pct);
+
+    /**
+     * @notice Default cap deviation percentage used for new pools (1e18 = 100%).
+     * @return pct The default cap deviation percentage (1e18 = 100%)
+     */
+    function getDefaultCapDeviationPercentage() external view returns (uint256 pct);
 }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";
 import { HyperSurgeHook } from "../hooks-quantamm/HyperSurgeHook.sol";
+import { PoolSwapParams } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 
 /// @notice Thin test/mock wrapper around HyperSurgeHook.
 /// @dev Intentionally does not change any logic — it only exposes a distinct type
@@ -12,15 +13,9 @@ contract HyperSurgeHookMock is HyperSurgeHook {
         IVault vault,
         uint256 defaultMaxSurgeFeePercentage,
         uint256 defaultThresholdPercentage,
+        uint256 defaultCapDeviation,
         string memory version
-    )
-        HyperSurgeHook(
-            vault,
-            defaultMaxSurgeFeePercentage,
-            defaultThresholdPercentage,
-            version
-        )
-    {}
+    ) HyperSurgeHook(vault, defaultMaxSurgeFeePercentage, defaultThresholdPercentage, defaultCapDeviation, version) {}
 
     function ComputeOracleDeviationPct(
         address pool,
@@ -29,6 +24,7 @@ contract HyperSurgeHookMock is HyperSurgeHook {
     ) external view returns (uint256 maxDev) {
         return _computeOracleDeviationPct(pool, balancesScaled18, w);
     }
+
     function PairSpotFromBalancesWeights(
         uint256 bIn,
         uint256 wIn,
@@ -48,5 +44,13 @@ contract HyperSurgeHookMock is HyperSurgeHook {
 
     function EnsureValidPct(uint256 pct) external pure {
         _ensureValidPct(pct);
+    }
+
+    function ComputeSurgeFee(
+        ComputeSurgeFeeLocals memory locals,
+        PoolSwapParams calldata p,
+        uint256 staticSwapFee
+    ) external pure returns (bool ok, uint256 surgeFee) {
+        return _computeSurgeFee(locals, p, staticSwapFee);
     }
 }

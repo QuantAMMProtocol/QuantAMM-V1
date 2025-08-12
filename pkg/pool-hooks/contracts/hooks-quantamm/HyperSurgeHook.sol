@@ -104,13 +104,15 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         IVault vault,
         uint256 defaultMaxSurgeFeePercentage,
         uint256 defaultThresholdPercentage,
+        uint256 defaultCapDeviation,
         string memory version
     ) SingletonAuthentication(vault) VaultGuard(vault) Version(version) {
         _ensureValidPct(defaultMaxSurgeFeePercentage);
         _ensureValidPct(defaultThresholdPercentage);
+        _ensureValidPct(defaultCapDeviation);
         _defaultMaxSurgeFee = defaultMaxSurgeFeePercentage;
         _defaultThreshold = defaultThresholdPercentage;
-        _defaultCapDeviation = 1e9; // 1.0 (100%) preserves existing behavior
+        _defaultCapDeviation = defaultCapDeviation;
     }
 
     ///@inheritdoc IHooks
@@ -407,95 +409,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         return (!locals.isWorseningSurge, amountsOutRaw);
     }
 
-    struct ComputeOracleDeviationLocals {
-        uint256[8] px;
-        uint256 maxDev;
-        uint64 raw;
-        uint256 i;
-        uint256 j;
-        uint256 bi;
-        uint256 wi;
-        uint256 pxi;
-        uint256 bj;
-        uint256 wj;
-        uint256 pxj;
-        uint256 poolPx;
-        uint256 extPx;
-        uint256 dev;
-    }
-
-    /// @dev Computes the pool-wide oracle deviation as the MAX pairwise deviation
-    ///      across all token pairs (i<j): |P_pool(i->j) - P_ext(i->j)| / P_ext(i->j).
-    ///      Uses the same spot & external price conventions as the swap-fee compute.
-    function _computeOracleDeviationPct(
-        address pool,
-        uint256[] memory balancesScaled18,
-        uint256[] memory w
-    ) internal view returns (uint256 maxDev) {
-        ComputeOracleDeviationLocals memory locals;
-        PoolCfg memory pc = _poolCfg[pool];
-        PoolDetails memory details = pc.details;
-
-        if (!details.initialized) {
-            return 0;
-        }
-
-        // Build external prices per token (1e18). Missing/zero -> mark as 0 (skipped).
-        for (locals.i = 0; locals.i < balancesScaled18.length; ++locals.i) {
-            TokenPriceCfg memory cfg = pc.tokenCfg[locals.i];
-            if (cfg.pairIndex != 0) {
-                locals.raw = HyperPrice.spot(cfg.pairIndex); // reverts if precompile fails
-                if (locals.raw != 0) {
-                    // cfg.priceDivisor precomputed as 10**(6 - szDecimals)
-                    if (cfg.priceDivisor != 0) {
-                        locals.px[locals.i] = (uint256(locals.raw) * 1e18) / uint256(cfg.priceDivisor);
-                    }
-                }
-            }
-        }
-
-        // Pairwise check (O(n^2), n<=8).
-        for (locals.i = 0; locals.i < balancesScaled18.length; ) {
-            locals.bi = balancesScaled18[locals.i];
-            locals.wi = w[locals.i];
-            locals.pxi = locals.px[locals.i];
-
-            if (locals.pxi == 0) {
-                //Do not block if there is an issue with the hyperliquid price
-                return 0;
-            }
-
-            for (locals.j = locals.i + 1; locals.j < balancesScaled18.length; ) {
-                locals.bj = balancesScaled18[locals.j];
-                locals.wj = w[locals.j];
-                locals.pxj = locals.px[locals.j];
-
-                if (locals.pxj == 0) {
-                    //Do not block if there is an issue with the hyperliquid price
-                    return 0;
-                }
-
-                // Pool-implied spot for j vs i: (Bj/wj) / (Bi/wi)
-                locals.poolPx = _pairSpotFromBalancesWeights(locals.bj, locals.wj, locals.bi, locals.wi);
-                if (locals.poolPx == 0) continue;
-
-                // External ratio j/i
-                locals.extPx = locals.pxj.divDown(locals.pxi);
-
-                locals.dev = _relAbsDiff(locals.poolPx, locals.extPx);
-                if (locals.dev > locals.maxDev) locals.maxDev = locals.dev;
-                unchecked {
-                    ++locals.j;
-                }
-            }
-            unchecked {
-                ++locals.i;
-            }
-        }
-
-        return locals.maxDev;
-    }
-
     /// @notice Getter to read the pool-specific surge threshold (1e18 = 100%).
     function getSurgeThresholdPercentage(address pool, TradeType tradeType) public view override returns (uint256) {
         if (tradeType == TradeType.ARBITRAGE) {
@@ -551,15 +464,20 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     ///@inheritdoc IHyperSurgeHook
     function getDefaultMaxSurgeFeePercentage() external view override returns (uint256) {
         //already in 1e18 no need to convert
-        return _defaultMaxSurgeFee;
+        return _defaultMaxSurgeFee * 1e9;
     }
 
     ///@inheritdoc IHyperSurgeHook
     function getDefaultSurgeThresholdPercentage() external view override returns (uint256) {
         //already in 1e18 no need to convert
-        return _defaultThreshold;
+        return _defaultThreshold * 1e9;
     }
-    
+
+    function getDefaultCapDeviationPercentage() external view override returns (uint256) {
+        //already in 1e18 no need to convert
+        return _defaultCapDeviation * 1e9;
+    }
+
     ///@inheritdoc IHyperSurgeHook
     function getNumTokens(address pool) external view override returns (uint8) {
         return _poolCfg[pool].details.numTokens;
@@ -657,7 +575,9 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         locals.extPx = locals.pxOut.divDown(locals.pxIn);
 
         //Do not block if there is an issue with the hyperliquid price
-        if (locals.extPx == 0) return (true, staticSwapFee);
+        if (locals.extPx == 0) {
+            return (true, staticSwapFee);
+        }
 
         locals.poolPxBefore = _pairSpotFromBalancesWeights(locals.bIn, locals.wIn, locals.bOut, locals.wOut);
         locals.deviationBefore = _relAbsDiff(locals.poolPxBefore, locals.extPx);
@@ -672,23 +592,22 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
         // P_pool = (B_out/w_out) / (B_in/w_in) = (B_out * w_in) / (B_in * w_out)
         locals.poolPx = _pairSpotFromBalancesWeights(locals.bIn, locals.wIn, locals.bOut, locals.wOut);
-        if (locals.poolPx == 0) return (true, staticSwapFee);
-
-
+        if (locals.poolPx == 0) {
+            return (true, staticSwapFee);
+        }
         // 5) Deviation
         locals.deviation = _relAbsDiff(locals.poolPx, locals.extPx); // |pool - ext| / ext
 
         if (locals.deviation > locals.deviationBefore) {
-                // If the pool price is increasing, we are in an arbitrage situation
-                locals.capDevPct = uint256(locals.poolDetails.arbCapDeviationPercentage);
-                locals.maxPct = uint256(locals.poolDetails.arbMaxSurgeFeePercentage);
-                locals.threshold = uint256(locals.poolDetails.arbThresholdPercentage);
-        } 
-        else {
-                // If the pool price is decreasing, we are in a noise situation
-                locals.capDevPct = uint256(locals.poolDetails.noiseCapDeviationPercentage);
-                locals.maxPct = uint256(locals.poolDetails.noiseMaxSurgeFeePercentage);
-                locals.threshold = uint256(locals.poolDetails.noiseThresholdPercentage);
+            // If the pool price is increasing, we are in an arbitrage situation
+            locals.capDevPct = uint256(locals.poolDetails.arbCapDeviationPercentage);
+            locals.maxPct = uint256(locals.poolDetails.arbMaxSurgeFeePercentage);
+            locals.threshold = uint256(locals.poolDetails.arbThresholdPercentage);
+        } else {
+            // If the pool price is decreasing, we are in a noise situation
+            locals.capDevPct = uint256(locals.poolDetails.noiseCapDeviationPercentage);
+            locals.maxPct = uint256(locals.poolDetails.noiseMaxSurgeFeePercentage);
+            locals.threshold = uint256(locals.poolDetails.noiseThresholdPercentage);
         }
 
         // convert to 1e18 scale
@@ -753,5 +672,94 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     function _ensureValidPct(uint256 pct) internal pure {
         if (pct > 1e9) revert("pct");
+    }
+
+    struct ComputeOracleDeviationLocals {
+        uint256[8] px;
+        uint256 maxDev;
+        uint64 raw;
+        uint256 i;
+        uint256 j;
+        uint256 bi;
+        uint256 wi;
+        uint256 pxi;
+        uint256 bj;
+        uint256 wj;
+        uint256 pxj;
+        uint256 poolPx;
+        uint256 extPx;
+        uint256 dev;
+    }
+
+    /// @dev Computes the pool-wide oracle deviation as the MAX pairwise deviation
+    ///      across all token pairs (i<j): |P_pool(i->j) - P_ext(i->j)| / P_ext(i->j).
+    ///      Uses the same spot & external price conventions as the swap-fee compute.
+    function _computeOracleDeviationPct(
+        address pool,
+        uint256[] memory balancesScaled18,
+        uint256[] memory w
+    ) internal view returns (uint256 maxDev) {
+        ComputeOracleDeviationLocals memory locals;
+        PoolCfg memory pc = _poolCfg[pool];
+        PoolDetails memory details = pc.details;
+
+        if (!details.initialized) {
+            return 0;
+        }
+
+        // Build external prices per token (1e18). Missing/zero -> mark as 0 (skipped).
+        for (locals.i = 0; locals.i < balancesScaled18.length; ++locals.i) {
+            TokenPriceCfg memory cfg = pc.tokenCfg[locals.i];
+            if (cfg.pairIndex != 0) {
+                locals.raw = HyperPrice.spot(cfg.pairIndex); // reverts if precompile fails
+                if (locals.raw != 0) {
+                    // cfg.priceDivisor precomputed as 10**(6 - szDecimals)
+                    if (cfg.priceDivisor != 0) {
+                        locals.px[locals.i] = (uint256(locals.raw) * 1e18) / uint256(cfg.priceDivisor);
+                    }
+                }
+            }
+        }
+
+        // Pairwise check (O(n^2), n<=8).
+        for (locals.i = 0; locals.i < balancesScaled18.length; ) {
+            locals.bi = balancesScaled18[locals.i];
+            locals.wi = w[locals.i];
+            locals.pxi = locals.px[locals.i];
+
+            if (locals.pxi == 0) {
+                //Do not block if there is an issue with the hyperliquid price
+                return 0;
+            }
+
+            for (locals.j = locals.i + 1; locals.j < balancesScaled18.length; ) {
+                locals.bj = balancesScaled18[locals.j];
+                locals.wj = w[locals.j];
+                locals.pxj = locals.px[locals.j];
+
+                if (locals.pxj == 0) {
+                    //Do not block if there is an issue with the hyperliquid price
+                    return 0;
+                }
+
+                // Pool-implied spot for j vs i: (Bj/wj) / (Bi/wi)
+                locals.poolPx = _pairSpotFromBalancesWeights(locals.bj, locals.wj, locals.bi, locals.wi);
+                if (locals.poolPx == 0) continue;
+
+                // External ratio j/i
+                locals.extPx = locals.pxj.divDown(locals.pxi);
+
+                locals.dev = _relAbsDiff(locals.poolPx, locals.extPx);
+                if (locals.dev > locals.maxDev) locals.maxDev = locals.dev;
+                unchecked {
+                    ++locals.j;
+                }
+            }
+            unchecked {
+                ++locals.i;
+            }
+        }
+
+        return locals.maxDev;
     }
 }

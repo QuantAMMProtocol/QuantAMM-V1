@@ -25,6 +25,14 @@ contract HyperSurgeHookMock is HyperSurgeHook {
         return _computeOracleDeviationPct(pool, balancesScaled18, w);
     }
 
+    function FindMaxDeviation(
+        HyperSurgeHook.ComputeOracleDeviationLocals memory locals,
+        uint256[] memory balancesScaled18,
+        uint256[] memory w
+    ) external pure returns (uint256) {
+        return _findMaxDeviation(locals, balancesScaled18, w);
+    }
+
     function PairSpotFromBalancesWeights(
         uint256 bIn,
         uint256 wIn,

@@ -182,10 +182,6 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                               HELPERS
-    //////////////////////////////////////////////////////////////*/
-
     /// @notice Register the BaseVaultTest pool with a fuzzed token count n (2..8).
     function _registerBasePoolWithN(uint8 n) internal returns (uint8 tokenCount) {
         n = uint8(bound(n, 2, 8));

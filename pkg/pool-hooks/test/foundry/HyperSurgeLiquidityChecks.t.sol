@@ -29,6 +29,7 @@ import {
 // Local deployer + mock
 import { HyperSurgeHookDeployer } from "./utils/HyperSurgeHookDeployer.sol";
 import { HyperSurgeHookMock } from "../../contracts/test/HyperSurgeHookMock.sol";
+import { HyperSurgeHook } from ".../../contracts/hooks-quantamm/HyperSurgeHook.sol";
 import {
     WeightedPoolContractsDeployer
 } from "@balancer-labs/v3-pool-weighted/test/foundry/utils/WeightedPoolContractsDeployer.sol";
@@ -236,23 +237,22 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         vm.stopPrank();
     }
 
-    function _balancesEqual(uint8 nUsed) internal pure returns (uint256[] memory B) {
-        B = new uint256[](nUsed);
-        for (uint8 i = 0; i < nUsed; ++i) B[i] = 1e20;
-    }
-    
-    function _balancesProportionalToWeights(uint8 nUsed) internal view returns (uint256[] memory B) {
-        uint256[] memory w = WeightedPool(address(pool)).getNormalizedWeights(); // 1e18 scale, sum=1e18
-        B = new uint256[](nUsed);
-        uint256 S = 1e20; // big scale to reduce rounding noise
+    function _balancesEqual(uint8 nUsed) internal pure returns (uint256[] memory balances) {
+        balances = new uint256[](nUsed);
         for (uint8 i = 0; i < nUsed; ++i) {
-            // B[i] = S * w[i] / 1e18, ensure non-zero
-            uint256 bi = (S * w[i]) / 1e18;
-            B[i] = bi == 0 ? 1 : bi;
+            balances[i] = 1e20;
         }
     }
 
-    /* ───────────────────── Add liquidity tests ───────────────────── */
+    function _balancesProportionalToWeights(uint8 nUsed) internal view returns (uint256[] memory balances) {
+        uint256[] memory weights = WeightedPool(address(pool)).getNormalizedWeights(); // 1e18 scale, sum=1e18
+        balances = new uint256[](nUsed);
+        uint256 scale = 1e20; // big scale to reduce rounding noise
+        for (uint8 i = 0; i < nUsed; ++i) {
+            uint256 bi = (scale * weights[i]) / 1e18;
+            balances[i] = bi == 0 ? 1 : bi;
+        }
+    }
 
     function testFuzz_onAfterAddLiquidity_proportional_allows_n(
         uint8 n,
@@ -264,14 +264,15 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         _configHLForAll(nUsed, pairSeed, szSeed);
         _configThresholds();
 
-        uint256[] memory Bp = _balancesEqual(nUsed);
-        uint256[] memory amt18 = new uint256[](nUsed);
-        uint256[] memory amtRaw = new uint256[](nUsed);
+        uint256[] memory balances = _balancesEqual(nUsed);
+        uint256[] memory amountsScaled18 = new uint256[](nUsed);
+        uint256[] memory amountsRaw = new uint256[](nUsed);
+
         for (uint8 i = 0; i < nUsed; ++i) {
-            uint256 b = 1e18 * (i + 1);
-            uint256 a = (uint256(keccak256(abi.encode(amtSeed, i))) % (b / 10 + 1));
-            amt18[i] = a;
-            amtRaw[i] = a;
+            uint256 weightScaled = 1e18 * (i + 1);
+            uint256 amount = (uint256(keccak256(abi.encode(amtSeed, i))) % (weightScaled / 10 + 1));
+            amountsScaled18[i] = amount;
+            amountsRaw[i] = amount;
         }
 
         vm.prank(address(vault));
@@ -279,10 +280,10 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             address(this),
             address(pool),
             AddLiquidityKind.PROPORTIONAL,
-            amt18,
-            amtRaw,
+            amountsScaled18,
+            amountsRaw,
             0,
-            Bp,
+            balances,
             ""
         );
         assertTrue(ok, "PROPORTIONAL must allow");
@@ -298,24 +299,25 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         _configHLForAll(nUsed, pairSeed, szSeed);
         _configThresholds();
 
-        uint256[] memory Bp = _balancesEqual(nUsed);
+        uint256[] memory balances = _balancesEqual(nUsed);
 
-        // Use LONGER arrays (nUsed + k, k>=1) → hook loops by Bp.length; no OOB; still mismatch ⇒ allow
+        // Use LONGER arrays (nUsed + k, k>=1) → hook loops by balances.length; no OOB; still mismatch ⇒ allow
         uint8 k = uint8(1 + (extraSeed % 3));
-        uint256[] memory amt18 = new uint256[](nUsed + k);
-        uint256[] memory amtRaw = new uint256[](nUsed + k);
+        uint256[] memory amountScaled18 = new uint256[](nUsed + k);
+        uint256[] memory amountsRaw = new uint256[](nUsed + k);
 
         vm.prank(address(vault));
         (bool ok, ) = hook.onAfterAddLiquidity(
             address(this),
             address(pool),
             AddLiquidityKind.UNBALANCED,
-            amt18,
-            amtRaw,
+            amountScaled18,
+            amountsRaw,
             0,
-            Bp,
+            balances,
             ""
         );
+
         assertTrue(ok, "length mismatch must allow");
     }
 
@@ -329,18 +331,27 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         _configHLForAll(nUsed, pairSeed, szSeed);
         _configThresholds();
 
-        uint256[] memory Bp = _balancesEqual(nUsed);
-        uint256[] memory amt18 = new uint256[](nUsed);
-        uint256[] memory amtRaw = new uint256[](nUsed);
+        uint256[] memory balances = _balancesEqual(nUsed);
+        uint256[] memory amountsScaled18 = new uint256[](nUsed);
+        uint256[] memory amountsRaw = new uint256[](nUsed);
 
         // Force underflow in old = B' - in (index 0): in > B'
-        uint256 X = ((bump % 5) + 1);
-        amt18[0] = Bp[0] + X;
-        amtRaw[0] = amt18[0];
+        uint256 overflowBump = ((bump % 5) + 1);
+        amountsScaled18[0] = balances[0] + overflowBump;
+        amountsRaw[0] = amountsScaled18[0];
 
         vm.startPrank(address(vault));
         vm.expectRevert(); // current hook reverts on this arithmetic underflow
-        hook.onAfterAddLiquidity(address(this), address(pool), AddLiquidityKind.UNBALANCED, amt18, amtRaw, 0, Bp, "");
+        hook.onAfterAddLiquidity(
+            address(this),
+            address(pool),
+            AddLiquidityKind.UNBALANCED,
+            amountsScaled18,
+            amountsRaw,
+            0,
+            balances,
+            ""
+        );
         vm.stopPrank();
     }
 
@@ -355,29 +366,27 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         _configThresholds();
 
         // old imbalanced (old = Bp - d at idx0), after Bp balanced
-        uint256[] memory Bp = _balancesEqual(nUsed);
-        uint256[] memory amt18 = new uint256[](nUsed);
-        uint256[] memory amtRaw = new uint256[](nUsed);
+        uint256[] memory balances = _balancesEqual(nUsed);
+        uint256[] memory amountsScaled18 = new uint256[](nUsed);
+        uint256[] memory amountsRaw = new uint256[](nUsed);
 
-        uint256 d = bound(delta, 1, Bp[0] / 2);
-        amt18[0] = d;
-        amtRaw[0] = d; // old = [Bp0 - d, Bp1, ...] → after improves to balanced
+        delta = bound(delta, 1, balances[0] / 2);
+        amountsScaled18[0] = delta;
+        amountsRaw[0] = delta; // old = [Bp0 - d, Bp1, ...] → after improves to balanced
 
         vm.prank(address(vault));
         (bool ok, ) = hook.onAfterAddLiquidity(
             address(this),
             address(pool),
             AddLiquidityKind.UNBALANCED,
-            amt18,
-            amtRaw,
+            amountsScaled18,
+            amountsRaw,
             0,
-            Bp,
+            balances,
             ""
         );
         assertTrue(ok, "improving/neutral deviation must allow");
     }
-
-    /* ──────────────────── Remove liquidity tests ──────────────────── */
 
     function testFuzz_onAfterRemoveLiquidity_proportional_allows_n(
         uint8 n,
@@ -389,14 +398,14 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         _configHLForAll(nUsed, pairSeed, szSeed);
         _configThresholds();
 
-        uint256[] memory Bp = _balancesEqual(nUsed);
-        uint256[] memory amt18 = new uint256[](nUsed);
-        uint256[] memory amtRaw = new uint256[](nUsed);
+        uint256[] memory balances = _balancesEqual(nUsed);
+        uint256[] memory amountsScaled18 = new uint256[](nUsed);
+        uint256[] memory amountsRaw = new uint256[](nUsed);
         for (uint8 i = 0; i < nUsed; ++i) {
             uint256 b = 1e18 * (i + 1);
             uint256 a = (uint256(keccak256(abi.encode(amtSeed, i))) % (b / 10 + 1));
-            amt18[i] = a;
-            amtRaw[i] = a;
+            amountsScaled18[i] = a;
+            amountsRaw[i] = a;
         }
 
         vm.prank(address(vault));
@@ -405,9 +414,9 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             address(pool),
             RemoveLiquidityKind.PROPORTIONAL,
             0,
-            amt18,
-            amtRaw,
-            Bp,
+            amountsScaled18,
+            amountsRaw,
+            balances,
             ""
         );
         assertTrue(ok, "PROPORTIONAL must allow");
@@ -423,12 +432,12 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         _configHLForAll(nUsed, pairSeed, szSeed);
         _configThresholds();
 
-        uint256[] memory Bp = _balancesEqual(nUsed);
+        uint256[] memory balances = _balancesEqual(nUsed);
 
         // longer arrays → mismatch but no OOB
         uint8 k = uint8(1 + (extraSeed % 3));
-        uint256[] memory amt18 = new uint256[](nUsed + k);
-        uint256[] memory amtRaw = new uint256[](nUsed + k);
+        uint256[] memory amountsScaled18 = new uint256[](nUsed + k);
+        uint256[] memory amountsRaw = new uint256[](nUsed + k);
 
         vm.prank(address(vault));
         (bool ok, ) = hook.onAfterRemoveLiquidity(
@@ -436,9 +445,9 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             address(pool),
             RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
             0,
-            amt18,
-            amtRaw,
-            Bp,
+            amountsScaled18,
+            amountsRaw,
+            balances,
             ""
         );
         assertTrue(ok, "length mismatch must allow");
@@ -450,12 +459,12 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         _configThresholds();
 
         // Force old = B' + out to overflow at idx 0 → hook should ALLOW (conservative)
-        uint256[] memory Bp = _balancesEqual(nUsed);
-        uint256[] memory amt18 = new uint256[](nUsed);
-        uint256[] memory amtRaw = new uint256[](nUsed);
-        Bp[0] = type(uint256).max;
-        amt18[0] = 1;
-        amtRaw[0] = 1;
+        uint256[] memory balances = _balancesEqual(nUsed);
+        uint256[] memory amountsScaled18 = new uint256[](nUsed);
+        uint256[] memory amountsRaw = new uint256[](nUsed);
+        balances[0] = type(uint256).max;
+        amountsScaled18[0] = 1;
+        amountsRaw[0] = 1;
 
         vm.prank(address(vault));
         (bool ok, ) = hook.onAfterRemoveLiquidity(
@@ -463,16 +472,19 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             address(pool),
             RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
             0,
-            amt18,
-            amtRaw,
-            Bp,
+            amountsScaled18,
+            amountsRaw,
+            balances,
             ""
         );
         assertTrue(ok, "overflow reconstruction should allow");
     }
 
     function testFuzz_onAfterAddLiquidity_worsens_blocks_n(
-        uint8 n, uint32 pairSeed, uint8 szSeed, uint256 deltaSeed
+        uint8 n,
+        uint32 pairSeed,
+        uint8 szSeed,
+        uint256 deltaSeed
     ) public {
         // Register and configure all tokens with HL pairs (ext ratio = 1)
         uint8 nUsed = _registerBasePoolWithPoolN(n);
@@ -484,27 +496,30 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
 
         // Choose a single-sided add on token 0 big enough to exceed the 2% threshold
         uint256 minDelta = (oldB[0] * 3) / 100; // ≥3% to be safely > threshold (2%)
-        uint256 maxDelta = oldB[0] / 2;         // keep it tame
+        uint256 maxDelta = oldB[0] / 2; // keep it tame
         uint256 d = bound(deltaSeed, minDelta == 0 ? 1 : minDelta, maxDelta == 0 ? 1 : maxDelta);
 
         // Post-add balances B' = old + in
         uint256[] memory Bprime = new uint256[](nUsed);
-        for (uint8 i = 0; i < nUsed; ++i) Bprime[i] = oldB[i];
+        for (uint8 i = 0; i < nUsed; ++i) {
+            Bprime[i] = oldB[i];
+        }
         Bprime[0] = Bprime[0] + d;
 
         // AmountsIn arrays (scaled18/raw) matching B' - old
-        uint256[] memory amt18 = new uint256[](nUsed);
-        uint256[] memory amtRaw = new uint256[](nUsed);
-        amt18[0] = d; amtRaw[0] = d;
+        uint256[] memory amountsScaled18 = new uint256[](nUsed);
+        uint256[] memory amountsRaw = new uint256[](nUsed);
+        amountsScaled18[0] = d;
+        amountsRaw[0] = d;
 
         // Call hook as vault
         vm.prank(address(vault));
-        (bool ok,) = hook.onAfterAddLiquidity(
+        (bool ok, ) = hook.onAfterAddLiquidity(
             address(this),
             address(pool),
             AddLiquidityKind.UNBALANCED,
-            amt18,
-            amtRaw,
+            amountsScaled18,
+            amountsRaw,
             0,
             Bprime,
             ""
@@ -514,10 +529,11 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         assertFalse(ok, "worsening deviation must block");
     }
 
-    /* ──────────────────────────── Remove: worsen ⇒ block ──────────────────────────── */
-
     function testFuzz_onAfterRemoveLiquidity_worsens_blocks_n(
-        uint8 n, uint32 pairSeed, uint8 szSeed, uint256 deltaSeed
+        uint8 n,
+        uint32 pairSeed,
+        uint8 szSeed,
+        uint256 deltaSeed
     ) public {
         // Register and configure all tokens with HL pairs (ext ratio = 1)
         uint8 nUsed = _registerBasePoolWithPoolN(n);
@@ -534,23 +550,26 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
 
         // Post-remove balances B' = old − out (make sure it doesn't underflow)
         uint256[] memory Bprime = new uint256[](nUsed);
-        for (uint8 i = 0; i < nUsed; ++i) Bprime[i] = oldB[i];
+        for (uint8 i = 0; i < nUsed; ++i) {
+            Bprime[i] = oldB[i];
+        }
         Bprime[0] = Bprime[0] - d;
 
         // AmountsOut arrays (scaled18/raw) matching old − B'
-        uint256[] memory amt18 = new uint256[](nUsed);
-        uint256[] memory amtRaw = new uint256[](nUsed);
-        amt18[0] = d; amtRaw[0] = d;
+        uint256[] memory amountsScaled18 = new uint256[](nUsed);
+        uint256[] memory amountsRaw = new uint256[](nUsed);
+        amountsScaled18[0] = d;
+        amountsRaw[0] = d;
 
         // Call hook as vault
         vm.prank(address(vault));
-        (bool ok,) = hook.onAfterRemoveLiquidity(
+        (bool ok, ) = hook.onAfterRemoveLiquidity(
             address(this),
             address(pool),
             RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
             0,
-            amt18,
-            amtRaw,
+            amountsScaled18,
+            amountsRaw,
             Bprime,
             ""
         );
@@ -571,12 +590,12 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
 
         // old imbalanced; choose B' balanced by having out only on idx0
         uint256[] memory Bp = _balancesEqual(nUsed);
-        uint256[] memory amt18 = new uint256[](nUsed);
-        uint256[] memory amtRaw = new uint256[](nUsed);
+        uint256[] memory amountsScaled18 = new uint256[](nUsed);
+        uint256[] memory amountsRaw = new uint256[](nUsed);
 
         uint256 d = bound(delta, 1, Bp[0] / 2);
-        amt18[0] = d;
-        amtRaw[0] = d; // old = B' + d at idx0 → imbalanced; after is balanced
+        amountsScaled18[0] = d;
+        amountsRaw[0] = d; // old = B' + d at idx0 → imbalanced; after is balanced
 
         vm.prank(address(vault));
         (bool ok, ) = hook.onAfterRemoveLiquidity(
@@ -584,8 +603,8 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             address(pool),
             RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
             0,
-            amt18,
-            amtRaw,
+            amountsScaled18,
+            amountsRaw,
             Bp,
             ""
         );

@@ -518,7 +518,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         PoolSwapParams calldata p,
         address pool,
         uint256 staticSwapFee
-    ) public view override onlyVault returns (bool, uint256) {
+    ) public view override returns (bool, uint256) {
         PoolCfg storage pc = _poolCfg[pool];
         ComputeSurgeFeeLocals memory locals;
         locals.poolDetails = pc.details;
@@ -548,7 +548,11 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
         locals.rawIn = HyperPrice.spot(pInCfg.pairIndex);
         locals.rawOut = HyperPrice.spot(pOutCfg.pairIndex);
-
+        if (locals.rawIn == 0 || locals.rawOut == 0) {
+            // Missing oracle data: safe path returns the pool’s static fee.
+            return (true, staticSwapFee);
+        }
+        
         locals.pxIn = (uint256(locals.rawIn) * 1e18) / uint256(pInCfg.priceDivisor);
         locals.pxOut = (uint256(locals.rawOut) * 1e18) / uint256(pOutCfg.priceDivisor);
 
@@ -721,6 +725,14 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             }
         }
 
+        return _findMaxDeviation(locals, balancesScaled18, w);
+    }
+
+    function _findMaxDeviation(
+        ComputeOracleDeviationLocals memory locals,
+        uint256[] memory balancesScaled18,
+        uint256[] memory w
+    ) internal pure returns (uint256) {
         // Pairwise check (O(n^2), n<=8).
         for (locals.i = 0; locals.i < balancesScaled18.length; ) {
             locals.bi = balancesScaled18[locals.i];

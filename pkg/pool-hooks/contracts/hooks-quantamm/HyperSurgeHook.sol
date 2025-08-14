@@ -112,7 +112,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     }
 
     ///@inheritdoc IHooks
-    function getHookFlags() public pure override returns (HookFlags memory hookFlags) {
+    function getHookFlags() external pure override returns (HookFlags memory hookFlags) {
         hookFlags.shouldCallComputeDynamicSwapFee = true;
         hookFlags.shouldCallAfterAddLiquidity = true;
         hookFlags.shouldCallAfterRemoveLiquidity = true;

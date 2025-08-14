@@ -72,22 +72,6 @@ interface IHyperSurgeHook {
      */
     event CapDeviationPercentageChanged(address indexed sender, address indexed pool, uint256 pct, TradeType tradeType);
 
-    /***
-     * @notice Emitted when a pool's liquidity is blocked for surge fee collection.
-     * @dev This is used to prevent liquidity from being added or removed during surge fee collection
-     *      to ensure that the pool can collect the fees without interference.
-     * @param pool      The pool whose liquidity is being blocked
-     * @param isAdd     True if liquidity is being blocked for addition, false for removal
-     * @param beforeDev The liquidity amount before blocking
-     * @param afterDev  The liquidity amount after blocking
-     * @param threshold The threshold amount that was used to block the liquidity
-     */
-    event LiquidityBlocked(address indexed sender, address indexed pool, bool isAdd, uint256 beforeDev, uint256 afterDev, uint256 threshold);
-
-    // -------------------------------------------------------------------------
-    // Configuration (external, permissioned by implementation)
-    // -------------------------------------------------------------------------
-
     /**
      * @notice Configure a single token’s external price mapping by token index for a given pool.
      * @dev

@@ -711,10 +711,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
                     }
                 }
             }
-
-            unchecked {
-                ++locals.i;
-            }
         }
 
         return _findMaxDeviation(locals, balancesScaled18, w);

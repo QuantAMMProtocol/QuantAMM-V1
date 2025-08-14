@@ -435,9 +435,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             TokenPriceCfg memory cfg = _poolCfg[pool].tokenCfg[i];
             pairIndexArr[i] = cfg.pairIndex;
             priceDivisorArr[i] = cfg.priceDivisor;
-            unchecked {
-                ++i;
-            }
         }
     }
 

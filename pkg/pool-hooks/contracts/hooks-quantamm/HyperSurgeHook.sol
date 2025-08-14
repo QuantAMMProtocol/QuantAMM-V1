@@ -538,7 +538,8 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
 
         //TODO overkill check? wont it just throw if the index is out of bounds?
-        if (p.indexIn >= locals.poolDetails.numTokens || p.indexOut >= locals.poolDetails.numTokens) {
+        if (p.indexIn >= locals.poolDetails.numTokens 
+        || p.indexOut >= locals.poolDetails.numTokens) {
             return (true, staticSwapFee);
         }
 

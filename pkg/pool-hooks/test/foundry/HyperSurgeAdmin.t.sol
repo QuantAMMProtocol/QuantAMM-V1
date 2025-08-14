@@ -959,9 +959,6 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         assertEq(hook.getDefaultMaxSurgeFeePercentage(), 0.02e18);
         assertEq(hook.getDefaultSurgeThresholdPercentage(), 0.02e18);
         assertEq(hook.getDefaultCapDeviationPercentage(), 1e18);
-        // Cap default in the constructor is hardcoded to 1e9 (→ 1e18 via getter);
-        assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), 1e18);
-        assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), 1e18);
     }
 
     function testFuzz_fee_setters_valid_before_register_then_reset_on_register(

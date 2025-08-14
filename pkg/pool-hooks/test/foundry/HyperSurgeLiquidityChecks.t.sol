@@ -275,7 +275,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             amountsRaw[i] = amount;
         }
 
-        vm.prank(address(vault));
         (bool ok, ) = hook.onAfterAddLiquidity(
             address(this),
             address(pool),
@@ -330,7 +329,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         amountsInScaled18[0] = d;
         amountsInRaw[0] = d;
 
-        vm.startPrank(address(vault)); // onAfter* are onlyVault
         (bool ok, ) = hook.onAfterAddLiquidity(
             address(this),
             address(pool),
@@ -386,7 +384,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         amountsInScaled18[0] = bump;
         amountsInRaw[0] = bump;
 
-        vm.startPrank(address(vault));
         (bool ok, ) = hook.onAfterAddLiquidity(
             address(this),
             address(pool),
@@ -421,7 +418,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         amountsScaled18[0] = balances[0] + overflowBump;
         amountsRaw[0] = amountsScaled18[0];
 
-        vm.startPrank(address(vault));
         vm.expectRevert(); // current hook reverts on this arithmetic underflow
         hook.onAfterAddLiquidity(
             address(this),
@@ -455,7 +451,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         amountsScaled18[0] = delta;
         amountsRaw[0] = delta; // old = [Bp0 - d, Bp1, ...] → after improves to balanced
 
-        vm.prank(address(vault));
         (bool ok, ) = hook.onAfterAddLiquidity(
             address(this),
             address(pool),
@@ -488,8 +483,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             amountsScaled18[i] = a;
             amountsRaw[i] = a;
         }
-
-        vm.prank(address(vault));
         (bool ok, ) = hook.onAfterRemoveLiquidity(
             address(this),
             address(pool),
@@ -501,37 +494,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             ""
         );
         assertTrue(ok, "PROPORTIONAL must allow");
-    }
-
-    function testFuzz_onAfterRemoveLiquidity_lengthMismatch_allows_n(
-        uint8 n,
-        uint32 pairSeed,
-        uint8 szSeed,
-        uint8 extraSeed
-    ) public {
-        uint8 nUsed = _registerBasePoolWithPoolN(n);
-        _configHLForAll(nUsed, pairSeed, szSeed);
-        _configThresholds();
-
-        uint256[] memory balances = _balancesEqual(nUsed);
-
-        // longer arrays → mismatch but no OOB
-        uint8 k = uint8(1 + (extraSeed % 3));
-        uint256[] memory amountsScaled18 = new uint256[](nUsed + k);
-        uint256[] memory amountsRaw = new uint256[](nUsed + k);
-
-        vm.prank(address(vault));
-        (bool ok, ) = hook.onAfterRemoveLiquidity(
-            address(this),
-            address(pool),
-            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
-            0,
-            amountsScaled18,
-            amountsRaw,
-            balances,
-            ""
-        );
-        assertTrue(ok, "length mismatch must allow");
     }
 
     /// @notice With checked arithmetic in onAfterRemoveLiquidity, any overflow while reconstructing
@@ -558,8 +520,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         amountsOutScaled18[0] = 1;
         amountsOutRaw[0] = 1;
 
-        vm.startPrank(address(vault)); // onlyVault calls the hook
-
         vm.expectRevert();
         hook.onAfterRemoveLiquidity(
             address(this), // sender
@@ -571,8 +531,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             balances,
             "" // userData (unused)
         );
-
-        vm.stopPrank();
     }
 
     function testFuzz_onAfterAddLiquidity_worsens_blocks_n(
@@ -607,8 +565,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         amountsScaled18[0] = d;
         amountsRaw[0] = d;
 
-        // Call hook as vault
-        vm.prank(address(vault));
         (bool ok, ) = hook.onAfterAddLiquidity(
             address(this),
             address(pool),
@@ -656,8 +612,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         amountsScaled18[0] = d;
         amountsRaw[0] = d;
 
-        // Call hook as vault
-        vm.prank(address(vault));
         (bool ok, ) = hook.onAfterRemoveLiquidity(
             address(this),
             address(pool),
@@ -692,7 +646,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         amountsScaled18[0] = d;
         amountsRaw[0] = d; // old = B' + d at idx0 → imbalanced; after is balanced
 
-        vm.prank(address(vault));
         (bool ok, ) = hook.onAfterRemoveLiquidity(
             address(this),
             address(pool),

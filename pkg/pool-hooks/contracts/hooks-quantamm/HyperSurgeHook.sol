@@ -316,7 +316,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     /// @notice Allow proportional adds, but block non-proportional adds that worsen deviation and end above threshold.
     function onAfterAddLiquidity(
-        address sender,
+        address,
         address pool,
         AddLiquidityKind kind,
         uint256[] memory amountsInScaled18,
@@ -363,7 +363,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     /// @notice Allow proportional removes, but block non-proportional removes that worsen deviation and end above threshold.
     function onAfterRemoveLiquidity(
-        address sender,
+        address,
         address pool,
         RemoveLiquidityKind kind,
         uint256, // lpAmount (unused)
@@ -379,18 +379,10 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             return (true, amountsOutRaw);
         }
 
-        if (amountsOutScaled18.length != balancesScaled18.length) {
-            return (false, amountsOutRaw);
-        }
-
         // Reconstruct pre-remove balances = post + out; if addition overflows, allow.
         locals.oldBalances = new uint256[](locals.n);
         for (uint256 i = 0; i < locals.n; ) {
-            uint256 b = balancesScaled18[i] + amountsOutScaled18[i];
-            if (b < balancesScaled18[i]) {
-                return (true, amountsOutRaw); // overflow wrap -> allow
-            }
-            locals.oldBalances[i] = b;
+            locals.oldBalances[i] = balancesScaled18[i] + amountsOutScaled18[i];
             unchecked {
                 ++i;
             }

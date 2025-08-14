@@ -372,7 +372,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
         // Reconstruct pre-remove balances = post + out; if addition overflows, allow.
         locals.oldBalances = new uint256[](locals.n);
-        for (uint256 i = 0; i < locals.n; ) {
+        for (uint256 i = 0; i < locals.n; ++i) {
             locals.oldBalances[i] = balancesScaled18[i] + amountsOutScaled18[i];
             unchecked {
                 ++i;

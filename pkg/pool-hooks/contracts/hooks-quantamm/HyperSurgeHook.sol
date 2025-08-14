@@ -134,7 +134,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             details.noiseThresholdPercentage = _defaultThreshold.toUint32();
             details.noiseCapDeviationPercentage = _defaultCapDeviation.toUint32();
 
-            //TODO is num tokens reliably the pool length?
             details.numTokens = uint8(tokenCfgs.length);
 
             details.initialized = true;

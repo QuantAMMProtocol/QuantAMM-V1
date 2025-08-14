@@ -700,7 +700,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
 
         // Build external prices per token (1e18). Missing/zero -> mark as 0 (skipped).
-        for (locals.i = 0; locals.i < balancesScaled18.length; ) {
+        for (locals.i = 0; locals.i < balancesScaled18.length; ++locals.i) {
             TokenPriceCfg memory cfg = pc.tokenCfg[locals.i];
             if (cfg.pairIndex != 0) {
                 locals.raw = HyperPrice.spot(cfg.pairIndex); // reverts if precompile fails

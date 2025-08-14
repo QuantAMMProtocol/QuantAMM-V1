@@ -63,10 +63,6 @@ contract HLTokenInfoStub {
     }
 }
 
-/*//////////////////////////////////////////////////////////////
-                             TESTS
-//////////////////////////////////////////////////////////////*/
-
 contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolContractsDeployer {
     using ArrayHelpers for *;
     using CastingHelpers for address[];
@@ -135,10 +131,6 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                                SETUP
-    //////////////////////////////////////////////////////////////*/
-
     function setUp() public virtual override {
         super.setUp(); // vault, pool, poolFactory, admin, authorizer, tokens, routers, ...
 
@@ -204,6 +196,12 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.store(HL_TOKENINFO_PRECOMPILE, slot, bytes32(uint256(sz)));
     }
 
+    /// @notice Registering a pool sets lane defaults for N tokens; re-registering resets mutated values to defaults.
+    /// @dev Bounds: `n ∈ [2,8]` to match Balancer V3 pool sizes; `tradeTypeInt ∈ {0,1}` for {ARB,NOISE}.
+    ///      Verifies that getters return 1e18-scaled defaults derived from constructor ppm9 params, then
+    ///      confirms that mutating params and calling `onRegister` again restores default values.
+    /// @param n Number of tokens requested via TokenConfig length.
+    /// @param tradeTypeInt Lane selector as uint8 (0=ARB, 1=NOISE).
     function testFuzz_onRegister_withN_setsDefaults_and_second_overwrites_to_defaults(
         uint8 n,
         uint8 tradeTypeInt
@@ -219,6 +217,7 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
 
         // Change to custom values
         vm.startPrank(admin);
+
         hook.setMaxSurgeFeePercentage(address(pool), 0.50e9, tradeType);
         hook.setSurgeThresholdPercentage(address(pool), 0.10e9, tradeType);
         hook.setCapDeviationPercentage(address(pool), 0.90e9, tradeType);
@@ -248,17 +247,17 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                      CAP DEVIATION ADMIN GUARDS
-    //////////////////////////////////////////////////////////////*/
-
-    // capDev must be <= 1e18 and strictly greater than thr (thr=0 here)
+    /// @notice Cap deviation must be > threshold and within (0, 100%] in ppm9 when threshold is zero.
+    /// @dev Bounds: fuzz `capDev ∈ [0, 1e18]`; accept `0 < capDev ≤ 1e9`, revert on `capDev == 0` or `capDev > 1e9`.
+    /// @param n Pool size (2..8).
+    /// @param capDev Cap deviation in ppm9.
+    /// @param tradeTypeInt Lane selector (0=ARB,1=NOISE).
     function testFuzz_setCapDeviationPercentage_bounds_withThrZero(uint8 n, uint256 capDev, uint8 tradeTypeInt) public {
         n = _registerBasePoolWithN(n);
         IHyperSurgeHook.TradeType tradeType = IHyperSurgeHook.TradeType(bound(tradeTypeInt, 0, 1));
 
         vm.startPrank(admin);
-        hook.setSurgeThresholdPercentage(address(pool), 0, tradeType); // thr=0
+        hook.setSurgeThresholdPercentage(address(pool), 0, tradeType);
 
         capDev = bound(capDev, 0, ONE + 1e20);
         if (capDev == 0) {
@@ -275,7 +274,9 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
-    // Enforce: capDev must be strictly greater than thr (and less than or equal 1e18)
+    /// @notice Cap deviation must remain strictly greater than threshold (positive separation).
+    /// @dev Fuzzes `thr` and `capDev` in ppm9 and asserts acceptance only when `capDev > thr`.
+    /// @param n Pool size (2..8).
     function testFuzz_setCapDeviation_enforces_gt_threshold(
         uint8 n,
         uint256 thr,
@@ -295,7 +296,9 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
-    // Reject: capDev <= thr (make sure thr itself is valid first)
+    /// @notice Setting cap deviation ≤ threshold is rejected for safety.
+    /// @dev Exercises the non-strict and reverse cases (`capDev == thr` or `< thr`) to ensure revert.
+    /// @param n Pool size (2..8).
     function testFuzz_setCapDeviation_rejects_le_threshold(
         uint8 n,
         uint256 thr,
@@ -325,8 +328,8 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
 
     function testFuzz_setTokenPriceConfigIndex_rejects_out_of_range(uint8 n, uint8 idx) public {
         _registerBasePoolWithN(n);
-        uint8 N = uint8(bound(n, 2, 8));
-        idx = uint8(bound(idx, N, N + 20)); // out-of-range
+        n = uint8(bound(n, 2, 8));
+        idx = uint8(bound(idx, n, n + 20)); // out-of-range
 
         vm.startPrank(admin);
         vm.expectRevert();
@@ -344,10 +347,12 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                        MAX / THRESHOLD ADMIN BOUNDS
-    //////////////////////////////////////////////////////////////*/
-
+    /// @notice Max surge fee must be within [0, 100%] in ppm9 and persisted in storage.
+    /// @dev Bounds: fuzz `pct ∈ [0, 1e18]`, but acceptance is `pct ≤ 1e9` (100% in ppm9).
+    ///      Reverts when `pct > 1e9`, otherwise stores and getter returns `pct * 1e9`.
+    /// @param n Pool size (2..8).
+    /// @param pct Candidate max fee in ppm9 units.
+    /// @param tradeTypeInt Lane selector (0=ARB,1=NOISE).
     function testFuzz_setMaxSurgeFeePercentage_bounds(uint8 n, uint256 pct, uint8 tradeTypeInt) public {
         _registerBasePoolWithN(n);
         pct = bound(pct, 0, ONE);
@@ -363,6 +368,13 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         }
         vm.stopPrank();
     }
+
+    /// @notice Threshold must be < cap and within [0, 100%] in ppm9.
+    /// @dev Bounds: fuzz `thr ∈ [0, 1e18]`, accept only `thr ≤ 1e9` and strictly `thr < cap` (default cap=1e9).
+    ///      Asserts revert on `thr == 1e9` (since not < cap) and on `thr > 1e9`.
+    /// @param n Pool size (2..8).
+    /// @param thr Threshold in ppm9.
+    /// @param tradeTypeInt Lane selector (0=ARB,1=NOISE).
 
     function testFuzz_setSurgeThresholdPercentage_bounds(uint8 n, uint256 thr, uint8 tradeTypeInt) public {
         _registerBasePoolWithN(n);
@@ -385,10 +397,8 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                        INDEX-BASED CONFIG
-//////////////////////////////////////////////////////////////*/
-
+    /// @notice Single-token price config: rejects out-of-range token index.
+    /// @dev Bounds: `idx ≥ n` must revert; `n ∈ [2,8]` aligns with Balancer V3 pool sizes.
     function testFuzz_setTokenPriceConfigIndex_rejects_out_of_range_index(uint8 numTokens, uint8 idx) public {
         numTokens = uint8(bound(numTokens, 2, 8));
         idx = uint8(bound(idx, numTokens, 30)); // force OOB
@@ -397,6 +407,7 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         TokenConfig[] memory cfg = new TokenConfig[](numTokens);
         LiquidityManagement memory lm;
         vm.prank(address(vault));
+
         assertTrue(hook.onRegister(poolFactory, address(pool), cfg, lm), "onRegister failed");
 
         // OOB index must revert
@@ -406,6 +417,8 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
+    /// @notice Single-token price config: accepts in-range index with nonzero pair id.
+    /// @dev Bounds: `idx ∈ [0, n-1]`, `pairIdx > 0`. Confirms happy path does not revert.
     function testFuzz_setTokenPriceConfigIndex_accepts_in_range_index(uint8 numTokens, uint8 idx) public {
         numTokens = uint8(bound(numTokens, 2, 8));
         idx = uint8(bound(idx, 0, numTokens - 1));
@@ -441,6 +454,11 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx);
     }
 
+    /// @notice szDecimals lookup determines divisor = 10**(6 - sz) for each token’s price pair.
+    /// @dev Bounds: `sz ∈ [0,6]` are the only valid oracle scales; verifies stored pair index and computed divisor.
+    /// @param sz Oracle significant-decimal count for the pair (0..6).
+    /// @param n Pool size (2..8).
+
     function testFuzz_setTokenPriceConfigIndex_szDecimals_and_divisor(uint8 sz, uint8 n) public {
         sz = uint8(bound(sz, 0, 6));
         n = uint8(bound(n, 2, 8));
@@ -463,6 +481,9 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         assertEq(storedDiv, expectedDiv, "divisor mismatch");
     }
 
+    /// @notice szDecimals > 6 is invalid and must revert on single-token price config.
+    /// @dev Enforces the oracle scale invariant; rejects `sz ≥ 7`.
+    /// @param sz Oracle significant-decimal count (≥7 → invalid).
     function testFuzz_setTokenPriceConfigIndex_szDecimals_over_6(uint8 sz) public {
         // invalid range > 6 should fail in hook
         sz = uint8(bound(sz, 7, 30));
@@ -482,6 +503,8 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
+    /// @notice Batch token price config: array length mismatch must revert atomically.
+    /// @dev Bounds: `a,b ∈ [0,n]`. If `a != b` then revert; else accept and spot-check stored rows.
     function testFuzz_setTokenPriceConfigBatchIndex_length_mismatch(uint8 n, uint8 lenA, uint8 lenB) public {
         // Register pool (any N in 2..8)
         n = _registerBasePoolWithN(n);
@@ -531,6 +554,9 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
+    /// @notice Batch token price config: zero pair id in any row is invalid and reverts the batch.
+    /// @dev Enforces `pairIdx > 0` precondition for oracle routing.
+    /// @param n Pool size (2..8).
     function test_setTokenPriceConfigBatchIndex_zero_pair_reverts(uint8 n) public {
         n = _registerBasePoolWithN(n);
 
@@ -551,6 +577,9 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
+    /// @notice Batch token price config: empty arrays are a no-op but sizes in getters still match `n`.
+    /// @dev Validates default-zero state after registration and empty batch behavior.
+    /// @param n Pool size (2..8).
     function test_setTokenPriceConfigBatchIndex_empty_ok(uint8 n) public {
         n = _registerBasePoolWithN(n);
         authorizer.grantRole(
@@ -575,6 +604,10 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         }
     }
 
+    /// @notice Batch token price config: valid rows are persisted with correct pair ids and divisors.
+    /// @dev Bounds: `len ∈ [1,n]`. Confirms unset indices remain zero.
+    /// @param n Pool size (2..8).
+    /// @param lenSeed Chooses number of rows to configure.
     function test_setTokenPriceConfigBatchIndex_success(uint8 n, uint8 lenSeed) public {
         n = _registerBasePoolWithN(n);
         authorizer.grantRole(
@@ -605,6 +638,10 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         }
     }
 
+    /// @notice All admin setters are restricted to SwapFeeManager/Governance or holders of the batch action id.
+    /// @dev After demonstrating a successful admin batch by `admin`, pranks a non-admin and asserts reverts for:
+    ///      {max fee, threshold, cap, single price index, batch price index}.
+    /// @param n Pool size (2..8).
     function testFuzz_onlyAdmin_rejected_on_all_admin_setters(
         uint8 n,
         uint8 idxSeed,
@@ -660,6 +697,8 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         hook.setCapDeviationPercentage(address(pool), cap, IHyperSurgeHook.TradeType.NOISE);
     }
 
+    /// @notice Single-token price config reverts when the pool is not initialized via `onRegister`.
+    /// @dev Asserts the `initialized` guard on the single-row setter.
     function testFuzz_priceConfigIndex_rejects_when_uninitialized(uint8 idxSeed, uint32 pairIdx) public {
         // NOT registering the pool → expect PoolNotInitialized
         uint8 idx = uint8(bound(idxSeed, 0, 7));
@@ -672,6 +711,8 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
+    /// @notice Batch price config reverts when the pool is not initialized via `onRegister`.
+    /// @dev Asserts the `initialized` guard on the batch setter.
     function testFuzz_priceConfigBatch_rejects_when_uninitialized(uint8 a, uint8 b, uint32 p0, uint32 p1) public {
         // Grant role needed for batch
         authorizer.grantRole(
@@ -694,6 +735,9 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
+    /// @notice Batch token price config: any out-of-range token index causes the entire batch to revert.
+    /// @dev Bounds: mixes in-range and out-of-range indices; asserts atomic failure.
+    /// @param n Pool size (2..8).
     function testFuzz_batch_rejects_tokenIndex_out_of_range(
         uint8 n,
         uint8 goodIdx,
@@ -750,6 +794,9 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
+    /// @notice Batch token price config: szDecimals > 6 in any row must revert atomically.
+    /// @dev Guards oracle scaling invariants across the whole batch.
+    /// @param n Pool size (2..8).
     function testFuzz_batch_rejects_decimals_over_6(uint8 n, uint8 idxSeed, uint32 pairIdx, uint8 sz) public {
         n = _registerBasePoolWithN(n);
         uint8 idx = uint8(bound(idxSeed, 0, n - 1));
@@ -774,6 +821,10 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
+    /// @notice Batch token price config: getters return arrays sized to `n` with exact pair/divisor per row.
+    /// @dev Bounds: `len ∈ [1,n]`. Confirms unset positions remain zero-initialized.
+    /// @param n Pool size (2..8).
+    /// @param lenSeed Chooses number of rows to configure.
     function testFuzz_batch_accepts_and_getters_match(uint8 n, uint8 lenSeed) public {
         n = _registerBasePoolWithN(n);
         uint8 len = uint8(bound(lenSeed, 1, n)); // number of rows we will set
@@ -815,6 +866,9 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         }
     }
 
+    /// @notice Batch token price config: duplicate writes to the same token index use last-write-wins semantics.
+    /// @dev Ensures deterministic storage in face of repeated indices within one batch.
+    /// @param n Pool size (2..8).
     function testFuzz_batch_duplicate_indices_last_write_wins(uint8 n, uint8 idxSeed, uint32 pA, uint32 pB) public {
         n = _registerBasePoolWithN(n);
         uint8 idx = uint8(bound(idxSeed, 0, n - 1));
@@ -859,42 +913,45 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         }
     }
 
+    /// @notice ARB and NOISE lanes are independent: setting values in one lane must not affect the other.
+    /// @dev Bounds: fuzz ppm9 values with `cap > thr` per lane; asserts getters are lane-scoped.
+    /// @param n Pool size (2..8).
     function testFuzz_fee_knobs_per_direction_independent(
         uint8 n,
-        uint256 a,
-        uint256 b,
-        uint256 c,
-        uint256 d,
-        uint256 e,
-        uint256 f
+        uint256 arbMaxUnbound,
+        uint256 arbThrUnbound,
+        uint256 arbCapUnbound,
+        uint256 noiseMaxUnbound,
+        uint256 noiseThrUnbound,
+        uint256 noiseCapUnbound
     ) public {
         _registerBasePoolWithN(n);
 
-        uint256 arbMax = bound(a % 1e9, 0, 1e9);
-        uint256 arbThr = bound(b % 1e9, 0, 1e9 - 1);
-        uint256 arbCap = bound(c % 1e9, arbThr + 1, 1e9);
+        uint256 arbMax = bound(arbMaxUnbound % 1e9, 0, 1e9);
+        uint256 arbThr = bound(arbThrUnbound % 1e9, 0, 1e9 - 1);
+        uint256 arbCap = bound(arbCapUnbound % 1e9, arbThr + 1, 1e9);
 
-        uint256 noiMax = bound(d % 1e9, 0, 1e9);
-        uint256 noiThr = bound(e % 1e9, 0, 1e9 - 1);
-        uint256 noiCap = bound(f % 1e9, noiThr + 1, 1e9);
+        uint256 noiseMax = bound(noiseMaxUnbound % 1e9, 0, 1e9);
+        uint256 noiseThr = bound(noiseThrUnbound % 1e9, 0, 1e9 - 1);
+        uint256 noiseCap = bound(noiseCapUnbound % 1e9, noiseThr + 1, 1e9);
 
         vm.startPrank(admin);
         hook.setMaxSurgeFeePercentage(address(pool), arbMax, IHyperSurgeHook.TradeType.ARBITRAGE);
         hook.setSurgeThresholdPercentage(address(pool), arbThr, IHyperSurgeHook.TradeType.ARBITRAGE);
         hook.setCapDeviationPercentage(address(pool), arbCap, IHyperSurgeHook.TradeType.ARBITRAGE);
 
-        hook.setMaxSurgeFeePercentage(address(pool), noiMax, IHyperSurgeHook.TradeType.NOISE);
-        hook.setSurgeThresholdPercentage(address(pool), noiThr, IHyperSurgeHook.TradeType.NOISE);
-        hook.setCapDeviationPercentage(address(pool), noiCap, IHyperSurgeHook.TradeType.NOISE);
+        hook.setMaxSurgeFeePercentage(address(pool), noiseMax, IHyperSurgeHook.TradeType.NOISE);
+        hook.setSurgeThresholdPercentage(address(pool), noiseThr, IHyperSurgeHook.TradeType.NOISE);
+        hook.setCapDeviationPercentage(address(pool), noiseCap, IHyperSurgeHook.TradeType.NOISE);
         vm.stopPrank();
 
         assertEq(hook.getMaxSurgeFeePercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), arbMax * 1e9);
         assertEq(hook.getSurgeThresholdPercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), arbThr * 1e9);
         assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), arbCap * 1e9);
 
-        assertEq(hook.getMaxSurgeFeePercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), noiMax * 1e9);
-        assertEq(hook.getSurgeThresholdPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), noiThr * 1e9);
-        assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), noiCap * 1e9);
+        assertEq(hook.getMaxSurgeFeePercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), noiseMax * 1e9);
+        assertEq(hook.getSurgeThresholdPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), noiseThr * 1e9);
+        assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), noiseCap * 1e9);
     }
 
     function test_getDefaultGetters_match_constructor() public view {
@@ -909,14 +966,14 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
 
     function testFuzz_fee_setters_valid_before_register_then_reset_on_register(
         uint8 n,
-        uint256 m,
-        uint256 t,
-        uint256 c
+        uint256 maxPctUnbound,
+        uint256 thrUnbound,
+        uint256 capUnbound
     ) public {
         // Set fees BEFORE onRegister (allowed by code), then register — defaults should overwrite
-        uint256 maxPct = bound(m % 1e9, 0, 1e9);
-        uint256 thr = bound(t % 1e9, 0, 1e9 - 1);
-        uint256 cap = bound(c % 1e9, thr + 1, 1e9);
+        uint256 maxPct = bound(maxPctUnbound % 1e9, 0, 1e9);
+        uint256 thr = bound(thrUnbound % 1e9, 0, 1e9 - 1);
+        uint256 cap = bound(capUnbound % 1e9, thr + 1, 1e9);
 
         vm.startPrank(admin);
         hook.setMaxSurgeFeePercentage(address(pool), maxPct, IHyperSurgeHook.TradeType.ARBITRAGE);

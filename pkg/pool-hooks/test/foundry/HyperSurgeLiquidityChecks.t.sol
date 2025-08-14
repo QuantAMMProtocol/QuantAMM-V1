@@ -289,36 +289,117 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         assertTrue(ok, "PROPORTIONAL must allow");
     }
 
-    function testFuzz_onAfterAddLiquidity_lengthMismatch_allows_n(
-        uint8 n,
+    /// @notice UNBALANCED add with a *longer* amounts array must not OOB,
+    ///         and if the post-add state is balanced (old is imbalanced), the add improves/keeps deviation ⇒ allow.
+    /// @dev    The hook iterates by `balances.length`, so `amounts.length == m+1` is safe (extra tail ignored).
+    ///         We adapt to the hook’s actual `numTokens` by reading the price-config arrays length from storage,
+    ///         then configure 1:1 external prices for all `m` tokens so deviation is driven purely by balances.
+    /// @param  nSeed Pool size seed (bounded to [2,8]) – used by registration helper.
+    /// @param  pairSeed Fuzzed seed for pair ids (helper will derive valid, non-zero pair ids).
+    /// @param  szSeed Fuzzed seed for szDecimals (helper will clamp to ≤6).
+    function testFuzz_onAfterAddLiquidity_lengthMismatch_improves_allows_n(
+        uint8 nSeed,
         uint32 pairSeed,
-        uint8 szSeed,
-        uint8 extraSeed
+        uint8 szSeed
     ) public {
-        uint8 nUsed = _registerBasePoolWithPoolN(n);
-        _configHLForAll(nUsed, pairSeed, szSeed);
+        uint8 n = uint8(bound(nSeed, 2, 8));
+        _registerBasePoolWithPoolN(n);
+
+        // Use the hook’s actual token count (numTokens) from storage-sized arrays.
+        (uint32[] memory pairs, ) = hook.getTokenPriceConfigs(address(pool));
+        uint256 m = pairs.length;
+        assertGe(m, 2, "pool must have at least 2 tokens");
+
+        // Configure external prices for the *actual* m tokens, then thresholds (0.1% etc).
+        _configHLForAll(uint8(m), pairSeed, szSeed);
         _configThresholds();
 
-        uint256[] memory balances = _balancesEqual(nUsed);
+        // Post-add balances: perfectly balanced vector of length m.
+        uint256[] memory balancesBalanced = new uint256[](m);
+        for (uint256 k = 0; k < m; ++k) {
+            balancesBalanced[k] = 1e24;
+        }
 
-        // Use LONGER arrays (nUsed + k, k>=1) → hook loops by balances.length; no OOB; still mismatch ⇒ allow
-        uint8 k = uint8(1 + (extraSeed % 3));
-        uint256[] memory amountScaled18 = new uint256[](nUsed + k);
-        uint256[] memory amountsRaw = new uint256[](nUsed + k);
+        // Make "old" imbalanced by setting a nonzero add on index 0; use amounts length m+1 (mismatch).
+        uint256 d = balancesBalanced[0] / 50; // 2% > 0.1% threshold
+        if (d == 0) {
+            d = 1;
+        }
+        uint256[] memory amountsInScaled18 = new uint256[](m + 1);
+        uint256[] memory amountsInRaw = new uint256[](m + 1);
+        amountsInScaled18[0] = d;
+        amountsInRaw[0] = d;
 
-        vm.prank(address(vault));
+        vm.startPrank(address(vault)); // onAfter* are onlyVault
+        (bool ok, ) = hook.onAfterAddLiquidity(
+            address(this),
+            address(pool),
+            AddLiquidityKind.UNBALANCED, // any non-PROPORTIONAL kind
+            amountsInScaled18,
+            amountsInRaw,
+            0, // lpAmount (unused)
+            balancesBalanced, // post-add is balanced (dev = 0)
+            "" // userData (unused)
+        );
+        vm.stopPrank();
+
+        assertTrue(ok, "improving/neutral deviation must allow even with longer amounts array");
+    }
+
+    /// @notice UNBALANCED add with a *longer* amounts array must not OOB,
+    ///         and if the post-add state worsens deviation beyond threshold, it must block.
+    /// @dev    We adapt to the hook’s `numTokens` (via price-config length), configure 1:1 prices for `m` tokens,
+    ///         then create a post-add imbalance (+10% on idx 0). We set amounts[0]=bump so old = post − bump ⇒ balanced.
+    ///         With small threshold (0.1%), this must block.
+    /// @param  nSeed Pool size seed (bounded to [2,8]) – used by registration helper.
+    /// @param  pairSeed Fuzzed seed for pair ids (helper will derive valid, non-zero pair ids).
+    /// @param  szSeed Fuzzed seed for szDecimals (helper will clamp to ≤6).
+    function testFuzz_onAfterAddLiquidity_lengthMismatch_worsens_blocks_n(
+        uint8 nSeed,
+        uint32 pairSeed,
+        uint8 szSeed
+    ) public {
+        uint8 n = uint8(bound(nSeed, 2, 8));
+        _registerBasePoolWithPoolN(n);
+
+        (uint32[] memory pairs, ) = hook.getTokenPriceConfigs(address(pool));
+        uint256 m = pairs.length;
+        assertGe(m, 2, "pool must have at least 2 tokens");
+
+        _configHLForAll(uint8(m), pairSeed, szSeed);
+        _configThresholds();
+
+        // Start from balanced vector, then make post-add imbalanced by +10% on index 0.
+        uint256[] memory balancesImbalanced = new uint256[](m);
+        for (uint256 k = 0; k < m; ++k) {
+            balancesImbalanced[k] = 1e24;
+        }
+        uint256 bump = balancesImbalanced[0] / 10; // 10% >> 0.1% threshold
+        if (bump == 0) {
+            bump = 1;
+        }
+        balancesImbalanced[0] += bump;
+
+        // amounts length m+1 (mismatch); set amounts[0]=bump so old = post-add − bump ⇒ balanced.
+        uint256[] memory amountsInScaled18 = new uint256[](m + 1);
+        uint256[] memory amountsInRaw = new uint256[](m + 1);
+        amountsInScaled18[0] = bump;
+        amountsInRaw[0] = bump;
+
+        vm.startPrank(address(vault));
         (bool ok, ) = hook.onAfterAddLiquidity(
             address(this),
             address(pool),
             AddLiquidityKind.UNBALANCED,
-            amountScaled18,
-            amountsRaw,
+            amountsInScaled18,
+            amountsInRaw,
             0,
-            balances,
+            balancesImbalanced, // post-add: imbalanced ⇒ dev ~ 10%
             ""
         );
+        vm.stopPrank();
 
-        assertTrue(ok, "length mismatch must allow");
+        assertFalse(ok, "worsening deviation above threshold must block even with longer amounts array");
     }
 
     function testFuzz_onAfterAddLiquidity_underflow_reverts_n(
@@ -453,31 +534,45 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         assertTrue(ok, "length mismatch must allow");
     }
 
-    function testFuzz_onAfterRemoveLiquidity_overflow_allows_n(uint8 n, uint32 pairSeed, uint8 szSeed) public {
-        uint8 nUsed = _registerBasePoolWithPoolN(n);
-        _configHLForAll(nUsed, pairSeed, szSeed);
-        _configThresholds();
+    /// @notice With checked arithmetic in onAfterRemoveLiquidity, any overflow while reconstructing
+    ///         pre-remove balances (post + out) must revert (fail-fast).
+    /// @dev    We fabricate an impossible state to prove the invariant: balances[0] = MAX and
+    ///         amountsOutScaled18[0] = 1 ⇒ (balances + out) overflows. In production, the Vault
+    ///         would not produce such inputs; this is a harness sanity check. Lengths are kept
+    ///         equal to avoid the early "length mismatch ⇒ allow" branch. N is fuzzed 2..8.
+    /// @param  nSeed Fuzzed pool size seed (bounded to [2,8]).
+    function testFuzz_onAfterRemoveLiquidity_overflow_reverts_n(uint8 nSeed) public {
+        uint8 n = uint8(bound(nSeed, 2, 8));
+        _registerBasePoolWithPoolN(n);
 
-        // Force old = B' + out to overflow at idx 0 → hook should ALLOW (conservative)
-        uint256[] memory balances = _balancesEqual(nUsed);
-        uint256[] memory amountsScaled18 = new uint256[](nUsed);
-        uint256[] memory amountsRaw = new uint256[](nUsed);
-        balances[0] = type(uint256).max;
-        amountsScaled18[0] = 1;
-        amountsRaw[0] = 1;
+        // Equal-length arrays to reach the arithmetic path (no early allow).
+        uint256[] memory balances = new uint256[](n);
+        uint256[] memory amountsOutScaled18 = new uint256[](n);
+        uint256[] memory amountsOutRaw = new uint256[](n);
 
-        vm.prank(address(vault));
-        (bool ok, ) = hook.onAfterRemoveLiquidity(
-            address(this),
-            address(pool),
-            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
-            0,
-            amountsScaled18,
-            amountsRaw,
+        // Seed sane non-zero balances, then force an overflow at index 0.
+        for (uint256 i = 0; i < n; ++i) {
+            balances[i] = 1e24;
+        }
+        balances[0] = type(uint256).max; // impossible in reality, useful to prove fail-fast
+        amountsOutScaled18[0] = 1;
+        amountsOutRaw[0] = 1;
+
+        vm.startPrank(address(vault)); // onlyVault calls the hook
+
+        vm.expectRevert();
+        hook.onAfterRemoveLiquidity(
+            address(this), // sender
+            address(pool), // pool
+            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN, // any non-PROPORTIONAL kind
+            0, // lpAmount (unused)
+            amountsOutScaled18,
+            amountsOutRaw,
             balances,
-            ""
+            "" // userData (unused)
         );
-        assertTrue(ok, "overflow reconstruction should allow");
+
+        vm.stopPrank();
     }
 
     function testFuzz_onAfterAddLiquidity_worsens_blocks_n(

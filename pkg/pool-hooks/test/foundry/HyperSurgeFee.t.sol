@@ -63,10 +63,6 @@ contract HLTokenInfoStub {
     }
 }
 
-/*//////////////////////////////////////////////////////////////
-                             TESTS
-//////////////////////////////////////////////////////////////*/
-
 contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolContractsDeployer {
     using ArrayHelpers for *;
     using CastingHelpers for address[];
@@ -183,10 +179,6 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                               HELPERS
-    //////////////////////////////////////////////////////////////*/
-
     /// @notice Register the BaseVaultTest pool with a fuzzed token count n (2..8).
     function _registerBasePoolWithN(uint8 n) internal {
         n = uint8(bound(n, 2, 8));
@@ -282,7 +274,9 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // --- balancesScaled18 with length N (simple increasing balances)
         uint256[] memory balances = new uint256[](params.n);
-        for (uint256 i = 0; i < params.n; ++i) balances[i] = 1e18 * (i + 1);
+        for (uint256 i = 0; i < params.n; ++i) {
+            balances[i] = 1e18 * (i + 1);
+        }
 
         // --- build PoolSwapParams (EXACT_IN: 0 -> indexOut)
         PoolSwapParams memory p;
@@ -366,7 +360,9 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // --- balancesScaled18 length N
         uint256[] memory balances = new uint256[](params.n);
-        for (uint256 i = 0; i < params.n; ++i) balances[i] = 1e18 * (i + 1);
+        for (uint256 i = 0; i < params.n; ++i) {
+            balances[i] = 1e18 * (i + 1);
+        }
 
         // --- build PoolSwapParams (EXACT_OUT: 0 -> indexOut)
         PoolSwapParams memory p;
@@ -378,7 +374,10 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         // bound amountOut to strictly inside the 30% guard
         params.MAX_RATIO = 30e16; // 30%
         params.maxIn = (balances[p.indexOut] * params.MAX_RATIO) / 1e18;
-        if (params.maxIn > 0) params.maxIn -= 1;
+        if (params.maxIn > 0) {
+            params.maxIn -= 1;
+        }
+
         p.amountGivenScaled18 = bound(amtSeed, 1, params.maxIn == 0 ? 1 : params.maxIn); // for EXACT_OUT this is amountOut
 
         // static fee (1e9)
@@ -436,7 +435,10 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         s.maxPct = marker % 1e9; // [0, 1e9]
         s.thr = s.maxPct / 4;
         s.cap = s.thr + (1e9 - s.thr) / 3; // thr < cap <= 1e9
-        if (s.cap == s.thr) s.cap = s.thr + 1;
+        if (s.cap == s.thr) {
+            s.cap += 1;
+        }
+
         s.staticFee = (marker >> 8) % (s.maxPct + 1); // [0, maxPct]
 
         vm.startPrank(admin);
@@ -466,7 +468,9 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // 5) Balances array of length N (ascending 1e18, 2e18, ...)
         s.balances = new uint256[](s.n);
-        for (uint256 i = 0; i < s.n; ++i) s.balances[i] = 1e18 * (i + 1);
+        for (uint256 i = 0; i < s.n; ++i) {
+            s.balances[i] = 1e18 * (i + 1);
+        }
 
         // 6) Build swap params (EXACT_IN), keep amount strictly inside WeightedMath 30% guard
         PoolSwapParams memory p;
@@ -477,7 +481,11 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         s.maxRatio = 30e16; // 30% in 1e18 basis
         s.maxIn = (s.balances[p.indexIn] * s.maxRatio) / 1e18;
-        if (s.maxIn > 0) s.maxIn -= 1; // strictly under boundary
+
+        if (s.maxIn > 0) {
+            s.maxIn -= 1;
+        }
+
         // derive a nonzero amount from marker and bound it
         uint256 amtSeed = (marker << 32) | marker;
         p.amountGivenScaled18 = bound(amtSeed, 1, s.maxIn == 0 ? 1 : s.maxIn);
@@ -588,15 +596,21 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 capDev = fee_ppm9To1e18(capDevPPM9);
         uint256 maxPct = fee_ppm9To1e18(maxFeePPM9);
 
-        if (deviation <= threshold) return staticSwapFee;
+        if (deviation <= threshold) {
+            return staticSwapFee;
+        }
 
         uint256 span = capDev - threshold;
         uint256 norm = fee_divDown(deviation - threshold, span);
-        if (norm > FEE_ONE) norm = FEE_ONE;
+        if (norm > FEE_ONE) {
+            norm = FEE_ONE;
+        }
 
         uint256 incr = fee_mulDown(maxPct - staticSwapFee, norm);
         uint256 fee = staticSwapFee + incr;
-        if (fee > maxPct) fee = maxPct;
+        if (fee > maxPct) {
+            fee = maxPct;
+        }
         return fee;
     }
 
@@ -1171,15 +1185,12 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
     }
 
     // Helper: for “bad/missing external prices”, either revert OR return (ok && static fee).
-    function _assertStaticFeeOrRevert_MissingPrices(PoolSwapParams memory p) internal {
+    function _assertStaticFeeOrRevert_MissingPrices(PoolSwapParams memory p) internal view {
         // call must be from vault (the test sets vm.prank(vault) before calling this)
-        try hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE) returns (bool ok, uint256 fee) {
-            // If it doesn’t revert, it must *not* produce a dynamic fee.
-            assertTrue(ok, "missing prices: ok must be true on success");
-            assertEq(fee, STATIC_SWAP_FEE, "missing prices: must return static fee");
-        } catch {
-            // Any revert (panic or custom) is acceptable for missing-price path in current hook.
-        }
+        (bool ok, uint256 fee) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
+
+        assertTrue(ok, "missing prices: ok must be true on success");
+        assertEq(fee, STATIC_SWAP_FEE, "missing prices: must return static fee");
     }
 
     /// Missing external prices path: must either revert *or* return the static fee (both kinds).
@@ -1208,7 +1219,9 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         PoolSwapParams memory p;
         p.amountGivenScaled18 = 1e18; // non-zero trade amount
         p.balancesScaled18 = new uint256[](m);
-        for (uint256 k = 0; k < m; ++k) p.balancesScaled18[k] = b[k];
+        for (uint256 k = 0; k < m; ++k) {
+            p.balancesScaled18[k] = b[k];
+        }
         p.indexIn = i;
         p.indexOut = j;
 
@@ -1222,14 +1235,11 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
     }
 
     // Helper: for invalid shapes, either revert OR return (ok && static fee). Never a non-static fee.
-    function _assertStaticFeeOrRevert(PoolSwapParams memory p) internal {
+    function _assertStaticFeeOrRevert(PoolSwapParams memory p) internal view {
         // Call must be from the Vault (set by the test before invoking this).
-        try hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE) returns (bool ok, uint256 fee) {
-            assertTrue(ok, "invalid shape must not set ok=false");
-            assertEq(fee, STATIC_SWAP_FEE, "invalid shape must not produce a dynamic fee");
-        } catch {
-            // Any revert (including Panic 0x12/0x32 or custom) is acceptable for invalid shapes.
-        }
+        (bool ok, uint256 fee) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
+        assertTrue(ok, "invalid shape must not set ok=false");
+        assertEq(fee, STATIC_SWAP_FEE, "invalid shape must not produce a dynamic fee");
     }
 
     /// Invalid shapes (length mismatch / equal indexes / out-of-bounds) must NEVER
@@ -1255,30 +1265,24 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         p.amountGivenScaled18 = 1e18; // non-zero trade amount
 
         // 1) Wrong length: (m-1 if m>2 else m+1). Keep indices in-bounds for the supplied array.
-        {
-            uint256 badLen = (m > 2) ? (m - 1) : (m + 1);
-            p.balancesScaled18 = new uint256[](badLen);
-            for (uint256 k = 0; k < badLen; ++k) p.balancesScaled18[k] = 1e24 + k;
-            p.indexIn = 0;
-            p.indexOut = (badLen > 1) ? 1 : 0;
-            _assertStaticFeeOrRevert(p);
-        }
+        uint256 badLen = (m > 2) ? (m - 1) : (m + 1);
+        p.balancesScaled18 = new uint256[](badLen);
+        for (uint256 k = 0; k < badLen; ++k) p.balancesScaled18[k] = 1e24 + k;
+        p.indexIn = 0;
+        p.indexOut = (badLen > 1) ? 1 : 0;
+        _assertStaticFeeOrRevert(p);
 
         // 2) Right length but equal indexes (invalid trading pair).
-        {
-            p.balancesScaled18 = goodBalances; // length == m
-            p.indexIn = 0;
-            p.indexOut = 0;
-            _assertStaticFeeOrRevert(p);
-        }
+        p.balancesScaled18 = goodBalances; // length == m
+        p.indexIn = 0;
+        p.indexOut = 0;
+        _assertStaticFeeOrRevert(p);
 
         // 3) Right length but out-of-bounds index relative to the pool size.
-        {
-            p.balancesScaled18 = goodBalances; // length == m
-            p.indexIn = m; // OOB by 1
-            p.indexOut = 0;
-            _assertStaticFeeOrRevert(p);
-        }
+        p.balancesScaled18 = goodBalances; // length == m
+        p.indexIn = m; // OOB by 1
+        p.indexOut = 0;
+        _assertStaticFeeOrRevert(p);
     }
 
     function testFuzz_view_readsLaneParams_and_safePath(uint8 nSeed) public {
@@ -1303,7 +1307,9 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // Build non-zero balances of correct length m
         uint256[] memory balances = new uint256[](m);
-        for (uint256 k = 0; k < m; ++k) balances[k] = 1e24 + k;
+        for (uint256 k = 0; k < m; ++k) {
+            balances[k] = 1e24 + k;
+        }
 
         PoolSwapParams memory p;
         p.amountGivenScaled18 = 1e18; // non-zero trade amount
@@ -1313,26 +1319,14 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // EXACT_IN: either revert or static fee (but never a computed dynamic fee)
         p.kind = SwapKind.EXACT_IN;
-        try hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE) returns (
-            bool okIn,
-            uint256 feeIn
-        ) {
-            assertTrue(okIn, "missing prices: ok must be true on success (IN)");
-            assertEq(feeIn, STATIC_SWAP_FEE, "missing prices: must return static fee (IN)");
-        } catch {
-            /* revert is acceptable on missing prices */
-        }
+        (bool okIn, uint256 feeIn) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
+        assertTrue(okIn, "missing prices: ok must be true on success (IN)");
+        assertEq(feeIn, STATIC_SWAP_FEE, "missing prices: must return static fee (IN)");
 
         // EXACT_OUT: same invariant
         p.kind = SwapKind.EXACT_OUT;
-        try hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE) returns (
-            bool okOut,
-            uint256 feeOut
-        ) {
-            assertTrue(okOut, "missing prices: ok must be true on success (OUT)");
-            assertEq(feeOut, STATIC_SWAP_FEE, "missing prices: must return static fee (OUT)");
-        } catch {
-            /* revert is acceptable on missing prices */
-        }
+        (bool okOut, uint256 feeOut) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
+        assertTrue(okOut, "missing prices: ok must be true on success (OUT)");
+        assertEq(feeOut, STATIC_SWAP_FEE, "missing prices: must return static fee (OUT)");
     }
 }

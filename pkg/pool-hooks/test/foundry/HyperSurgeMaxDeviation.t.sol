@@ -81,9 +81,7 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
             uint256 x = 1e12 + (uint256(keccak256(abi.encode(seed, i))) % (1e24 - 1e12));
             b[i] = x;
         }
-    }
-
-    // Build a locals struct with two overridden prices targeting a desired deviation `D` (1e18 scale).
+    }// Build a locals struct with two overridden prices targeting a desired deviation `D` (1e18 scale).
     // We set pxIn = 1e18 and pxOut so that extPx = pxOut/pxIn = P / (1 + D), using the same divDown rounding.
     function _localsForDeviation(
         uint256 P, // pair spot (1e18)
@@ -712,5 +710,287 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         (, uint256 fee2) = hook.ComputeSurgeFee(L2, p, STATIC_SWAP_FEE);
 
         assertApproxEqAbs(fee1, fee2, 1, "fee must be invariant to balance scaling");
+    }
+
+    
+    struct ExactOutArbLaneBoundaryLocals {
+        uint8 n;
+        uint8 i;
+        uint8 j;
+        uint32 thrOK;
+        uint32 capOK;
+        uint32 maxOK;
+        uint256 thr;
+        uint256 cap;
+        uint256 maxFee;
+        uint256 span;
+        uint256 D;
+        uint256 P;
+        uint256 pxIn;
+        uint256 pxOut;
+        uint256 incMax;
+        uint256 numer;
+        uint256 norm;
+        uint256 inc;
+        uint256 want;
+        uint256 got;
+        uint256 wIn;
+        uint256 wOut;
+        uint256 bIn;
+        uint256 bOut;
+        uint256 rIn;
+        uint256 rOut;
+        uint256 feeA;
+        uint256 feeB;
+        uint256 denom;
+        uint256 extPx;
+    }
+    /// @notice EXACT_OUT (ARB): when deviation is strictly between threshold and cap,
+    ///         the fee must follow the linear ramp for the ARB lane.
+    /// @dev    Detects orientation (pxOut/pxIn vs pxIn/pxOut) by probing the zero-deviation case,
+    ///         then constructs external price for a mid-span deviation D and checks the linear ramp.
+    function testFuzz_feeBetween_linear_exactOut_arbLane_oriented_dropIn(
+        uint8 nSeed,
+        uint256 wSeed,
+        uint256 bSeed,
+        uint256 dSeed
+    ) public {
+        ExactOutArbLaneBoundaryLocals memory X;
+
+        // ---- pool shape & pair selection
+        X.n = uint8(bound(nSeed, 2, 8));
+        X.i = uint8(bound(uint256(keccak256(abi.encode(dSeed, 11))), 0, X.n - 1));
+        X.j = (X.i + 1 + uint8(bound(uint256(keccak256(abi.encode(dSeed, 12))), 0, X.n - 2))) % X.n;
+
+        // ---- weights (positive, not necessarily normalized) and balances (large non-zero)
+        X.wIn = (uint256(keccak256(abi.encode(wSeed, 1))) % 9e17) + 1e16; // [1e16 .. 9e17+)
+        X.wOut = (uint256(keccak256(abi.encode(wSeed, 2))) % 9e17) + 1e16;
+        X.bIn = 1e24 + (uint256(keccak256(abi.encode(bSeed, 3))) % 1e24);
+        X.bOut = 1e24 + (uint256(keccak256(abi.encode(bSeed, 4))) % 1e24);
+
+        // ---- pair spot P = (bOut/wOut) / (bIn/wIn) in 1e18, floor each step
+        uint256 rOut = (X.bOut * 1e18) / X.wOut;
+        uint256 rIn = (X.bIn * 1e18) / X.wIn;
+        vm.assume(rIn > 0);
+        X.P = (rOut * 1e18) / rIn;
+        vm.assume(X.P > 0);
+
+        // ---- ARB lane defaults (ppm9 → 1e18)
+        X.thr = uint256(1_000_000) * 1e9; // 0.1%
+        X.cap = uint256(500_000_000) * 1e9; // 50%
+        X.maxFee = uint256(50_000_000) * 1e9; // 5%
+        X.span = X.cap - X.thr;
+        vm.assume(X.span > 1);
+
+        // ---- choose midpoint deviation D inside the span
+        X.D = X.thr + X.span / 2;
+
+        // ---- detect ARB orientation (which ratio the code interprets as the external price)
+        HyperSurgeHookMock orientMock = new HyperSurgeHookMock(IVault(vault), 0, 0, 0, "arb-orient");
+        PoolSwapParams memory pOrient;
+        pOrient.kind = SwapKind.EXACT_OUT;
+        pOrient.amountGivenScaled18 = 1e18;
+        pOrient.indexIn = X.i;
+        pOrient.indexOut = X.j;
+
+        HyperSurgeHookMock.ComputeSurgeFeeLocals memory LA;
+        LA.pxIn = 1e18;
+        LA.pxOut = X.P;
+        LA.bIn = X.bIn;
+        LA.bOut = X.bOut;
+        LA.wIn = X.wIn;
+        LA.wOut = X.wOut;
+        (, X.feeA) = orientMock.ComputeSurgeFee(LA, pOrient, STATIC_SWAP_FEE);
+
+        HyperSurgeHookMock.ComputeSurgeFeeLocals memory LB;
+        LB.pxIn = X.P;
+        LB.pxOut = 1e18;
+        LB.bIn = X.bIn;
+        LB.bOut = X.bOut;
+        LB.wIn = X.wIn;
+        LB.wOut = X.wOut;
+        (, X.feeB) = orientMock.ComputeSurgeFee(LB, pOrient, STATIC_SWAP_FEE);
+
+        bool usesPxOutOverPxIn;
+        if (X.feeA == STATIC_SWAP_FEE) {
+            usesPxOutOverPxIn = true;
+        } else if (X.feeB == STATIC_SWAP_FEE) {
+            usesPxOutOverPxIn = false;
+        } else {
+            // fallback: pick the one closer to static
+            usesPxOutOverPxIn = (X.feeA <= X.feeB);
+        }
+
+        // ---- build external price for deviation D: extPx = P / (1 + D)
+        X.denom = 1e18 + X.D;
+        X.extPx = (X.P * 1e18) / X.denom;
+        if (X.extPx == 0) X.extPx = 1;
+
+        if (usesPxOutOverPxIn) {
+            X.pxIn = 1e18;
+            X.pxOut = X.extPx;
+        } else {
+            X.pxIn = X.extPx;
+            X.pxOut = 1e18;
+        }
+
+        // ---- run ARB lane on mid-span deviation
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(IVault(vault), 0, 0, 0, "arb-linear");
+        PoolSwapParams memory p;
+        p.kind = SwapKind.EXACT_OUT;
+        p.amountGivenScaled18 = 1e18;
+        p.indexIn = X.i;
+        p.indexOut = X.j;
+
+        HyperSurgeHookMock.ComputeSurgeFeeLocals memory L;
+        L.pxIn = X.pxIn;
+        L.pxOut = X.pxOut;
+        L.bIn = X.bIn;
+        L.bOut = X.bOut;
+        L.wIn = X.wIn;
+        L.wOut = X.wOut;
+
+        (, X.got) = mock.ComputeSurgeFee(L, p, STATIC_SWAP_FEE);
+
+        // ---- expected fee: static + (max - static) * (D - thr) / (cap - thr), floored
+        X.incMax = (X.maxFee > STATIC_SWAP_FEE) ? (X.maxFee - STATIC_SWAP_FEE) : 0;
+        X.numer = (X.D > X.thr) ? (X.D - X.thr) : 0;
+        X.norm = (X.numer * 1e18) / X.span; // 1e18-scaled
+        X.inc = (X.incMax * X.norm) / 1e18;
+        X.want = STATIC_SWAP_FEE + X.inc;
+
+        assertEq(X.got, X.want, "EXACT_OUT (ARB): fee must follow linear ramp between thr and cap");
+    }
+
+
+    
+    /// @notice EXACT_OUT (ARB): boundaries — below threshold returns static fee, at/above cap clamps to max.
+    /// @dev    Orientation is detected at runtime. For the cap side, we overshoot slightly to defeat rounding.
+    function testFuzz_feeBoundaries_exactOut_arbLane_oriented_dropIn(
+        uint8 nSeed,
+        uint256 wSeed,
+        uint256 bSeed,
+        uint256 dSeed
+    ) public {
+        ExactOutArbLaneBoundaryLocals memory X;
+
+        // ---- pool shape & pair selection
+        X.n = uint8(bound(nSeed, 2, 8));
+        X.i = uint8(bound(uint256(keccak256(abi.encode(dSeed, 21))), 0, X.n - 1));
+        X.j = (X.i + 1 + uint8(bound(uint256(keccak256(abi.encode(dSeed, 22))), 0, X.n - 2))) % X.n;
+
+        // ---- weights & balances
+        X.wIn = (uint256(keccak256(abi.encode(wSeed, 1))) % 9e17) + 1e16;
+        X.wOut = (uint256(keccak256(abi.encode(wSeed, 2))) % 9e17) + 1e16;
+        X.bIn = 1e24 + (uint256(keccak256(abi.encode(bSeed, 3))) % 1e24);
+        X.bOut = 1e24 + (uint256(keccak256(abi.encode(bSeed, 4))) % 1e24);
+
+        X.rOut = (X.bOut * 1e18) / X.wOut;
+        X.rIn = (X.bIn * 1e18) / X.wIn;
+        vm.assume(X.rIn > 0);
+        X.P = (X.rOut * 1e18) / X.rIn;
+        vm.assume(X.P > 0);
+
+        // ---- ARB defaults and span
+        X.thr = uint256(1_000_000) * 1e9; // 0.1%
+        X.cap = uint256(500_000_000) * 1e9; // 50%
+        X.maxFee = uint256(50_000_000) * 1e9; // 5%
+        X.span = X.cap - X.thr;
+
+        // ---- detect orientation
+        HyperSurgeHookMock orientMock = new HyperSurgeHookMock(IVault(vault), 0, 0, 0, "arb-orient");
+        PoolSwapParams memory pOrient;
+        pOrient.kind = SwapKind.EXACT_OUT;
+        pOrient.amountGivenScaled18 = 1e18;
+        pOrient.indexIn = X.i;
+        pOrient.indexOut = X.j;
+
+        HyperSurgeHookMock.ComputeSurgeFeeLocals memory LA;
+        LA.pxIn = 1e18;
+        LA.pxOut = X.P;
+        LA.bIn = X.bIn;
+        LA.bOut = X.bOut;
+        LA.wIn = X.wIn;
+        LA.wOut = X.wOut;
+        (, X.feeA) = orientMock.ComputeSurgeFee(LA, pOrient, STATIC_SWAP_FEE);
+
+        HyperSurgeHookMock.ComputeSurgeFeeLocals memory LB;
+        LB.pxIn = X.P;
+        LB.pxOut = 1e18;
+        LB.bIn = X.bIn;
+        LB.bOut = X.bOut;
+        LB.wIn = X.wIn;
+        LB.wOut = X.wOut;
+        (, X.feeB) = orientMock.ComputeSurgeFee(LB, pOrient, STATIC_SWAP_FEE);
+
+        bool usesPxOutOverPxIn = (X.feeA == STATIC_SWAP_FEE) ? true : (X.feeB == STATIC_SWAP_FEE) ? false : (X.feeA <= X.feeB);
+
+        // ---- test (B) below threshold ⇒ static
+        {
+            X.D = X.thr / 2;
+            X.denom = 1e18 + X.D;
+            X.extPx = (X.P * 1e18) / X.denom;
+            if (X.extPx == 0) X.extPx = 1;
+
+            if (usesPxOutOverPxIn) {
+                X.pxIn = 1e18;
+                X.pxOut = X.extPx;
+            } else {
+                X.pxIn = X.extPx;
+                X.pxOut = 1e18;
+            }
+
+            HyperSurgeHookMock mockLow = new HyperSurgeHookMock(IVault(vault), 0, 0, 0, "arb-bounds-low");
+            PoolSwapParams memory pLow;
+            pLow.kind = SwapKind.EXACT_OUT;
+            pLow.amountGivenScaled18 = 1e18;
+            pLow.indexIn = X.i;
+            pLow.indexOut = X.j;
+
+            HyperSurgeHookMock.ComputeSurgeFeeLocals memory LLow;
+            LLow.pxIn = X.pxIn;
+            LLow.pxOut = X.pxOut;
+            LLow.bIn = X.bIn;
+            LLow.bOut = X.bOut;
+            LLow.wIn = X.wIn;
+            LLow.wOut = X.wOut;
+
+            (, X.got) = mockLow.ComputeSurgeFee(LLow, pLow, STATIC_SWAP_FEE);
+            assertEq(X.got, STATIC_SWAP_FEE, "EXACT_OUT (ARB): below threshold must return static fee");
+        }
+
+        // ---- test (A) at/above cap ⇒ max (overshoot by +10% of span to defeat rounding)
+        {
+            X.D = X.cap + (X.span / 10);
+            uint256 denom = 1e18 + X.D;
+            uint256 extPx = (X.P * 1e18) / denom;
+            if (extPx == 0) extPx = 1;
+
+            if (usesPxOutOverPxIn) {
+                X.pxIn = 1e18;
+                X.pxOut = extPx;
+            } else {
+                X.pxIn = extPx;
+                X.pxOut = 1e18;
+            }
+
+            HyperSurgeHookMock mockHi = new HyperSurgeHookMock(IVault(vault), 0, 0, 0, "arb-bounds-hi");
+            PoolSwapParams memory pHi;
+            pHi.kind = SwapKind.EXACT_OUT;
+            pHi.amountGivenScaled18 = 1e18;
+            pHi.indexIn = X.i;
+            pHi.indexOut = X.j;
+
+            HyperSurgeHookMock.ComputeSurgeFeeLocals memory LHi;
+            LHi.pxIn = X.pxIn;
+            LHi.pxOut = X.pxOut;
+            LHi.bIn = X.bIn;
+            LHi.bOut = X.bOut;
+            LHi.wIn = X.wIn;
+            LHi.wOut = X.wOut;
+
+            (, X.got) = mockHi.ComputeSurgeFee(LHi, pHi, STATIC_SWAP_FEE);
+            assertEq(X.got, X.maxFee, "EXACT_OUT (ARB): at/above cap must clamp to max");
+        }
     }
 }

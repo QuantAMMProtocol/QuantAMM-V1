@@ -69,8 +69,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     struct TokenPriceCfg {
         uint32 pairIndex;
-        uint32 priceDivisor; // precomputed: 10**(6 - szDecimals) (or LUT equivalent)
-        // remaining bytes pack into same 32-byte slot
+        uint32 priceDivisor;
     }
 
     struct PoolDetails {
@@ -80,24 +79,21 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint32 noiseMaxSurgeFeePercentage;
         uint32 noiseThresholdPercentage;
         uint32 noiseCapDeviationPercentage;
-        uint8 numTokens; // 2..8 inclusive
+        uint8 numTokens;
         bool initialized;
     }
 
     struct PoolCfg {
         PoolDetails details;
-        TokenPriceCfg[8] tokenCfg; // per-index config
+        TokenPriceCfg[8] tokenCfg;
     }
 
     mapping(address => PoolCfg) private _poolCfg;
 
-    ///@dev Default in 1e18
     uint256 private immutable _defaultMaxSurgeFee;
 
-    ///@dev Default in 1e18
     uint256 private immutable _defaultThreshold;
 
-    ///@dev Default in 1e18
     uint256 private immutable _defaultCapDeviation;
 
     constructor(
@@ -137,11 +133,13 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             details.noiseMaxSurgeFeePercentage = _defaultMaxSurgeFee.toUint32();
             details.noiseThresholdPercentage = _defaultThreshold.toUint32();
             details.noiseCapDeviationPercentage = _defaultCapDeviation.toUint32();
-            details.numTokens = uint8(tokenCfgs.length);
-            details.initialized = true;
 
-            //TODO given the only vault modifier I dont think we need to check if it is already initialised
+            //TODO is num tokens reliably the pool length?
+            details.numTokens = uint8(tokenCfgs.length);
+
+            details.initialized = true;
             _poolCfg[pool].details = details;
+
         } else {
             revert NumTokensOutOfRange();
         }
@@ -158,19 +156,23 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint8 tokenIndex,
         uint32 pairIdx
     ) external onlySwapFeeManagerOrGovernance(pool) {
+        //TODO should this be done on construction? Not sure there is any reason to change it
+        //or at least be blocked once set
+        TokenPriceCfg memory tempCfg;
         PoolDetails memory details = _poolCfg[pool].details;
 
-        if (!details.initialized) revert PoolNotInitialized();
-        if (tokenIndex >= details.numTokens) revert TokenIndexOutOfRange();
-
-        TokenPriceCfg memory tempCfg;
-        uint8 sz = 0; // default for USD quoted
+        if (!details.initialized) {
+            revert PoolNotInitialized();
+        }
+        if (tokenIndex >= details.numTokens) {
+            revert TokenIndexOutOfRange();
+        }
 
         if (pairIdx == 0) {
             revert InvalidPairIndex();
         }
 
-        sz = HyperTokenInfo.szDecimals(pairIdx); // may revert "dec"
+        uint8 sz = HyperTokenInfo.szDecimals(pairIdx); // may revert "dec"
 
         if (sz > 6) {
             revert InvalidDecimals();
@@ -185,11 +187,9 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     }
 
     struct SetBatchConfigs {
-        uint8 idx;
         uint8 sz;
         TokenPriceCfg tempCfg;
         uint256 i;
-        uint256 len;
     }
 
     /// @notice Batch version (indices).
@@ -201,26 +201,28 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint8[] calldata tokenIndices,
         uint32[] calldata pairIdx
     ) external onlySwapFeeManagerOrGovernance(pool) {
+        //TODO should this be done on construction? Not sure there is any reason to change it
+        //or at least be blocked once set
         PoolDetails memory detail = _poolCfg[pool].details;
-        if (!detail.initialized) revert PoolNotInitialized();
         SetBatchConfigs memory cfg;
+
+        if (!detail.initialized) {
+            revert PoolNotInitialized();
+        }
 
         if (tokenIndices.length != pairIdx.length) {
             revert InvalidArrayLengths();
         }
-        cfg.len = tokenIndices.length;
 
-        for (cfg.i = 0; cfg.i < cfg.len; ) {
-            cfg.idx = tokenIndices[cfg.i];
-
-            if (cfg.idx >= detail.numTokens) {
+        for (cfg.i = 0; cfg.i < tokenIndices.length; ) {
+            if (tokenIndices[cfg.i] >= detail.numTokens) {
                 revert TokenIndexOutOfRange();
             }
 
-            cfg.sz = 0;
             if (pairIdx[cfg.i] == 0) {
                 revert InvalidPairIndex();
             }
+
             cfg.sz = HyperTokenInfo.szDecimals(pairIdx[cfg.i]); // may revert "dec"
 
             if (cfg.sz > 6) {
@@ -230,9 +232,9 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             cfg.tempCfg.pairIndex = pairIdx[cfg.i];
             cfg.tempCfg.priceDivisor = _divisorFromSz(cfg.sz);
 
-            _poolCfg[pool].tokenCfg[cfg.idx] = cfg.tempCfg;
+            _poolCfg[pool].tokenCfg[tokenIndices[cfg.i]] = cfg.tempCfg;
 
-            emit TokenPriceConfiguredIndex(pool, cfg.idx, cfg.tempCfg.pairIndex, cfg.sz);
+            emit TokenPriceConfiguredIndex(pool, tokenIndices[cfg.i], cfg.tempCfg.pairIndex, cfg.sz);
 
             unchecked {
                 ++cfg.i;
@@ -247,11 +249,13 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         TradeType tradeType
     ) external override onlySwapFeeManagerOrGovernance(pool) {
         _ensureValidPct(pct);
+
         if (tradeType == TradeType.ARBITRAGE) {
             _poolCfg[pool].details.arbMaxSurgeFeePercentage = pct.toUint32();
         } else {
             _poolCfg[pool].details.noiseMaxSurgeFeePercentage = pct.toUint32();
         }
+
         emit MaxSurgeFeePercentageChanged(msg.sender, pool, pct, tradeType);
     }
 
@@ -271,6 +275,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             capDev = uint256(_poolCfg[pool].details.noiseCapDeviationPercentage);
         }
 
+        //could be done before with two if/elses but more compact code this way
         if (capDev != 0 && pct >= capDev) {
             revert InvalidThresholdDeviation();
         }
@@ -324,13 +329,15 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
         // Proportional add is always allowed.
         if (kind == AddLiquidityKind.PROPORTIONAL) {
+            //TODO do we need to check amounts are actually proportional?
             return (true, amountsInRaw);
         }
 
         locals.oldBalances = new uint256[](balancesScaled18.length);
-        for (uint256 i = 0; i < balancesScaled18.length; ++i) {
+        for (uint256 i = 0; i < balancesScaled18.length; ) {
+            locals.oldBalances[i] = balancesScaled18[i] - amountsInScaled18[i];
             unchecked {
-                locals.oldBalances[i] = balancesScaled18[i] - amountsInScaled18[i];
+                ++i;
             }
         }
 
@@ -381,17 +388,20 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
 
         locals.n = balancesScaled18.length;
-        if (locals.n < 2) return (true, amountsOutRaw);
+        if (locals.n < 2) {
+            return (true, amountsOutRaw);
+        }
 
         // Reconstruct pre-remove balances = post + out; if addition overflows, allow.
         locals.oldBalances = new uint256[](locals.n);
-        for (uint256 i = 0; i < locals.n; ++i) {
+        for (uint256 i = 0; i < locals.n; ) {
+            uint256 b = balancesScaled18[i] + amountsOutScaled18[i];
+            if (b < balancesScaled18[i]) {
+                return (true, amountsOutRaw); // overflow wrap -> allow
+            }
+            locals.oldBalances[i] = b;
             unchecked {
-                uint256 b = balancesScaled18[i] + amountsOutScaled18[i];
-                if (b < balancesScaled18[i]) {
-                    return (true, amountsOutRaw); // overflow wrap -> allow
-                }
-                locals.oldBalances[i] = b;
+                ++i;
             }
         }
 
@@ -454,27 +464,27 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         pairIndexArr = new uint32[](details.numTokens);
         priceDivisorArr = new uint32[](details.numTokens);
 
-        for (uint8 i = 0; i < details.numTokens; ++i) {
+        for (uint8 i = 0; i < details.numTokens; ) {
             TokenPriceCfg memory cfg = _poolCfg[pool].tokenCfg[i];
             pairIndexArr[i] = cfg.pairIndex;
             priceDivisorArr[i] = cfg.priceDivisor;
+            unchecked {
+                ++i;
+            }
         }
     }
 
     ///@inheritdoc IHyperSurgeHook
     function getDefaultMaxSurgeFeePercentage() external view override returns (uint256) {
-        //already in 1e18 no need to convert
         return _defaultMaxSurgeFee * 1e9;
     }
 
     ///@inheritdoc IHyperSurgeHook
     function getDefaultSurgeThresholdPercentage() external view override returns (uint256) {
-        //already in 1e18 no need to convert
         return _defaultThreshold * 1e9;
     }
 
     function getDefaultCapDeviationPercentage() external view override returns (uint256) {
-        //already in 1e18 no need to convert
         return _defaultCapDeviation * 1e9;
     }
 
@@ -548,13 +558,14 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
         locals.rawIn = HyperPrice.spot(pInCfg.pairIndex);
         locals.rawOut = HyperPrice.spot(pOutCfg.pairIndex);
+
         if (locals.rawIn == 0 || locals.rawOut == 0) {
             // Missing oracle data: safe path returns the pool’s static fee.
             return (true, staticSwapFee);
         }
-        
-        locals.pxIn = (uint256(locals.rawIn) * 1e18) / uint256(pInCfg.priceDivisor);
-        locals.pxOut = (uint256(locals.rawOut) * 1e18) / uint256(pOutCfg.priceDivisor);
+
+        locals.pxIn = (uint256(locals.rawIn) * 1e18).divDown(uint256(pInCfg.priceDivisor));
+        locals.pxOut = (uint256(locals.rawOut) * 1e18).divDown(uint256(pOutCfg.priceDivisor));
 
         //Do not block if there is an issue with the hyperliquid price
         if (locals.pxIn == 0 || locals.pxOut == 0) {
@@ -624,7 +635,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
 
         locals.span = locals.capDevPct - locals.threshold; // > 0 by fallback above
-
         locals.norm = (locals.deviation - locals.threshold).divDown(locals.span);
 
         if (locals.norm > FixedPoint.ONE) {
@@ -712,7 +722,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
 
         // Build external prices per token (1e18). Missing/zero -> mark as 0 (skipped).
-        for (locals.i = 0; locals.i < balancesScaled18.length; ++locals.i) {
+        for (locals.i = 0; locals.i < balancesScaled18.length; ) {
             TokenPriceCfg memory cfg = pc.tokenCfg[locals.i];
             if (cfg.pairIndex != 0) {
                 locals.raw = HyperPrice.spot(cfg.pairIndex); // reverts if precompile fails
@@ -722,6 +732,10 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
                         locals.px[locals.i] = (uint256(locals.raw) * 1e18) / uint256(cfg.priceDivisor);
                     }
                 }
+            }
+
+            unchecked {
+                ++locals.i;
             }
         }
 

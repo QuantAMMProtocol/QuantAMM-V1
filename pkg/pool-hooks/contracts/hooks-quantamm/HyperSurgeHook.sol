@@ -329,7 +329,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
         // Proportional add is always allowed.
         if (kind == AddLiquidityKind.PROPORTIONAL) {
-            //TODO do we need to check amounts are actually proportional?
             return (true, amountsInRaw);
         }
 

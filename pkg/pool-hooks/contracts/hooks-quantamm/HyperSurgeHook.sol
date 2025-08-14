@@ -431,7 +431,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         pairIndexArr = new uint32[](details.numTokens);
         priceDivisorArr = new uint32[](details.numTokens);
 
-        for (uint8 i = 0; i < details.numTokens; ) {
+        for (uint8 i = 0; i < details.numTokens; ++i) {
             TokenPriceCfg memory cfg = _poolCfg[pool].tokenCfg[i];
             pairIndexArr[i] = cfg.pairIndex;
             priceDivisorArr[i] = cfg.priceDivisor;

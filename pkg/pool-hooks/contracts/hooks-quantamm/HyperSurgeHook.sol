@@ -373,7 +373,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         bytes memory // userData (unused)
     ) public view override returns (bool success, uint256[] memory hookAdjustedAmountsOutRaw) {
         RemoveLiquidityLocals memory locals;
-
+        locals.n = balancesScaled18.length;
         // Proportional remove is always allowed. should we check?
         if (kind == RemoveLiquidityKind.PROPORTIONAL) {
             return (true, amountsOutRaw);

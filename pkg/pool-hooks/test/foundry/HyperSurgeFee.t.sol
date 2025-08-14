@@ -1248,15 +1248,11 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
     function testFuzz_view_invalidShapes_staticOrRevert(uint8 nSeed) public {
         uint8 nTarget = uint8(bound(nSeed, 2, 8));
         _registerBasePoolWithN(nTarget);
-
-        // Adapt to the pool’s *actual* token count to avoid OOB surprises.
-        uint256[] memory weights = WeightedPool(address(pool)).getNormalizedWeights();
-        uint256 m = weights.length;
-        assertGe(m, 2, "pool must have at least 2 tokens");
+        assertGe(nTarget, 2, "pool must have at least 2 tokens");
 
         // Good non-zero balances to avoid accidental /0 from zeros.
-        uint256[] memory goodBalances = new uint256[](m);
-        for (uint256 k = 0; k < m; ++k) {
+        uint256[] memory goodBalances = new uint256[](nTarget);
+        for (uint256 k = 0; k < nTarget; ++k) {
             goodBalances[k] = 1e24 + k;
         }
 
@@ -1264,8 +1260,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         p.kind = SwapKind.EXACT_IN;
         p.amountGivenScaled18 = 1e18; // non-zero trade amount
 
-        // 1) Wrong length: (m-1 if m>2 else m+1). Keep indices in-bounds for the supplied array.
-        uint256 badLen = (m > 2) ? (m - 1) : (m + 1);
+        // 1) Wrong length: (nTarget-1 if nTarget>2 else nTarget+1). Keep indices in-bounds for the supplied array.
+        uint256 badLen = (nTarget > 2) ? (nTarget - 1) : (nTarget + 1);
         p.balancesScaled18 = new uint256[](badLen);
         for (uint256 k = 0; k < badLen; ++k) p.balancesScaled18[k] = 1e24 + k;
         p.indexIn = 0;
@@ -1273,14 +1269,14 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         _assertStaticFeeOrRevert(p);
 
         // 2) Right length but equal indexes (invalid trading pair).
-        p.balancesScaled18 = goodBalances; // length == m
+        p.balancesScaled18 = goodBalances; // length == nTarget
         p.indexIn = 0;
         p.indexOut = 0;
         _assertStaticFeeOrRevert(p);
 
         // 3) Right length but out-of-bounds index relative to the pool size.
-        p.balancesScaled18 = goodBalances; // length == m
-        p.indexIn = m; // OOB by 1
+        p.balancesScaled18 = goodBalances; // length == nTarget
+        p.indexIn = nTarget; // OOB by 1
         p.indexOut = 0;
         _assertStaticFeeOrRevert(p);
     }

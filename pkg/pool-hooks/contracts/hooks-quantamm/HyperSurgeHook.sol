@@ -374,9 +374,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         locals.oldBalances = new uint256[](locals.n);
         for (uint256 i = 0; i < locals.n; ++i) {
             locals.oldBalances[i] = balancesScaled18[i] + amountsOutScaled18[i];
-            unchecked {
-                ++i;
-            }
         }
 
         uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();

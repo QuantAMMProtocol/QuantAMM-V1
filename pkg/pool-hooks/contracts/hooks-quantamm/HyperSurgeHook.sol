@@ -124,7 +124,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         address pool,
         TokenConfig[] memory tokenCfgs,
         LiquidityManagement calldata
-    ) public override onlyVault returns (bool) {
+    ) external override onlyVault returns (bool) {
         PoolDetails memory details;
         if (tokenCfgs.length >= 2 && tokenCfgs.length <= 8) {
             details.arbMaxSurgeFeePercentage = _defaultMaxSurgeFee.toUint32();

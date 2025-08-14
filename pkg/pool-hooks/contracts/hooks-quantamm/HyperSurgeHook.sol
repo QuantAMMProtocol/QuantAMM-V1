@@ -213,7 +213,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             revert InvalidArrayLengths();
         }
 
-        for (cfg.i = 0; cfg.i < tokenIndices.length; ) {
+        for (cfg.i = 0; cfg.i < tokenIndices.length; ++cfg.i) {
             if (tokenIndices[cfg.i] >= detail.numTokens) {
                 revert TokenIndexOutOfRange();
             }

@@ -324,7 +324,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256, // lpAmount (unused)
         uint256[] memory balancesScaled18,
         bytes memory // userData (unused)
-    ) public override returns (bool success, uint256[] memory hookAdjustedAmountsInRaw) {
+    ) public view override returns (bool success, uint256[] memory hookAdjustedAmountsInRaw) {
         AddLiquidityLocals memory locals;
 
         // Proportional add is always allowed.
@@ -349,10 +349,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         // Block only if deviation worsens AND exceeds threshold after the change.
         locals.isWorseningSurge = (locals.afterDev > locals.beforeDev) && (locals.afterDev > locals.threshold);
 
-        if (locals.isWorseningSurge) {
-            emit LiquidityBlocked(sender, pool, /*isAdd=*/ true, locals.beforeDev, locals.afterDev, locals.threshold);
-        }
-
         return (!locals.isWorseningSurge, amountsInRaw);
     }
 
@@ -375,21 +371,16 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256[] memory amountsOutRaw,
         uint256[] memory balancesScaled18,
         bytes memory // userData (unused)
-    ) public override returns (bool success, uint256[] memory hookAdjustedAmountsOutRaw) {
+    ) public view override returns (bool success, uint256[] memory hookAdjustedAmountsOutRaw) {
         RemoveLiquidityLocals memory locals;
 
-        // Proportional remove is always allowed.
+        // Proportional remove is always allowed. should we check?
         if (kind == RemoveLiquidityKind.PROPORTIONAL) {
             return (true, amountsOutRaw);
         }
 
         if (amountsOutScaled18.length != balancesScaled18.length) {
-            return (true, amountsOutRaw);
-        }
-
-        locals.n = balancesScaled18.length;
-        if (locals.n < 2) {
-            return (true, amountsOutRaw);
+            return (false, amountsOutRaw);
         }
 
         // Reconstruct pre-remove balances = post + out; if addition overflows, allow.
@@ -411,10 +402,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         locals.threshold = getSurgeThresholdPercentage(pool, TradeType.NOISE);
 
         locals.isWorseningSurge = (locals.afterDev > locals.beforeDev) && (locals.afterDev > locals.threshold);
-
-        if (locals.isWorseningSurge) {
-            emit LiquidityBlocked(sender, pool, false, locals.beforeDev, locals.afterDev, locals.threshold);
-        }
 
         return (!locals.isWorseningSurge, amountsOutRaw);
     }

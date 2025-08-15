@@ -501,7 +501,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             return (false, staticSwapFee);
         }
 
-
         uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
         locals.wIn = weights[p.indexIn];
         locals.wOut = weights[p.indexOut];

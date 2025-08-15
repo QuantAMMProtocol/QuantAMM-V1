@@ -506,10 +506,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         locals.wIn = weights[p.indexIn];
         locals.wOut = weights[p.indexOut];
 
-        //TODO overkill check? wont it just throw if the index is out of bounds?
-        if (weights.length <= p.indexIn || weights.length <= p.indexOut) {
-            return (true, staticSwapFee);
-        }
 
         locals.calcAmountScaled18 = WeightedPool(pool).onSwap(p);
 

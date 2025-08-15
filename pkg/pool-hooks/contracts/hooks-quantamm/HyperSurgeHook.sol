@@ -112,7 +112,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     }
 
     ///@inheritdoc IHooks
-    function getHookFlags() external pure override returns (HookFlags memory hookFlags) {
+    function getHookFlags() public pure override returns (HookFlags memory hookFlags) {
         hookFlags.shouldCallComputeDynamicSwapFee = true;
         hookFlags.shouldCallAfterAddLiquidity = true;
         hookFlags.shouldCallAfterRemoveLiquidity = true;
@@ -124,7 +124,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         address pool,
         TokenConfig[] memory tokenCfgs,
         LiquidityManagement calldata
-    ) external override onlyVault returns (bool) {
+    ) public override onlyVault returns (bool) {
         PoolDetails memory details;
         if (tokenCfgs.length >= 2 && tokenCfgs.length <= 8) {
             details.arbMaxSurgeFeePercentage = _defaultMaxSurgeFee.toUint32();

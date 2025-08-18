@@ -408,7 +408,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint8 tokenIndex
     ) external view override returns (uint32 pairIndex, uint32 priceDivisor) {
         TokenPriceCfg memory cfg = _poolCfg[pool].tokenCfg[tokenIndex];
-        return (cfg.pairIndex,  _divisorFromSz(cfg.sz));
+        return (cfg.pairIndex, _divisorFromSz(cfg.sz));
     }
 
     ///@inheritdoc IHyperSurgeHook

@@ -81,7 +81,8 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
             uint256 x = 1e12 + (uint256(keccak256(abi.encode(seed, i))) % (1e24 - 1e12));
             b[i] = x;
         }
-    }// Build a locals struct with two overridden prices targeting a desired deviation `D` (1e18 scale).
+    } // Build a locals struct with two overridden prices targeting a desired deviation `D` (1e18 scale).
+
     // We set pxIn = 1e18 and pxOut so that extPx = pxOut/pxIn = P / (1 + D), using the same divDown rounding.
     function _localsForDeviation(
         uint256 P, // pair spot (1e18)
@@ -712,7 +713,6 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         assertApproxEqAbs(fee1, fee2, 1, "fee must be invariant to balance scaling");
     }
 
-    
     struct ExactOutArbLaneBoundaryLocals {
         uint8 n;
         uint8 i;

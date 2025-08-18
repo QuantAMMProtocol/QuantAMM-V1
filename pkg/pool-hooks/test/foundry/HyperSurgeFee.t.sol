@@ -392,125 +392,126 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         assertGe(dyn, params.staticFee, "dyn fee >= static fee");
     }
 
-        // Pack locals to avoid stack-too-deep
-        struct FailureCtx {
-            uint256 n;
-            uint8 indexIn;
-            uint8 indexOut;
-            // price source (HL) config
-            uint32 pairIdx;
-            uint8 sz;
-            // fee knobs (1e9 scale)
-            uint256 maxPct;
-            uint256 thr;
-            uint256 cap;
-            uint256 staticFee;
-            // balances + limits
-            uint256[] balances;
-            uint256 maxRatio; // 30e16 (30% in 1e18 basis)
-            uint256 maxIn;
-            // results
-            bool ok;
-            uint256 dyn;
-            uint256 max9;
-            uint256 thr9;
-            uint256 cap9;
-            uint256 capRoom;
-            uint256 staticSeed;
-            uint256 i;
-            uint256 amtSeed;
+    // Pack locals to avoid stack-too-deep
+    struct FailureCtx {
+        uint256 n;
+        uint8 indexIn;
+        uint8 indexOut;
+        // price source (HL) config
+        uint32 pairIdx;
+        uint8 sz;
+        // fee knobs (1e9 scale)
+        uint256 maxPct;
+        uint256 thr;
+        uint256 cap;
+        uint256 staticFee;
+        // balances + limits
+        uint256[] balances;
+        uint256 maxRatio; // 30e16 (30% in 1e18 basis)
+        uint256 maxIn;
+        // results
+        bool ok;
+        uint256 dyn;
+        uint256 max9;
+        uint256 thr9;
+        uint256 cap9;
+        uint256 capRoom;
+        uint256 staticSeed;
+        uint256 i;
+        uint256 amtSeed;
+    }
+
+    function testFuzz_hyper_price_spot_failure_marker(uint256 marker) public {
+        // Keep the seed bounded and lively
+        marker = bound(marker, 4, type(uint32).max - 1);
+
+        FailureCtx memory locals;
+
+        // 1) Pool size
+        locals.n = WeightedPool(address(pool)).getNormalizedWeights().length;
+        assertGe(locals.n, 2, "pool must have >=2 tokens");
+        require(locals.n <= 8, "hook supports up to 8");
+
+        // 2) Register hook with exactly N TokenConfig entries
+        TokenConfig[] memory cfg = new TokenConfig[](locals.n);
+        LiquidityManagement memory lm;
+        vm.prank(address(vault));
+        assertTrue(hook.onRegister(poolFactory, address(pool), cfg, lm), "onRegister failed");
+
+        // 3) Build VALID lane params (9), then upscale ONCE to 18dp
+        //    max9 ∈ [1..1e9], thr9 ∈ [1..max9], cap9 ∈ (thr9..1e9]
+        locals.max9 = 1 + (marker % 1_000_000_000); // avoid 0
+        locals.thr9 = 1 + ((marker >> 8) % locals.max9); // ≥1 and ≤ max9
+        locals.capRoom = 1_000_000_000 - locals.thr9; // room above thr
+        locals.cap9 = locals.thr9 + 1; // strictly > thr
+        if (locals.capRoom > 0) {
+            locals.cap9 = locals.thr9 + 1 + ((marker >> 16) % locals.capRoom); // (thr9, 1e9]
+        }
+        if (locals.cap9 > 1_000_000_000) locals.cap9 = 1_000_000_000; // clamp just in case
+
+        // Upscale once to 18dp
+        locals.maxPct = locals.max9 * 1e9;
+        locals.thr = locals.thr9 * 1e9;
+        locals.cap = locals.cap9 * 1e9;
+
+        // static fee (18dp) ∈ [0..maxPct18]
+        uint256 staticSeed = (uint256(keccak256(abi.encodePacked(marker))) << 32) | marker;
+        locals.staticFee = bound(staticSeed, 0, locals.maxPct);
+
+        vm.startPrank(admin);
+        // Set both lanes using 18dp values
+        hook.setMaxSurgeFeePercentage(address(pool), locals.maxPct, IHyperSurgeHook.TradeType.ARBITRAGE);
+        hook.setSurgeThresholdPercentage(address(pool), locals.thr, IHyperSurgeHook.TradeType.ARBITRAGE);
+        hook.setCapDeviationPercentage(address(pool), locals.cap, IHyperSurgeHook.TradeType.ARBITRAGE);
+
+        hook.setMaxSurgeFeePercentage(address(pool), locals.maxPct, IHyperSurgeHook.TradeType.NOISE);
+        hook.setSurgeThresholdPercentage(address(pool), locals.thr, IHyperSurgeHook.TradeType.NOISE);
+        hook.setCapDeviationPercentage(address(pool), locals.cap, IHyperSurgeHook.TradeType.NOISE);
+        vm.stopPrank();
+
+        // 4) Configure price sources for the two indices we’ll use
+        locals.indexIn = 0;
+        locals.indexOut = uint8(1 + (marker % (locals.n - 1))); // ∈ [1, n-1]
+        locals.pairIdx = 2; // any non-zero pair id for HL
+        locals.sz = uint8((marker >> 16) % 7); // 0..6
+
+        _hlSetSzDecimals(locals.pairIdx, locals.sz);
+        _hlSetSpot(locals.pairIdx, 0); // spot=0 → hook may return (ok=false), but must not revert
+
+        vm.startPrank(admin);
+        hook.setTokenPriceConfigIndex(address(pool), locals.indexIn, locals.pairIdx);
+        hook.setTokenPriceConfigIndex(address(pool), locals.indexOut, locals.pairIdx);
+        vm.stopPrank();
+
+        // 5) Balances array of length N (ascending 1e18, 2e18, ...)
+        locals.balances = new uint256[](locals.n);
+        for (locals.i = 0; locals.i < locals.n; ++locals.i) {
+            locals.balances[locals.i] = 1e18 * (locals.i + 1);
         }
 
-        function testFuzz_hyper_price_spot_failure_marker(uint256 marker) public {
-            // Keep the seed bounded and lively
-            marker = bound(marker, 4, type(uint32).max - 1);
+        // 6) Build swap params (EXACT_IN), amount within 30% guard
+        PoolSwapParams memory p;
+        p.kind = SwapKind.EXACT_IN;
+        p.balancesScaled18 = locals.balances;
+        p.indexIn = locals.indexIn;
+        p.indexOut = locals.indexOut;
 
-            FailureCtx memory locals;
-
-            // 1) Pool size
-            locals.n = WeightedPool(address(pool)).getNormalizedWeights().length;
-            assertGe(locals.n, 2, "pool must have >=2 tokens");
-            require(locals.n <= 8, "hook supports up to 8");
-
-            // 2) Register hook with exactly N TokenConfig entries
-            TokenConfig[] memory cfg = new TokenConfig[](locals.n);
-            LiquidityManagement memory lm;
-            vm.prank(address(vault));
-            assertTrue(hook.onRegister(poolFactory, address(pool), cfg, lm), "onRegister failed");
-
-            // 3) Build VALID lane params (9), then upscale ONCE to 18dp
-            //    max9 ∈ [1..1e9], thr9 ∈ [1..max9], cap9 ∈ (thr9..1e9]
-            locals.max9 = 1 + (marker % 1_000_000_000); // avoid 0
-            locals.thr9 = 1 + ((marker >> 8) % locals.max9); // ≥1 and ≤ max9
-            locals.capRoom = 1_000_000_000 - locals.thr9; // room above thr
-            locals.cap9 = locals.thr9 + 1; // strictly > thr
-            if (locals.capRoom > 0) {
-                locals.cap9 = locals.thr9 + 1 + ((marker >> 16) % locals.capRoom); // (thr9, 1e9]
-            }
-            if (locals.cap9 > 1_000_000_000) locals.cap9 = 1_000_000_000; // clamp just in case
-
-            // Upscale once to 18dp
-            locals.maxPct = locals.max9 * 1e9;
-            locals.thr = locals.thr9 * 1e9;
-            locals.cap = locals.cap9 * 1e9;
-
-            // static fee (18dp) ∈ [0..maxPct18]
-            uint256 staticSeed = (uint256(keccak256(abi.encodePacked(marker))) << 32) | marker;
-            locals.staticFee = bound(staticSeed, 0, locals.maxPct);
-
-            vm.startPrank(admin);
-            // Set both lanes using 18dp values
-            hook.setMaxSurgeFeePercentage(address(pool), locals.maxPct, IHyperSurgeHook.TradeType.ARBITRAGE);
-            hook.setSurgeThresholdPercentage(address(pool), locals.thr, IHyperSurgeHook.TradeType.ARBITRAGE);
-            hook.setCapDeviationPercentage(address(pool), locals.cap, IHyperSurgeHook.TradeType.ARBITRAGE);
-
-            hook.setMaxSurgeFeePercentage(address(pool), locals.maxPct, IHyperSurgeHook.TradeType.NOISE);
-            hook.setSurgeThresholdPercentage(address(pool), locals.thr, IHyperSurgeHook.TradeType.NOISE);
-            hook.setCapDeviationPercentage(address(pool), locals.cap, IHyperSurgeHook.TradeType.NOISE);
-            vm.stopPrank();
-
-            // 4) Configure price sources for the two indices we’ll use
-            locals.indexIn = 0;
-            locals.indexOut = uint8(1 + (marker % (locals.n - 1))); // ∈ [1, n-1]
-            locals.pairIdx = 2; // any non-zero pair id for HL
-            locals.sz = uint8((marker >> 16) % 7); // 0..6
-
-            _hlSetSzDecimals(locals.pairIdx, locals.sz);
-            _hlSetSpot(locals.pairIdx, 0); // spot=0 → hook may return (ok=false), but must not revert
-
-            vm.startPrank(admin);
-            hook.setTokenPriceConfigIndex(address(pool), locals.indexIn, locals.pairIdx);
-            hook.setTokenPriceConfigIndex(address(pool), locals.indexOut, locals.pairIdx);
-            vm.stopPrank();
-
-            // 5) Balances array of length N (ascending 1e18, 2e18, ...)
-            locals.balances = new uint256[](locals.n);
-            for (locals.i = 0; locals.i < locals.n; ++locals.i) {
-                locals.balances[locals.i] = 1e18 * (locals.i + 1);
-            }
-
-            // 6) Build swap params (EXACT_IN), amount within 30% guard
-            PoolSwapParams memory p;
-            p.kind = SwapKind.EXACT_IN;
-            p.balancesScaled18 = locals.balances;
-            p.indexIn = locals.indexIn;
-            p.indexOut = locals.indexOut;
-
-            locals.maxRatio = 30e16; // 30% in 1e18 basis
-            locals.maxIn = (locals.balances[p.indexIn] * locals.maxRatio) / 1e18;
-            if (locals.maxIn > 0) {locals.maxIn -= 1;}
-
-            locals.amtSeed = (marker << 32) | marker;
-            p.amountGivenScaled18 = bound(locals.amtSeed, 1, locals.maxIn == 0 ? 1 : locals.maxIn);
-
-            (locals.ok, locals.dyn) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), locals.staticFee);
-
-            // If ok=false (spot=0 path), that's fine; just ensure no revert. If ok=true, fee ≤ 100%.
-            if (locals.ok) {
-                assertLe(locals.dyn, 1e18, "fee must be <= 100%");
-            }
+        locals.maxRatio = 30e16; // 30% in 1e18 basis
+        locals.maxIn = (locals.balances[p.indexIn] * locals.maxRatio) / 1e18;
+        if (locals.maxIn > 0) {
+            locals.maxIn -= 1;
         }
 
+        locals.amtSeed = (marker << 32) | marker;
+        p.amountGivenScaled18 = bound(locals.amtSeed, 1, locals.maxIn == 0 ? 1 : locals.maxIn);
+
+        (locals.ok, locals.dyn) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), locals.staticFee);
+
+        // If ok=false (spot=0 path), that's fine; just ensure no revert. If ok=true, fee ≤ 100%.
+        if (locals.ok) {
+            assertLe(locals.dyn, 1e18, "fee must be <= 100%");
+        }
+    }
 
     /* ================================
        =     FEE ENGINE – HELPERS     =

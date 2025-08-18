@@ -589,7 +589,6 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.stopPrank();
     }
 
-
     /// @notice Batch token price config: valid rows are persisted with correct pair ids and divisors.
     /// @dev Bounds: `len ∈ [1,n]`. Confirms unset indices remain zero.
     /// @param n Pool size (2..8).

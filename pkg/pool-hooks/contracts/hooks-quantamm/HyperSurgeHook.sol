@@ -627,15 +627,17 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     }
 
     function _divisorFromSz(uint8 s) internal pure returns (uint32) {
-        // s in [0..6], divisor = 10**(6 - s)
+        // s in [0..8], divisor = 10**(8 - s)
         // LUT avoids EXP cost both at config and (especially) runtime.
-        if (s == 0) return 1_000_000;
-        if (s == 1) return 100_000;
-        if (s == 2) return 10_000;
-        if (s == 3) return 1_000;
-        if (s == 4) return 100;
-        if (s == 5) return 10;
-        // s == 6
+        if (s == 0) return 100_000_000;
+        if (s == 1) return 10_000_000;
+        if (s == 2) return 1_000_000;
+        if (s == 3) return 100_000;
+        if (s == 4) return 10_000;
+        if (s == 5) return 1_000;
+        if (s == 6) return 100;
+        if (s == 7) return 10;
+        // s == 8
         return 1;
     }
 

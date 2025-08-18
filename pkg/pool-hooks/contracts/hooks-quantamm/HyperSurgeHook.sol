@@ -75,12 +75,12 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     }
 
     struct PoolDetails {
-        uint32 arbMaxSurgeFee9dp;
-        uint32 arbThresholdPercentage9dp;
-        uint32 arbCapDeviationPercentage9dp;
-        uint32 noiseMaxSurgeFee9dp;
-        uint32 noiseThresholdPercentage9dp;
-        uint32 noiseCapDeviationPercentage9dp;
+        uint32 arbMaxSurgeFee9;
+        uint32 arbThresholdPercentage9;
+        uint32 arbCapDeviationPercentage9;
+        uint32 noiseMaxSurgeFee9;
+        uint32 noiseThresholdPercentage9;
+        uint32 noiseCapDeviationPercentage9;
         uint8 numTokens;
     }
 
@@ -93,25 +93,25 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     mapping(address => PoolCfg) private _poolCfg;
 
-    uint256 private immutable _defaultMaxSurgeFee;
+    uint256 private immutable _defaultMaxSurgeFeePercentage18;
 
-    uint256 private immutable _defaultThresholdPercentage;
+    uint256 private immutable _defaultThresholdPercentage18;
 
-    uint256 private immutable _defaultCapDeviationPercentage;
+    uint256 private immutable _defaultCapDeviationPercentage18;
 
     constructor(
         IVault vault,
-        uint256 defaultMaxSurgeFee,
-        uint256 defaultThresholdPercentage,
-        uint256 defaultCapDeviationPercentage,
+        uint256 defaultMaxSurgeFeePercentage18,
+        uint256 defaultThresholdPercentage18,
+        uint256 defaultCapDeviationPercentage18,
         string memory version
     ) SingletonAuthentication(vault) VaultGuard(vault) Version(version) {
-        _ensureValidPct(defaultMaxSurgeFee);
-        _ensureValidPct(defaultThresholdPercentage);
-        _ensureValidPct(defaultCapDeviationPercentage);
-        _defaultMaxSurgeFee = defaultMaxSurgeFee;
-        _defaultThresholdPercentage = defaultThresholdPercentage;
-        _defaultCapDeviationPercentage = defaultCapDeviationPercentage;
+        _ensureValidPct(defaultMaxSurgeFeePercentage18);
+        _ensureValidPct(defaultThresholdPercentage18);
+        _ensureValidPct(defaultCapDeviationPercentage18);
+        _defaultMaxSurgeFeePercentage18 = defaultMaxSurgeFeePercentage18;
+        _defaultThresholdPercentage18 = defaultThresholdPercentage18;
+        _defaultCapDeviationPercentage18 = defaultCapDeviationPercentage18;
     }
 
     ///@inheritdoc IHooks
@@ -130,12 +130,12 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     ) public override onlyVault returns (bool) {
         PoolDetails memory details;
         if (tokenCfgs.length >= 2 && tokenCfgs.length <= 8) {
-            details.arbMaxSurgeFee9dp = _safeConvertTo9Decimals(_defaultMaxSurgeFee);
-            details.arbThresholdPercentage9dp = _safeConvertTo9Decimals(_defaultThresholdPercentage);
-            details.arbCapDeviationPercentage9dp = _safeConvertTo9Decimals(_defaultCapDeviationPercentage);
-            details.noiseMaxSurgeFee9dp = _safeConvertTo9Decimals(_defaultMaxSurgeFee);
-            details.noiseThresholdPercentage9dp = _safeConvertTo9Decimals(_defaultThresholdPercentage);
-            details.noiseCapDeviationPercentage9dp = _safeConvertTo9Decimals(_defaultCapDeviationPercentage);
+            details.arbMaxSurgeFee9 = _safeConvertTo9Decimals(_defaultMaxSurgeFeePercentage18);
+            details.arbThresholdPercentage9 = _safeConvertTo9Decimals(_defaultThresholdPercentage18);
+            details.arbCapDeviationPercentage9 = _safeConvertTo9Decimals(_defaultCapDeviationPercentage18);
+            details.noiseMaxSurgeFee9 = _safeConvertTo9Decimals(_defaultMaxSurgeFeePercentage18);
+            details.noiseThresholdPercentage9 = _safeConvertTo9Decimals(_defaultThresholdPercentage18);
+            details.noiseCapDeviationPercentage9 = _safeConvertTo9Decimals(_defaultCapDeviationPercentage18);
 
             details.numTokens = uint8(tokenCfgs.length);
 
@@ -226,9 +226,9 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         _ensureValidPct(pct18);
 
         if (tradeType == TradeType.ARBITRAGE) {
-            _poolCfg[pool].details.arbMaxSurgeFee9dp = _safeConvertTo9Decimals(pct18);
+            _poolCfg[pool].details.arbMaxSurgeFee9 = _safeConvertTo9Decimals(pct18);
         } else {
-            _poolCfg[pool].details.noiseMaxSurgeFee9dp = _safeConvertTo9Decimals(pct18);
+            _poolCfg[pool].details.noiseMaxSurgeFee9 = _safeConvertTo9Decimals(pct18);
         }
 
         emit MaxSurgeFeePercentageChanged(msg.sender, pool, pct18, tradeType);
@@ -242,12 +242,13 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     ) external override onlySwapFeeManagerOrGovernance(pool) {
         _ensureValidPct(pct18); // keep a valid ramp span: threshold < capDev ≤ 1
         uint32 capDev;
+        PoolDetails memory poolDetails = _poolCfg[pool].details;
         if (tradeType == TradeType.ARBITRAGE) {
-            _poolCfg[pool].details.arbThresholdPercentage9dp = _safeConvertTo9Decimals(pct18);
-            capDev = _poolCfg[pool].details.arbCapDeviationPercentage9dp;
+            poolDetails.arbThresholdPercentage9 = _safeConvertTo9Decimals(pct18);
+            capDev = poolDetails.arbCapDeviationPercentage9;
         } else {
-            _poolCfg[pool].details.noiseThresholdPercentage9dp = _safeConvertTo9Decimals(pct18);
-            capDev = _poolCfg[pool].details.noiseCapDeviationPercentage9dp;
+            poolDetails.noiseThresholdPercentage9 = _safeConvertTo9Decimals(pct18);
+            capDev = poolDetails.noiseCapDeviationPercentage9;
         }
 
         uint256 capDev18 = _convertTo18Decimals(capDev);
@@ -255,6 +256,8 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         if (capDev18 != 0 && pct18 >= capDev18) {
             revert InvalidThresholdDeviation();
         }
+
+        _poolCfg[pool].details = poolDetails;
 
         emit ThresholdPercentageChanged(msg.sender, pool, pct18, tradeType);
     }
@@ -267,12 +270,13 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     ) external override onlySwapFeeManagerOrGovernance(pool) {
         _ensureValidPct(capDevPct18);
         uint32 thr;
+        PoolDetails memory poolDetails = _poolCfg[pool].details;
         if (tradeType == TradeType.ARBITRAGE) {
-            _poolCfg[pool].details.arbCapDeviationPercentage9dp = _safeConvertTo9Decimals(capDevPct18);
-            thr = _poolCfg[pool].details.arbThresholdPercentage9dp;
+            poolDetails.arbCapDeviationPercentage9 = _safeConvertTo9Decimals(capDevPct18);
+            thr = poolDetails.arbThresholdPercentage9;
         } else {
-            _poolCfg[pool].details.noiseCapDeviationPercentage9dp = _safeConvertTo9Decimals(capDevPct18);
-            thr = _poolCfg[pool].details.noiseThresholdPercentage9dp;
+            poolDetails.noiseCapDeviationPercentage9 = _safeConvertTo9Decimals(capDevPct18);
+            thr = poolDetails.noiseThresholdPercentage9;
         }
 
         uint256 thr18 = _convertTo18Decimals(thr);
@@ -280,6 +284,8 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         if (capDevPct18 <= thr18) {
             revert InvalidCapDeviationPercentage();
         }
+
+        _poolCfg[pool].details = poolDetails;
 
         emit CapDeviationPercentageChanged(msg.sender, pool, capDevPct18, tradeType);
     }
@@ -372,27 +378,27 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     /// @notice Getter to read the pool-specific surge threshold (1e18 = 100%).
     function getSurgeThresholdPercentage(address pool, TradeType tradeType) public view override returns (uint256) {
         if (tradeType == TradeType.ARBITRAGE) {
-            return _convertTo18Decimals(_poolCfg[pool].details.arbThresholdPercentage9dp);
+            return _convertTo18Decimals(_poolCfg[pool].details.arbThresholdPercentage9);
         } else {
-            return _convertTo18Decimals(_poolCfg[pool].details.noiseThresholdPercentage9dp);
+            return _convertTo18Decimals(_poolCfg[pool].details.noiseThresholdPercentage9);
         }
     }
 
     ///@inheritdoc IHyperSurgeHook
     function getMaxSurgeFeePercentage(address pool, TradeType tradeType) external view override returns (uint256) {
         if (tradeType == TradeType.ARBITRAGE) {
-            return _convertTo18Decimals(_poolCfg[pool].details.arbMaxSurgeFee9dp);
+            return _convertTo18Decimals(_poolCfg[pool].details.arbMaxSurgeFee9);
         } else {
-            return _convertTo18Decimals(_poolCfg[pool].details.noiseMaxSurgeFee9dp);
+            return _convertTo18Decimals(_poolCfg[pool].details.noiseMaxSurgeFee9);
         }
     }
 
     ///@inheritdoc IHyperSurgeHook
     function getCapDeviationPercentage(address pool, TradeType tradeType) external view override returns (uint256) {
         if (tradeType == TradeType.ARBITRAGE) {
-            return _convertTo18Decimals(_poolCfg[pool].details.arbCapDeviationPercentage9dp);
+            return _convertTo18Decimals(_poolCfg[pool].details.arbCapDeviationPercentage9);
         } else {
-            return _convertTo18Decimals(_poolCfg[pool].details.noiseCapDeviationPercentage9dp);
+            return _convertTo18Decimals(_poolCfg[pool].details.noiseCapDeviationPercentage9);
         }
     }
 
@@ -423,17 +429,17 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     ///@inheritdoc IHyperSurgeHook
     function getDefaultMaxSurgeFeePercentage() external view override returns (uint256) {
-        return _defaultMaxSurgeFee;
+        return _defaultMaxSurgeFeePercentage18;
     }
 
     ///@inheritdoc IHyperSurgeHook
     function getDefaultSurgeThresholdPercentage() external view override returns (uint256) {
-        return _defaultThresholdPercentage;
+        return _defaultThresholdPercentage18;
     }
 
     ///@inheritdoc IHyperSurgeHook
     function getDefaultCapDeviationPercentage() external view override returns (uint256) {
-        return _defaultCapDeviationPercentage;
+        return _defaultCapDeviationPercentage18;
     }
 
     ///@inheritdoc IHyperSurgeHook
@@ -448,13 +454,13 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256 pxIn;
         uint256 pxOut;
         uint256 extPx;
-        uint256 deviationBefore;
-        uint256 deviation;
-        uint256 threshold;
-        uint256 maxPct;
+        uint256 deviationBefore18;
+        uint256 deviation18;
+        uint256 threshold18;
+        uint256 maxPct18;
         uint256 increment;
-        uint256 surgeFee;
-        uint256 capDevPct;
+        uint256 surgeFee18;
+        uint256 capDevPct18;
         uint256 bIn;
         uint256 bOut;
         uint64 rawIn;
@@ -493,8 +499,8 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             return (true, staticSwapFee);
         }
 
-        locals.pxIn = (uint256(locals.rawIn) * 1e18).divDown(_divisorFromSz(pInCfg.sz));
-        locals.pxOut = (uint256(locals.rawOut) * 1e18).divDown(_divisorFromSz(pOutCfg.sz));
+        locals.pxIn = uint256(locals.rawIn).divDown(_divisorFromSz(pInCfg.sz));
+        locals.pxOut = uint256(locals.rawOut).divDown(_divisorFromSz(pOutCfg.sz));
 
         //Do not block if there is an issue with the hyperliquid price
         if (locals.pxIn == 0 || locals.pxOut == 0) {
@@ -524,7 +530,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
 
         locals.poolPxBefore = _pairSpotFromBalancesWeights(locals.bIn, locals.wIn, locals.bOut, locals.wOut);
-        locals.deviationBefore = _relAbsDiff(locals.poolPxBefore, locals.extPx);
+        locals.deviationBefore18 = _relAbsDiff(locals.poolPxBefore, locals.extPx);
 
         if (p.kind == SwapKind.EXACT_IN) {
             locals.bIn += p.amountGivenScaled18;
@@ -540,41 +546,36 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             return (true, staticSwapFee);
         }
         // 5) Deviation
-        locals.deviation = _relAbsDiff(locals.poolPx, locals.extPx); // |pool - ext| / ext
+        locals.deviation18 = _relAbsDiff(locals.poolPx, locals.extPx); // |pool - ext| / ext
 
-        if (locals.deviation > locals.deviationBefore) {
+        if (locals.deviation18 > locals.deviationBefore18) {
             // If the pool price is increasing, we are in an arbitrage situation
-            locals.capDevPct = uint256(locals.poolDetails.arbCapDeviationPercentage9dp);
-            locals.maxPct = uint256(locals.poolDetails.arbMaxSurgeFee9dp);
-            locals.threshold = uint256(locals.poolDetails.arbThresholdPercentage9dp);
+            locals.capDevPct18 = _convertTo18Decimals(locals.poolDetails.arbCapDeviationPercentage9);
+            locals.maxPct18 = _convertTo18Decimals(locals.poolDetails.arbMaxSurgeFee9);
+            locals.threshold18 = _convertTo18Decimals(locals.poolDetails.arbThresholdPercentage9);
         } else {
             // If the pool price is decreasing, we are in a noise situation
-            locals.capDevPct = uint256(locals.poolDetails.noiseCapDeviationPercentage9dp);
-            locals.maxPct = uint256(locals.poolDetails.noiseMaxSurgeFee9dp);
-            locals.threshold = uint256(locals.poolDetails.noiseThresholdPercentage9dp);
+            locals.capDevPct18 = _convertTo18Decimals(locals.poolDetails.noiseCapDeviationPercentage9);
+            locals.maxPct18 = _convertTo18Decimals(locals.poolDetails.noiseMaxSurgeFee9);
+            locals.threshold18 = _convertTo18Decimals(locals.poolDetails.noiseThresholdPercentage9);
         }
 
-        // convert to 1e18 scale
-        locals.capDevPct *= 1e9;
-        locals.maxPct *= 1e9;
-        locals.threshold *= 1e9;
-
-        if (locals.deviation <= locals.threshold) {
+        if (locals.deviation18 <= locals.threshold18) {
             return (true, staticSwapFee);
         }
 
-        locals.span = locals.capDevPct - locals.threshold; // > 0 by fallback above
-        locals.norm = (locals.deviation - locals.threshold).divDown(locals.span);
+        locals.span = locals.capDevPct18 - locals.threshold18; // > 0 by fallback above
+        locals.norm = (locals.deviation18 - locals.threshold18).divDown(locals.span);
 
         if (locals.norm > FixedPoint.ONE) {
             locals.norm = FixedPoint.ONE;
         }
 
-        locals.increment = (locals.maxPct - staticSwapFee).mulDown(locals.norm);
-        locals.surgeFee = staticSwapFee + locals.increment;
-        if (locals.surgeFee > locals.maxPct) locals.surgeFee = locals.maxPct;
+        locals.increment = (locals.maxPct18 - staticSwapFee).mulDown(locals.norm);
+        locals.surgeFee18 = staticSwapFee + locals.increment;
+        if (locals.surgeFee18 > locals.maxPct18) locals.surgeFee18 = locals.maxPct18;
 
-        return (true, locals.surgeFee);
+        return (true, locals.surgeFee18);
     }
 
     function _pairSpotFromBalancesWeights(
@@ -629,6 +630,15 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             revert InvalidPercentage();
         }
         return uint32(value);
+    }
+
+    ///@notice Converts a 9 decimal places fixed point number to 18 decimal places.
+    function _convertTo18Decimals(uint32 setting9Dp) internal pure returns (uint256) {
+        return uint256(setting9Dp) * 1e9;
+    }
+
+    function _safeConvertTo9Decimals(uint256 setting18Dp) internal pure returns (uint32) {
+        return (setting18Dp / 1e9).toUint32();
     }
 
     struct ComputeOracleDeviationLocals {
@@ -722,14 +732,5 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
 
         return locals.maxDev;
-    }
-
-    ///@notice Converts a 9 decimal places fixed point number to 18 decimal places.
-    function _convertTo18Decimals(uint32 setting9Dp) internal pure returns (uint256) {
-        return uint256(setting9Dp) * 1e9;
-    }
-
-    function _safeConvertTo9Decimals(uint256 setting18Dp) internal pure returns (uint32) {
-        return (setting18Dp / 1e9).toUint32();
     }
 }

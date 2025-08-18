@@ -110,14 +110,14 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         L.pxOut = pxOut;
 
         // Configure NOISE lane (used when deviation does not worsen).
-        L.poolDetails.noiseThresholdPercentage9dp = uint32(DEFAULT_THRESHOLD_PPM9);
-        L.poolDetails.noiseMaxSurgeFee9dp = uint32(DEFAULT_MAX_SURGE_FEE_PPM9);
-        L.poolDetails.noiseCapDeviationPercentage9dp = uint32(DEFAULT_CAP_DEV_PPM9);
+        L.poolDetails.noiseThresholdPercentage9 = uint32(DEFAULT_THRESHOLD_PPM9);
+        L.poolDetails.noiseMaxSurgeFee9 = uint32(DEFAULT_MAX_SURGE_FEE_PPM9);
+        L.poolDetails.noiseCapDeviationPercentage9 = uint32(DEFAULT_CAP_DEV_PPM9);
 
         // Set ARB lane too (not used here, but keep consistent).
-        L.poolDetails.arbThresholdPercentage9dp = uint32(DEFAULT_THRESHOLD_PPM9);
-        L.poolDetails.arbMaxSurgeFee9dp = uint32(DEFAULT_MAX_SURGE_FEE_PPM9);
-        L.poolDetails.arbCapDeviationPercentage9dp = uint32(DEFAULT_CAP_DEV_PPM9);
+        L.poolDetails.arbThresholdPercentage9 = uint32(DEFAULT_THRESHOLD_PPM9);
+        L.poolDetails.arbMaxSurgeFee9 = uint32(DEFAULT_MAX_SURGE_FEE_PPM9);
+        L.poolDetails.arbCapDeviationPercentage9 = uint32(DEFAULT_CAP_DEV_PPM9);
     }
 
     // 1e18 fixed-point helpers identical to Balancer's FixedPoint

@@ -438,7 +438,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
             vm.prank(address(vault));
             assertTrue(hook.onRegister(poolFactory, address(pool), cfg, lm), "onRegister failed");
 
-            // 3) Build VALID lane params (9dp), then upscale ONCE to 18dp
+            // 3) Build VALID lane params (9), then upscale ONCE to 18dp
             //    max9 ∈ [1..1e9], thr9 ∈ [1..max9], cap9 ∈ (thr9..1e9]
             locals.max9 = 1 + (marker % 1_000_000_000); // avoid 0
             locals.thr9 = 1 + ((marker >> 8) % locals.max9); // ≥1 and ≤ max9
@@ -642,12 +642,12 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         localCompute.wOut = wOut;
         localCompute.pxIn = pxIn;
         localCompute.pxOut = pxOut;
-        localCompute.poolDetails.noiseThresholdPercentage9dp = thrPPM9;
-        localCompute.poolDetails.noiseCapDeviationPercentage9dp = capPPM9;
-        localCompute.poolDetails.noiseMaxSurgeFee9dp = maxPPM9;
-        localCompute.poolDetails.arbThresholdPercentage9dp = thrPPM9;
-        localCompute.poolDetails.arbCapDeviationPercentage9dp = capPPM9;
-        localCompute.poolDetails.arbMaxSurgeFee9dp = maxPPM9;
+        localCompute.poolDetails.noiseThresholdPercentage9 = thrPPM9;
+        localCompute.poolDetails.noiseCapDeviationPercentage9 = capPPM9;
+        localCompute.poolDetails.noiseMaxSurgeFee9 = maxPPM9;
+        localCompute.poolDetails.arbThresholdPercentage9 = thrPPM9;
+        localCompute.poolDetails.arbCapDeviationPercentage9 = capPPM9;
+        localCompute.poolDetails.arbMaxSurgeFee9 = maxPPM9;
     }
 
     function fee_boundParams(
@@ -1349,7 +1349,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.staticFee = 30e14; // 30 bps = 0.003 * 1e18
         locals.maxFee = 120e14; // 120 bps
 
-        // 9dp lane params (contract upscales to 18dp)
+        // 9 lane params (contract upscales to 18dp)
         locals.thr9 = 100_000_000; // 10%
         locals.cap9 = 500_000_000; // 50%
         locals.max9 = uint32(locals.maxFee / 1e9);
@@ -1359,12 +1359,12 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         localCompute.pxOut = 10e18; // external price E = 10
 
         // set both lanes the same (lane choice irrelevant for this edge)
-        localCompute.poolDetails.noiseThresholdPercentage9dp = locals.thr9;
-        localCompute.poolDetails.noiseCapDeviationPercentage9dp = locals.cap9;
-        localCompute.poolDetails.noiseMaxSurgeFee9dp = locals.max9;
-        localCompute.poolDetails.arbThresholdPercentage9dp = locals.thr9;
-        localCompute.poolDetails.arbCapDeviationPercentage9dp = locals.cap9;
-        localCompute.poolDetails.arbMaxSurgeFee9dp = locals.max9;
+        localCompute.poolDetails.noiseThresholdPercentage9 = locals.thr9;
+        localCompute.poolDetails.noiseCapDeviationPercentage9 = locals.cap9;
+        localCompute.poolDetails.noiseMaxSurgeFee9 = locals.max9;
+        localCompute.poolDetails.arbThresholdPercentage9 = locals.thr9;
+        localCompute.poolDetails.arbCapDeviationPercentage9 = locals.cap9;
+        localCompute.poolDetails.arbMaxSurgeFee9 = locals.max9;
 
         PoolSwapParams memory p;
         p.kind = SwapKind.EXACT_IN;
@@ -1407,12 +1407,12 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         localCompute.pxIn = 1e18;
         localCompute.pxOut = 10e18;
 
-        localCompute.poolDetails.noiseThresholdPercentage9dp = locals.thr9;
-        localCompute.poolDetails.noiseCapDeviationPercentage9dp = locals.cap9;
-        localCompute.poolDetails.noiseMaxSurgeFee9dp = locals.max9;
-        localCompute.poolDetails.arbThresholdPercentage9dp = locals.thr9;
-        localCompute.poolDetails.arbCapDeviationPercentage9dp = locals.cap9;
-        localCompute.poolDetails.arbMaxSurgeFee9dp = locals.max9;
+        localCompute.poolDetails.noiseThresholdPercentage9 = locals.thr9;
+        localCompute.poolDetails.noiseCapDeviationPercentage9 = locals.cap9;
+        localCompute.poolDetails.noiseMaxSurgeFee9 = locals.max9;
+        localCompute.poolDetails.arbThresholdPercentage9 = locals.thr9;
+        localCompute.poolDetails.arbCapDeviationPercentage9 = locals.cap9;
+        localCompute.poolDetails.arbMaxSurgeFee9 = locals.max9;
 
         PoolSwapParams memory p;
         p.kind = SwapKind.EXACT_IN;
@@ -1465,12 +1465,12 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         localCompute.pxIn = 1e18;
         localCompute.pxOut = 10e18;
 
-        localCompute.poolDetails.noiseThresholdPercentage9dp = locals.thr9;
-        localCompute.poolDetails.noiseCapDeviationPercentage9dp = locals.cap9;
-        localCompute.poolDetails.noiseMaxSurgeFee9dp = locals.max9;
-        localCompute.poolDetails.arbThresholdPercentage9dp = locals.thr9;
-        localCompute.poolDetails.arbCapDeviationPercentage9dp = locals.cap9;
-        localCompute.poolDetails.arbMaxSurgeFee9dp = locals.max9;
+        localCompute.poolDetails.noiseThresholdPercentage9 = locals.thr9;
+        localCompute.poolDetails.noiseCapDeviationPercentage9 = locals.cap9;
+        localCompute.poolDetails.noiseMaxSurgeFee9 = locals.max9;
+        localCompute.poolDetails.arbThresholdPercentage9 = locals.thr9;
+        localCompute.poolDetails.arbCapDeviationPercentage9 = locals.cap9;
+        localCompute.poolDetails.arbMaxSurgeFee9 = locals.max9;
 
         PoolSwapParams memory p;
         p.kind = SwapKind.EXACT_IN;
@@ -1540,12 +1540,12 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         localCompute.pxIn = 1e18;
         localCompute.pxOut = 10e18;
 
-        localCompute.poolDetails.noiseThresholdPercentage9dp = locals.thr9;
-        localCompute.poolDetails.noiseCapDeviationPercentage9dp = locals.cap9;
-        localCompute.poolDetails.noiseMaxSurgeFee9dp = locals.max9;
-        localCompute.poolDetails.arbThresholdPercentage9dp = locals.thr9;
-        localCompute.poolDetails.arbCapDeviationPercentage9dp = locals.cap9;
-        localCompute.poolDetails.arbMaxSurgeFee9dp = locals.max9;
+        localCompute.poolDetails.noiseThresholdPercentage9 = locals.thr9;
+        localCompute.poolDetails.noiseCapDeviationPercentage9 = locals.cap9;
+        localCompute.poolDetails.noiseMaxSurgeFee9 = locals.max9;
+        localCompute.poolDetails.arbThresholdPercentage9 = locals.thr9;
+        localCompute.poolDetails.arbCapDeviationPercentage9 = locals.cap9;
+        localCompute.poolDetails.arbMaxSurgeFee9 = locals.max9;
 
         PoolSwapParams memory p;
         p.kind = SwapKind.EXACT_IN;

@@ -134,8 +134,8 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         vm.store(HL_PRICE_PRECOMPILE, slot, bytes32(uint256(price_1e6)));
     }
 
-    function _hlSetSzDecimals(uint32 pairIdx, uint8 sz) internal {
-        bytes32 slot = keccak256(abi.encode(bytes32(uint256(pairIdx)), bytes32(uint256(0))));
+    function _hlSetSzDecimals(uint32 tokenIdx, uint8 sz) internal {
+        bytes32 slot = keccak256(abi.encode(bytes32(uint256(tokenIdx)), bytes32(uint256(0))));
         vm.store(HL_TOKENINFO_PRECOMPILE, slot, bytes32(uint256(sz)));
     }
 
@@ -203,14 +203,15 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
 
     /// Configure HL for all token indices [0..nUsed-1]
     function _configHLForAll(uint8 nUsed, uint32 basePairSeed, uint8 szSeed) internal {
-        uint8 sz = uint8(bound(szSeed, 0, 6));
-        uint32 base = uint32(bound(uint256(basePairSeed), 1, type(uint32).max - nUsed - 1));
+        uint8 sz = uint8(bound(szSeed, 1, 8));
+        uint32 base = uint32(bound(uint256(basePairSeed), 21, type(uint32).max - nUsed - 21));
         for (uint8 i = 0; i < nUsed; ++i) {
             uint32 pairIdx = base + i; // non-zero, distinct
-            _hlSetSzDecimals(pairIdx, sz); // 0..6
+            uint32 tokenIdx = base + i + 20; // 0..nUsed-1
+            _hlSetSzDecimals(tokenIdx, sz); // 0..6
             _hlSetSpot(pairIdx, 1); // raw=1 (ratio stability)
             vm.prank(admin);
-            hook.setTokenPriceConfigIndex(address(pool), i, pairIdx);
+            hook.setTokenPriceConfigIndex(address(pool), i, pairIdx, tokenIdx);
         }
     }
 

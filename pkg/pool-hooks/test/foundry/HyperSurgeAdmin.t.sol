@@ -332,17 +332,18 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
 
         vm.startPrank(admin);
         vm.expectRevert();
-        hook.setTokenPriceConfigIndex(address(pool), idx, 0);
+        hook.setTokenPriceConfigIndex(address(pool), idx, 0, 0);
         vm.stopPrank();
     }
 
     function testFuzz_setTokenPriceConfigIndex_accepts(uint8 n, uint8 idx, uint32 pairIdx) public {
         n = _registerBasePoolWithN(n);
         idx = uint8(bound(idx, 0, n - 1));
-        pairIdx = uint32(bound(pairIdx, 1, type(uint32).max)); // non-zero for pair mapping
+        pairIdx = uint32(bound(pairIdx, 21, type(uint32).max - 20)); // non-zero for pair mapping
+
 
         vm.startPrank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx); // pair mapping
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, pairIdx + 20); // pair mapping
         vm.stopPrank();
     }
 
@@ -425,7 +426,7 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         // OOB index must revert
         vm.startPrank(admin);
         vm.expectRevert();
-        hook.setTokenPriceConfigIndex(address(pool), idx, /*pairIdx*/ 0);
+        hook.setTokenPriceConfigIndex(address(pool), idx, /*pairIdx*/ 0, /*tokenIdx*/ 0);
         vm.stopPrank();
     }
 
@@ -443,8 +444,9 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         vm.startPrank(admin);
 
         uint32 pairIdx = 1;
-        _hlSetSzDecimals(pairIdx, 6);
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx);
+        uint32 tokenIdx = 21;
+        _hlSetSzDecimals(tokenIdx, 6);
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, tokenIdx);
 
         vm.stopPrank();
     }
@@ -452,7 +454,7 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
     function testFuzz_setTokenPriceConfigIndex_pairIdx_nonzero(uint8 numTokens, uint8 idx, uint32 pairIdx) public {
         numTokens = uint8(bound(numTokens, 2, 8));
         idx = uint8(bound(idx, 0, numTokens - 1));
-        pairIdx = uint32(bound(pairIdx, 1, type(uint32).max)); // ensure non-zero
+        pairIdx = uint32(bound(pairIdx, 21, type(uint32).max - 20)); // ensure non-zero
 
         TokenConfig[] memory cfg = new TokenConfig[](numTokens);
         LiquidityManagement memory lm;
@@ -460,10 +462,10 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         assertTrue(hook.onRegister(poolFactory, address(pool), cfg, lm), "onRegister failed");
 
         // stub szDecimals for this pair
-        _hlSetSzDecimals(pairIdx, 6);
+        _hlSetSzDecimals(pairIdx + 20, 8);
 
         vm.prank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx);
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, pairIdx + 20);
     }
 
     /// @notice szDecimals lookup determines divisor = 10**(6 - sz) for each token’s price pair.
@@ -472,7 +474,7 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
     /// @param n Pool size (2..8).
 
     function testFuzz_setTokenPriceConfigIndex_szDecimals_and_divisor(uint8 sz, uint8 n) public {
-        sz = uint8(bound(sz, 0, 6));
+        sz = uint8(bound(sz, 1, 8));
         n = uint8(bound(n, 2, 8));
 
         TokenConfig[] memory cfg = new TokenConfig[](n); // 4 tokens, any N in 2..8
@@ -482,10 +484,11 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
 
         uint8 idx = 0;
         uint32 pairIdx = 1;
-        _hlSetSzDecimals(pairIdx, sz);
+        uint32 tokenIdx = 21;
+        _hlSetSzDecimals(tokenIdx, sz);
 
         vm.prank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx);
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, tokenIdx);
 
         (uint32 storedPair, uint32 storedDiv) = hook.getTokenPriceConfigIndex(address(pool), idx);
         assertEq(storedPair, pairIdx, "pair index mismatch");
@@ -507,11 +510,12 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
 
         uint8 idx = 0;
         uint32 pairIdx = 1;
-        _hlSetSzDecimals(pairIdx, sz);
+        uint32 tokenIdx = 21;
+        _hlSetSzDecimals(tokenIdx, sz);
 
         vm.startPrank(admin);
         vm.expectRevert();
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx);
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, tokenIdx);
         vm.stopPrank();
     }
 
@@ -533,6 +537,7 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
 
         uint8[] memory indices = new uint8[](a);
         uint32[] memory pairs = new uint32[](b);
+        uint32[] memory tokenIdxs = new uint32[](b);
 
         // Fill indices/pairs with valid values for any elements that exist
         for (uint8 i = 0; i < a; ++i) {
@@ -541,18 +546,19 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         for (uint8 i = 0; i < b; ++i) {
             uint32 pair = uint32(1000 + i);
             pairs[i] = pair;
+            tokenIdxs[i] = pair + 20;
             // Ensure szDecimals(pair) ∈ [0..8] so row-level checks would pass if lengths matched
-            _hlSetSzDecimals(pair, uint8(i % 9));
+            _hlSetSzDecimals(pair + 20, uint8(i % 9));
         }
 
         vm.startPrank(admin);
         if (a != b) {
             // Your hook explicitly reverts on mismatched lengths
             vm.expectRevert(); // InvalidArrayLengths()
-            hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs);
+            hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs, tokenIdxs);
         } else {
             // Equal lengths: should succeed (including the a=b=0 "no-op" batch)
-            hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs);
+            hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs, tokenIdxs);
 
             // Spot-check: for any rows we set, getter must reflect pair+divisor
             for (uint8 i = 0; i < a; ++i) {
@@ -580,12 +586,14 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         // Non-empty batch with a zero pairIdx → must revert
         uint8[] memory indices = new uint8[](1);
         uint32[] memory pairs = new uint32[](1);
+        uint32[] memory tokenIdxs = new uint32[](1);
         indices[0] = 0; // valid token index
         pairs[0] = 0; // INVALID
+        tokenIdxs[0] = 0; // INVALID
 
         vm.startPrank(admin);
         vm.expectRevert(); // InvalidPairIndex()
-        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs);
+        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs, tokenIdxs);
         vm.stopPrank();
     }
 
@@ -603,16 +611,18 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         uint8 len = uint8(bound(lenSeed, 1, n)); // at least 1 row
         uint8[] memory indices = new uint8[](len);
         uint32[] memory pairs = new uint32[](len);
+        uint32[] memory tokenIdxs = new uint32[](len);
 
         for (uint8 i = 0; i < len; ++i) {
             indices[i] = i; // 0..len-1 within n
             pairs[i] = uint32(1000 + i); // non-zero pair
+            tokenIdxs[i] = pairs[i] + 20;
             // hook validates szDecimals(pair) ∈ [0..6], so set it
-            _hlSetSzDecimals(pairs[i], uint8(i % 9));
+            _hlSetSzDecimals(tokenIdxs[i], uint8(i % 9));
         }
 
         vm.prank(admin);
-        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs);
+        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs, tokenIdxs);
 
         // Verify stored pair & divisor per row
         for (uint8 i = 0; i < len; ++i) {
@@ -638,8 +648,8 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         // Register a live pool first so the reverts (if any) are ACL-related
         n = _registerBasePoolWithN(n);
         uint8 idx = uint8(bound(idxSeed, 0, n - 1));
-        pairIdx = uint32(bound(pairIdx, 1, type(uint32).max)); // non-zero
-        _hlSetSzDecimals(pairIdx, uint8(bound(uint8(pairIdx), 0, 6)));
+        pairIdx = uint32(bound(pairIdx, 21, type(uint32).max - 20)); // non-zero
+        _hlSetSzDecimals(pairIdx + 20, uint8(bound(uint8(pairIdx), 1, 8)));
 
         // Grant batch role to admin so only the non-admin fails ACL
         authorizer.grantRole(
@@ -656,17 +666,19 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         // Single index must fail from non-admin
         vm.prank(rando);
         vm.expectRevert();
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx);
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, pairIdx + 20);
 
         // Batch must fail from non-admin
         uint8[] memory indices = new uint8[](1);
         uint32[] memory pairs = new uint32[](1);
+        uint32[] memory tokenIdxs = new uint32[](1);
         indices[0] = idx;
         pairs[0] = pairIdx;
+        tokenIdxs[0] = pairIdx + 20;
 
         vm.prank(rando);
         vm.expectRevert();
-        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs);
+        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs, tokenIdxs);
 
         // Fee knobs must fail from non-admin (both directions)
         vm.prank(rando);
@@ -687,12 +699,12 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
     function testFuzz_priceConfigIndex_rejects_when_uninitialized(uint8 idxSeed, uint32 pairIdx) public {
         // NOT registering the pool → expect PoolNotInitialized
         uint8 idx = uint8(bound(idxSeed, 0, 7));
-        pairIdx = uint32(bound(pairIdx, 1, type(uint32).max));
-        _hlSetSzDecimals(pairIdx, uint8(bound(uint8(pairIdx), 0, 6)));
+        pairIdx = uint32(bound(pairIdx, 21, type(uint32).max - 20));
+        _hlSetSzDecimals(pairIdx + 20, uint8(bound(uint8(pairIdx + 20), 1, 8)));
 
         vm.startPrank(admin);
         vm.expectRevert(); // PoolNotInitialized()
-        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx);
+        hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, pairIdx + 20);
         vm.stopPrank();
     }
 
@@ -707,16 +719,20 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         // Build small batch
         uint8[] memory indices = new uint8[](2);
         uint32[] memory pairs = new uint32[](2);
+        uint32[] memory tokenIdxs = new uint32[](2);
         indices[0] = uint8(bound(a, 0, 7));
         indices[1] = uint8(bound(b, 0, 7));
-        pairs[0] = uint32(bound(p0, 1, type(uint32).max));
-        pairs[1] = uint32(bound(p1, 1, type(uint32).max));
-        _hlSetSzDecimals(pairs[0], uint8(bound(uint8(pairs[0]), 0, 6)));
-        _hlSetSzDecimals(pairs[1], uint8(bound(uint8(pairs[1]), 0, 6)));
+        pairs[0] = uint32(bound(p0, 21, type(uint32).max - 20));
+        pairs[1] = uint32(bound(p1, 21, type(uint32).max - 20));
+        tokenIdxs[0] = pairs[0] + 20;
+        tokenIdxs[1] = pairs[1] + 20;
+
+        _hlSetSzDecimals(tokenIdxs[0], uint8(bound(uint8(tokenIdxs[0]), 1, 8)));
+        _hlSetSzDecimals(tokenIdxs[1], uint8(bound(uint8(tokenIdxs[1]), 1, 8)));
 
         vm.startPrank(admin);
         vm.expectRevert(); // PoolNotInitialized()
-        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs);
+        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs, tokenIdxs);
         vm.stopPrank();
     }
 
@@ -732,8 +748,8 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         n = _registerBasePoolWithN(n);
         goodIdx = uint8(bound(goodIdx, 0, n - 1));
         badIdx = uint8(bound(badIdx, n, n + 12)); // OOB
-        pairIdx = uint32(bound(pairIdx, 1, type(uint32).max));
-        _hlSetSzDecimals(pairIdx, uint8(bound(uint8(pairIdx), 0, 6)));
+        pairIdx = uint32(bound(pairIdx, 21, type(uint32).max - 20));
+        _hlSetSzDecimals(pairIdx + 20, uint8(bound(uint8(pairIdx), 1, 8)));
 
         authorizer.grantRole(
             IAuthentication(address(hook)).getActionId(IHyperSurgeHook.setTokenPriceConfigBatchIndex.selector),
@@ -742,14 +758,17 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
 
         uint8[] memory indices = new uint8[](2);
         uint32[] memory pairs = new uint32[](2);
+        uint32[] memory tokenIdxs = new uint32[](2);
         indices[0] = goodIdx;
         pairs[0] = pairIdx;
         indices[1] = badIdx;
         pairs[1] = pairIdx;
+        tokenIdxs[0] = 0 + 20;
+        tokenIdxs[1] = pairIdx + 20;
 
         vm.startPrank(admin);
         vm.expectRevert(); // TokenIndexOutOfRange()
-        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs);
+        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs, tokenIdxs);
         vm.stopPrank();
     }
 
@@ -758,8 +777,8 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         idx0 = uint8(bound(idx0, 0, n - 1));
         idx1 = uint8(bound(idx1, 0, n - 1));
 
-        p1 = uint32(bound(p1, 1, type(uint32).max));
-        _hlSetSzDecimals(p1, uint8(bound(uint8(p1), 0, 6)));
+        p1 = uint32(bound(p1, 21, type(uint32).max - 20));
+        _hlSetSzDecimals(p1 + 20, uint8(bound(uint8(p1), 1, 8)));
 
         authorizer.grantRole(
             IAuthentication(address(hook)).getActionId(IHyperSurgeHook.setTokenPriceConfigBatchIndex.selector),
@@ -768,27 +787,30 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
 
         uint8[] memory indices = new uint8[](2);
         uint32[] memory pairs = new uint32[](2);
+        uint32[] memory tokenIdxs = new uint32[](2);
         indices[0] = idx0;
         pairs[0] = 0; // zero pairIdx → invalid
         indices[1] = idx1;
         pairs[1] = p1;
+        tokenIdxs[0] = 0 + 20;
+        tokenIdxs[1] = p1 + 20;
 
         vm.startPrank(admin);
         vm.expectRevert(); // InvalidPairIndex()
-        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs);
+        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs, tokenIdxs);
         vm.stopPrank();
     }
 
     /// @notice Batch token price config: szDecimals > 8 in any row must revert atomically.
     /// @dev Guards oracle scaling invariants across the whole batch.
     /// @param n Pool size (2..8).
-    function testFuzz_batch_rejects_decimals_over_6(uint8 n, uint8 idxSeed, uint32 pairIdx, uint8 sz) public {
+    function testFuzz_batch_rejects_decimals_over_8(uint8 n, uint8 idxSeed, uint32 pairIdx, uint8 sz) public {
         n = _registerBasePoolWithN(n);
         uint8 idx = uint8(bound(idxSeed, 0, n - 1));
 
-        pairIdx = uint32(bound(pairIdx, 1, type(uint32).max));
+        pairIdx = uint32(bound(pairIdx, 21, type(uint32).max - 20));
         sz = uint8(bound(sz, 9, 40)); // > 8 invalid
-        _hlSetSzDecimals(pairIdx, sz);
+        _hlSetSzDecimals(pairIdx + 20, sz);
 
         authorizer.grantRole(
             IAuthentication(address(hook)).getActionId(IHyperSurgeHook.setTokenPriceConfigBatchIndex.selector),
@@ -797,12 +819,14 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
 
         uint8[] memory indices = new uint8[](1);
         uint32[] memory pairs = new uint32[](1);
+        uint32[] memory tokenIdxs = new uint32[](1);
         indices[0] = idx;
         pairs[0] = pairIdx;
+        tokenIdxs[0] = pairIdx + 20;
 
         vm.startPrank(admin);
         vm.expectRevert(); // InvalidDecimals()
-        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs);
+        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs, tokenIdxs);
         vm.stopPrank();
     }
 
@@ -821,16 +845,18 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
 
         uint8[] memory indices = new uint8[](len);
         uint32[] memory pairs = new uint32[](len);
+        uint32[] memory tokenIdxs = new uint32[](len);
 
         for (uint8 i = 0; i < len; ++i) {
             indices[i] = i;
             pairs[i] = uint32(1000 + i); // distinct
+            tokenIdxs[i] = pairs[i] + 20;
             uint8 sz = uint8(i % 9); // 0..8
-            _hlSetSzDecimals(pairs[i], sz);
+            _hlSetSzDecimals(tokenIdxs[i], sz);
         }
 
         vm.prank(admin);
-        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs);
+        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs, tokenIdxs);
 
         // Verify via both getters
         (uint32[] memory pairArr, uint32[] memory divArr) = hook.getTokenPriceConfigs(address(pool));
@@ -851,10 +877,10 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
     function testFuzz_batch_duplicate_indices_last_write_wins(uint8 n, uint8 idxSeed, uint32 pA, uint32 pB) public {
         n = _registerBasePoolWithN(n);
         uint8 idx = uint8(bound(idxSeed, 0, n - 1));
-        pA = uint32(bound(pA, 1, type(uint32).max));
-        pB = uint32(bound(pB, 1, type(uint32).max));
-        _hlSetSzDecimals(pA, uint8(bound(uint8(pA), 0, 8)));
-        _hlSetSzDecimals(pB, uint8(bound(uint8(pB), 0, 8)));
+        pA = uint32(bound(pA, 21, type(uint32).max - 20));
+        pB = uint32(bound(pB, 21, type(uint32).max - 20));
+        _hlSetSzDecimals(pA + 20, uint8(bound(uint8(pA), 1, 8)));
+        _hlSetSzDecimals(pB + 20, uint8(bound(uint8(pB), 1, 8)));
 
         authorizer.grantRole(
             IAuthentication(address(hook)).getActionId(IHyperSurgeHook.setTokenPriceConfigBatchIndex.selector),
@@ -864,18 +890,23 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         // Two rows targeting same index, second should overwrite first
         uint8[] memory indices = new uint8[](2);
         uint32[] memory pairs = new uint32[](2);
+        
         indices[0] = idx;
         pairs[0] = pA;
         indices[1] = idx;
         pairs[1] = pB;
 
+        uint32[] memory tokenIdxs = new uint32[](2);
+        tokenIdxs[0] = pA + 20;
+        tokenIdxs[1] = pB + 20;
+
         vm.prank(admin);
-        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs);
+        hook.setTokenPriceConfigBatchIndex(address(pool), indices, pairs, tokenIdxs);
 
         (uint32 pair, uint32 div) = hook.getTokenPriceConfigIndex(address(pool), idx);
         assertEq(pair, pB, "last write did not win");
         // divisor must match sz of pB
-        uint8 szB = uint8(bound(uint8(pB), 0, 8));
+        uint8 szB = uint8(bound(uint8(pB), 1, 8));
         uint32 expectedDiv = uint32(10 ** uint32(8 - szB));
         assertEq(div, expectedDiv);
     }

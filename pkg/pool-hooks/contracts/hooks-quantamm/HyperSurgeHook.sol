@@ -150,25 +150,28 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     /// @notice Configure a single token’s Hyperliquid mapping for a given pool by token index (0..7).
     /// @param pool The pool address to configure.
     /// @param tokenIndex The balancer index of the token to configure (0..7).
-    /// @param pairIdx the index of the pair being set
+    /// @param hlPairIdx the index of the pair being set
+    /// @param hlTokenIdx the index of the token being set
     function setTokenPriceConfigIndex(
         address pool,
         uint8 tokenIndex,
-        uint32 pairIdx
+        uint32 hlPairIdx,
+        uint32 hlTokenIdx
     ) external onlySwapFeeManagerOrGovernance(pool) {
         PoolDetails storage details = _poolCfg[pool].details;
-        _setTokenPriceConfigIndex(pool, tokenIndex, pairIdx, details);
+        _setTokenPriceConfigIndex(pool, tokenIndex, hlPairIdx, hlTokenIdx, details);
     }
 
     function _setTokenPriceConfigIndex(
         address pool,
         uint8 tokenIndex,
-        uint32 pairIdx,
+        uint32 hlPairIdx,
+        uint32 hlTokenIdx,
         PoolDetails storage details
     ) internal {
         TokenPriceCfg memory tempCfg;
 
-        if (pairIdx == 0) {
+        if (hlPairIdx == 0) {
             revert InvalidPairIndex();
         }
 
@@ -176,17 +179,17 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             revert TokenIndexOutOfRange();
         }
 
-        tempCfg.sz = HyperTokenInfo.szDecimals(pairIdx); // may revert "dec"
+        tempCfg.sz = HyperTokenInfo.szDecimals(hlTokenIdx); 
 
         if (tempCfg.sz > 8) {
             revert InvalidDecimals();
         }
 
-        tempCfg.pairIndex = pairIdx;
+        tempCfg.pairIndex = hlPairIdx;
 
         _poolCfg[pool].tokenCfg[tokenIndex] = tempCfg;
 
-        emit TokenPriceConfiguredIndex(pool, tokenIndex, tempCfg.pairIndex, tempCfg.sz);
+        emit TokenPriceConfiguredIndex(pool, tokenIndex, tempCfg.pairIndex, hlTokenIdx, tempCfg.sz);
     }
 
     struct SetBatchConfigs {
@@ -201,7 +204,8 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     function setTokenPriceConfigBatchIndex(
         address pool,
         uint8[] calldata tokenIndices,
-        uint32[] calldata pairIdx
+        uint32[] calldata pairIdx,
+        uint32[] calldata hlTokenIdx
     ) external onlySwapFeeManagerOrGovernance(pool) {
         //TODO should this be done on construction? Not sure there is any reason to change it
         //or at least be blocked once set
@@ -213,7 +217,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
 
         for (cfg.i = 0; cfg.i < tokenIndices.length; ++cfg.i) {
-            _setTokenPriceConfigIndex(pool, tokenIndices[cfg.i], pairIdx[cfg.i], detail);
+            _setTokenPriceConfigIndex(pool, tokenIndices[cfg.i], pairIdx[cfg.i], hlTokenIdx[cfg.i], detail);
         }
     }
 

@@ -261,8 +261,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         _hlSetSpot(params.pairIdx, params.raw);
 
         vm.startPrank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), params.indexIn, params.pairIdx);
-        hook.setTokenPriceConfigIndex(address(pool), params.indexOut, params.pairIdx); // HL pair
+        hook.setTokenPriceConfigIndex(address(pool), params.indexIn, params.pairIdx, params.pairIdx + 20);
+        hook.setTokenPriceConfigIndex(address(pool), params.indexOut, params.pairIdx, params.pairIdx + 20); // HL pair
         vm.stopPrank();
 
         // --- balancesScaled18 with length N (simple increasing balances)
@@ -343,12 +343,12 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         params.indexOut = uint8(bound(outSeed, 1, uint8(params.n - 1)));
 
         params.pairIdx = 1;
-        _hlSetSzDecimals(params.pairIdx, uint8(params.divisor));
+        _hlSetSzDecimals(params.pairIdx + 20, uint8(params.divisor));
         _hlSetSpot(params.pairIdx, params.raw);
 
         vm.startPrank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), params.indexIn, params.pairIdx);
-        hook.setTokenPriceConfigIndex(address(pool), params.indexOut, params.pairIdx); // HL pair
+        hook.setTokenPriceConfigIndex(address(pool), params.indexIn, params.pairIdx, params.pairIdx + 20);
+        hook.setTokenPriceConfigIndex(address(pool), params.indexOut, params.pairIdx, params.pairIdx + 20); // HL pair
         vm.stopPrank();
 
         // --- balancesScaled18 length N
@@ -472,8 +472,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         _hlSetSpot(locals.pairIdx, 0); // spot=0 → hook may return (ok=false), but must not revert
 
         vm.startPrank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), locals.indexIn, locals.pairIdx);
-        hook.setTokenPriceConfigIndex(address(pool), locals.indexOut, locals.pairIdx);
+        hook.setTokenPriceConfigIndex(address(pool), locals.indexIn, locals.pairIdx, locals.pairIdx + 20);
+        hook.setTokenPriceConfigIndex(address(pool), locals.indexOut, locals.pairIdx, locals.pairIdx + 20);
         vm.stopPrank();
 
         // 5) Balances array of length N (ascending 1e18, 2e18, ...)

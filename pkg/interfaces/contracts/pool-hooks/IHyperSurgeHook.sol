@@ -33,13 +33,15 @@ interface IHyperSurgeHook {
      * @notice Emitted when a token's external price configuration is set by token index.
      * @param pool         Pool address being configured
      * @param tokenIndex   Token index within the pool (0-based)
-     * @param pairIndex    Hyperliquid pair/market index 
+     * @param hlPairIndex    Hyperliquid pair/market index
+     * @param hlTokenIndex   Hyperliquid token index
      * @param szDecimals   Hyperliquid size-decimals for that pair
      */
     event TokenPriceConfiguredIndex(
         address indexed pool,
         uint8 indexed tokenIndex,
-        uint32 pairIndex,
+        uint32 hlPairIndex,
+        uint32 hlTokenIndex,
         uint8 szDecimals
     );
 
@@ -74,23 +76,29 @@ interface IHyperSurgeHook {
 
     /**
      * @notice Configure a single token’s external price mapping by token index for a given pool.
-     * @dev
-     * - `pairIdx` must be nonzero and map to a valid Hyperliquid market.
+     * @param tokenIndex balancer pools index of the token
+     * @param hlPairIdx the index of the pair being set from hl
+     * @param hlTokenIdx the index of the token being set from hl
      */
     function setTokenPriceConfigIndex(
         address pool,
         uint8 tokenIndex,
-        uint32 pairIdx
+        uint32 hlPairIdx,
+        uint32 hlTokenIdx
     ) external;
 
     /**
      * @notice Batch configure multiple tokens’ external price mapping by token index for a given pool.
-     * @dev Array lengths must match: tokenIndices.length == pairIdx.length.
+     * @param pool The pool address to configure.
+     * @param tokenIndices The balancer indices of the tokens to configure (0..7).
+     * @param hlPairIdx The indices of the pairs being set from hl.
+     * @param hlTokenIdx The indices of the tokens being set from hl.
      */
     function setTokenPriceConfigBatchIndex(
         address pool,
         uint8[] calldata tokenIndices,
-        uint32[] calldata pairIdx
+        uint32[] calldata hlPairIdx,
+        uint32[] calldata hlTokenIdx
     ) external;
 
     /**

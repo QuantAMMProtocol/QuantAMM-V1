@@ -33,10 +33,6 @@ import {
 } from "@balancer-labs/v3-pool-weighted/test/foundry/utils/WeightedPoolContractsDeployer.sol";
 import { WeightedPool } from "@balancer-labs/v3-pool-weighted/contracts/WeightedPool.sol";
 
-/*//////////////////////////////////////////////////////////////
-                           PRECOMPILE STUBS
-//////////////////////////////////////////////////////////////*/
-
 contract HLPriceStub {
     mapping(uint32 => uint32) internal px; // slot 0
 
@@ -74,6 +70,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
     address constant HL_PRICE_PRECOMPILE = 0x0000000000000000000000000000000000000808;
     address constant HL_TOKENINFO_PRECOMPILE = 0x0000000000000000000000000000000000000807;
     uint256 internal constant DEFAULT_SWAP_FEE = 1e16; // 1%
+    uint256 constant FEE_ONE = 1e18;
 
     HyperSurgeHookMock internal hook;
 
@@ -131,10 +128,6 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
             vault
         );
     }
-
-    /*//////////////////////////////////////////////////////////////
-                                SETUP
-    //////////////////////////////////////////////////////////////*/
 
     function setUp() public virtual override {
         super.setUp(); // vault, poolocalCompute, poolFactory, admin, authorizer, tokens, routers, ...
@@ -513,12 +506,6 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         }
     }
 
-    /* ================================
-       =     FEE ENGINE – HELPERS     =
-       ================================ */
-
-    uint256 private constant FEE_ONE = 1e18;
-
     function fee_mulDown(uint256 a, uint256 b) internal pure returns (uint256) {
         return (a * b) / FEE_ONE;
     }
@@ -666,10 +653,6 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         // Max fee must be >= static swap fee (1% => 10_000_000 ppm9), and <= 90%
         maxp = uint32(bound(maxPPM9, 10_000_000, 900_000_000));
     }
-
-    /* ============================================
-       =   INTERNAL ENGINE: LOGIC & OUTPUT TESTS   =
-       ============================================ */
 
     struct FeeRampLocals {
         uint8 n;

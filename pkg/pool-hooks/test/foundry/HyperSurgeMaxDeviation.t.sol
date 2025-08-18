@@ -16,12 +16,11 @@ import { BaseVaultTest } from "@balancer-labs/v3-vault/test/foundry/utils/BaseVa
 /// the hook's ComputeSurgeFee pure entrypoint.
 contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
     uint256 constant ONE = 1e18;
-
-    // Use the same defaults as the original tests (units: 1e9 => 0.1% == 1_000_000)
     uint256 constant DEFAULT_MAX_SURGE_FEE_PPM9 = 0.05e9; // 5%
     uint256 constant DEFAULT_THRESHOLD_PPM9 = 0.1e9; // 0.1%
     uint256 constant DEFAULT_CAP_DEV_PPM9 = 0.5e9; // 50%
     uint256 constant STATIC_SWAP_FEE = 1e16; // 1% (1e18 scale)
+    uint256 constant WEIGHT_MIN = 1e16; // 1%
 
     HyperSurgeHookMock internal hook;
 
@@ -37,10 +36,6 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
             "test"
         );
     }
-
-    /* ───────────────────────── helpers ───────────────────────── */
-
-    uint256 constant WEIGHT_MIN = 1e16; // 1%
 
     // Simple normalized weights with a 1% floor, deterministic from a seed.
     function _normWeights(uint8 n, uint256 seed) internal pure returns (uint256[] memory w) {
@@ -167,7 +162,6 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         return fee;
     }
 
-    /* ───────────────────────── tests ───────────────────────── */
 
     /// 1) Below threshold ⇒ the dynamic fee must equal the static (minimum) fee.
     function testFuzz_feeBelowThreshold_min(uint8 nSeed, uint256 wSeed, uint256 bSeed, uint256 dSeed) public view {
@@ -265,8 +259,6 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         assertEq(fee, expected, "fee must follow linear ramp between min and max");
     }
 
-    /* ───────────────────────── extra helpers ───────────────────────── */
-
     function _ppm9To1e18(uint32 v) internal pure returns (uint256) {
         // 1 ppm9 unit = 1e-9 in 1e18 fixed => multiply by 1e9
         return uint256(v) * 1e9;
@@ -300,8 +292,6 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         if (fee > maxPct) fee = maxPct;
         return fee;
     }
-
-    /* ───────────────────────── new fuzz tests ───────────────────────── */
 
     struct MonotonicInDeviationLocals {
         uint8 n;

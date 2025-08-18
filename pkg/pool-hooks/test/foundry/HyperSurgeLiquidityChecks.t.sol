@@ -35,10 +35,6 @@ import {
 } from "@balancer-labs/v3-pool-weighted/test/foundry/utils/WeightedPoolContractsDeployer.sol";
 import { WeightedPool } from "@balancer-labs/v3-pool-weighted/contracts/WeightedPool.sol";
 
-/*//////////////////////////////////////////////////////////////
-                           PRECOMPILE STUBS
-//////////////////////////////////////////////////////////////*/
-
 contract HLPriceStub {
     mapping(uint32 => uint32) internal px; // slot 0
 
@@ -64,10 +60,6 @@ contract HLTokenInfoStub {
         sz[pairIndex] = decimals;
     }
 }
-
-/*//////////////////////////////////////////////////////////////
-                             TESTS
-//////////////////////////////////////////////////////////////*/
 
 contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolContractsDeployer {
     using ArrayHelpers for *;
@@ -137,10 +129,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                                SETUP
-    //////////////////////////////////////////////////////////////*/
-
     function _hlSetSpot(uint32 pairIdx, uint32 price_1e6) internal {
         bytes32 slot = keccak256(abi.encode(bytes32(uint256(pairIdx)), bytes32(uint256(0))));
         vm.store(HL_PRICE_PRECOMPILE, slot, bytes32(uint256(price_1e6)));
@@ -193,8 +181,6 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             admin
         );
     }
-
-    /* ───────────────────────── helpers ───────────────────────── */
 
     function _poolTokenCount() internal view returns (uint8) {
         uint256 len = WeightedPool(address(pool)).getNormalizedWeights().length;

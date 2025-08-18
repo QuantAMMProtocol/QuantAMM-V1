@@ -18,9 +18,9 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
     uint256 constant ONE = 1e18;
 
     // Use the same defaults as the original tests (units: 1e9 => 0.1% == 1_000_000)
-    uint256 constant DEFAULT_MAX_SURGE_FEE_PPM9 = 50_000_000; // 5%
-    uint256 constant DEFAULT_THRESHOLD_PPM9 = 1_000_000; // 0.1%
-    uint256 constant DEFAULT_CAP_DEV_PPM9 = 500_000_000; // 50%
+    uint256 constant DEFAULT_MAX_SURGE_FEE_PPM9 = 0.05e9; // 5%
+    uint256 constant DEFAULT_THRESHOLD_PPM9 = 0.1e9; // 0.1%
+    uint256 constant DEFAULT_CAP_DEV_PPM9 = 0.5e9; // 50%
     uint256 constant STATIC_SWAP_FEE = 1e16; // 1% (1e18 scale)
 
     HyperSurgeHookMock internal hook;
@@ -31,9 +31,9 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         // Vault is unused by the pure helper; supply a placeholder.
         hook = new HyperSurgeHookMock(
             IVault(vault),
-            DEFAULT_MAX_SURGE_FEE_PPM9,
-            DEFAULT_THRESHOLD_PPM9,
-            DEFAULT_CAP_DEV_PPM9,
+            DEFAULT_MAX_SURGE_FEE_PPM9 * 1e9,
+            DEFAULT_THRESHOLD_PPM9 * 1e9,
+            DEFAULT_CAP_DEV_PPM9 * 1e9,
             "test"
         );
     }
@@ -110,14 +110,14 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         L.pxOut = pxOut;
 
         // Configure NOISE lane (used when deviation does not worsen).
-        L.poolDetails.noiseThresholdPercentage = uint32(DEFAULT_THRESHOLD_PPM9);
-        L.poolDetails.noiseMaxSurgeFeePercentage = uint32(DEFAULT_MAX_SURGE_FEE_PPM9);
-        L.poolDetails.noiseCapDeviationPercentage = uint32(DEFAULT_CAP_DEV_PPM9);
+        L.poolDetails.noiseThresholdPercentage9dp = uint32(DEFAULT_THRESHOLD_PPM9);
+        L.poolDetails.noiseMaxSurgeFee9dp = uint32(DEFAULT_MAX_SURGE_FEE_PPM9);
+        L.poolDetails.noiseCapDeviationPercentage9dp = uint32(DEFAULT_CAP_DEV_PPM9);
 
         // Set ARB lane too (not used here, but keep consistent).
-        L.poolDetails.arbThresholdPercentage = uint32(DEFAULT_THRESHOLD_PPM9);
-        L.poolDetails.arbMaxSurgeFeePercentage = uint32(DEFAULT_MAX_SURGE_FEE_PPM9);
-        L.poolDetails.arbCapDeviationPercentage = uint32(DEFAULT_CAP_DEV_PPM9);
+        L.poolDetails.arbThresholdPercentage9dp = uint32(DEFAULT_THRESHOLD_PPM9);
+        L.poolDetails.arbMaxSurgeFee9dp = uint32(DEFAULT_MAX_SURGE_FEE_PPM9);
+        L.poolDetails.arbCapDeviationPercentage9dp = uint32(DEFAULT_CAP_DEV_PPM9);
     }
 
     // 1e18 fixed-point helpers identical to Balancer's FixedPoint
@@ -183,7 +183,7 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
 
         vm.assume(P > 0);
 
-        uint256 threshold = DEFAULT_THRESHOLD_PPM9 * 1e9;
+        uint256 threshold = DEFAULT_THRESHOLD_PPM9;
         // target deviation in [0 .. threshold] (inclusive lower range)
         uint256 D = uint256(keccak256(abi.encode(dSeed))) % (threshold + 1);
 
@@ -243,8 +243,8 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         uint256 P = _pairSpotFromBalancesWeights(b[i], w[i], b[j], w[j]);
         vm.assume(P > 0);
 
-        uint256 threshold = DEFAULT_THRESHOLD_PPM9 * 1e9;
-        uint256 capDev = DEFAULT_CAP_DEV_PPM9 * 1e9;
+        uint256 threshold = DEFAULT_THRESHOLD_PPM9;
+        uint256 capDev = DEFAULT_CAP_DEV_PPM9;
         uint256 span = capDev - threshold;
 
         // Target a deviation strictly inside (threshold, capDev):
@@ -335,7 +335,7 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         locals.price = _pairSpotFromBalancesWeights(b[locals.i], w[locals.i], b[locals.j], w[locals.j]);
         vm.assume(locals.price > 0);
 
-        locals.capDev1e18 = DEFAULT_CAP_DEV_PPM9 * 1e9;
+        locals.capDev1e18 = DEFAULT_CAP_DEV_PPM9;
         // Pick two target deviations in [0, capDev*3/2]
         uint256 D1 = uint256(keccak256(abi.encode(dSeed1))) % (locals.capDev1e18 + locals.capDev1e18 / 2 + 1);
         uint256 D2raw = uint256(keccak256(abi.encode(dSeed2))) % (locals.capDev1e18 + locals.capDev1e18 / 2 + 1);
@@ -388,7 +388,7 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         vm.assume(P_ij > 0);
 
         // Pick some deviation (bounded safely below 1 to keep pxOut > 0 in _localsForDeviation)
-        uint256 capDev = DEFAULT_CAP_DEV_PPM9 * 1e9;
+        uint256 capDev = DEFAULT_CAP_DEV_PPM9;
         uint256 D = uint256(keccak256(abi.encode(dSeed))) % (capDev + capDev / 2 + 1);
 
         (uint256 pxIn, uint256 pxOut) = _localsForDeviation(P_ij, D);
@@ -458,13 +458,13 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         locals.price = _pairSpotFromBalancesWeights(b[locals.i], w[locals.i], b[locals.j], w[locals.j]);
         vm.assume(locals.price > 0);
 
-        locals.capDev1e18 = DEFAULT_CAP_DEV_PPM9 * 1e9;
+        locals.capDev1e18 = DEFAULT_CAP_DEV_PPM9;
         locals.deviation = uint256(keccak256(abi.encode(dSeed))) % (locals.capDev1e18 + locals.capDev1e18 / 2 + 1);
 
         (locals.pxIn, locals.pxOut) = _localsForDeviation(locals.price, locals.deviation);
 
         // Choose static fee in [0 .. maxPct]
-        uint256 maxPct = DEFAULT_MAX_SURGE_FEE_PPM9 * 1e9;
+        uint256 maxPct = DEFAULT_MAX_SURGE_FEE_PPM9;
         uint256 staticFee = uint256(staticFeeSeed) % (maxPct + 1);
 
         HyperSurgeHookMock.ComputeSurgeFeeLocals memory L = _makeLocals(
@@ -528,7 +528,7 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         locals.price = _pairSpotFromBalancesWeights(b[locals.i], w[locals.i], b[locals.j], w[locals.j]);
         vm.assume(locals.price > 0);
 
-        locals.capDev1e18 = DEFAULT_CAP_DEV_PPM9 * 1e9;
+        locals.capDev1e18 = DEFAULT_CAP_DEV_PPM9;
         locals.deviation = uint256(keccak256(abi.encode(dSeed))) % (locals.capDev1e18 + locals.capDev1e18 / 2 + 1);
 
         (locals.pxIn, locals.pxOut) = _localsForDeviation(locals.price, locals.deviation);
@@ -613,8 +613,8 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         locals.P = _pairSpotFromBalancesWeights(b[locals.i], w[locals.i], b[locals.j], w[locals.j]);
         vm.assume(locals.P > 0);
 
-        locals.threshold = DEFAULT_THRESHOLD_PPM9 * 1e9;
-        locals.capDev = DEFAULT_CAP_DEV_PPM9 * 1e9;
+        locals.threshold = DEFAULT_THRESHOLD_PPM9;
+        locals.capDev = DEFAULT_CAP_DEV_PPM9;
 
         locals.offs = [-2, -1, 0, 1, 2];
 
@@ -693,7 +693,7 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         uint256 P = _pairSpotFromBalancesWeights(b[i], w[i], b[j], w[j]);
         vm.assume(P > 0);
 
-        uint256 capDev = DEFAULT_CAP_DEV_PPM9 * 1e9;
+        uint256 capDev = DEFAULT_CAP_DEV_PPM9;
         uint256 D = uint256(keccak256(abi.encode(dSeed))) % (capDev + capDev / 3 + 1);
 
         (uint256 pxIn, uint256 pxOut) = _localsForDeviation(P, D);

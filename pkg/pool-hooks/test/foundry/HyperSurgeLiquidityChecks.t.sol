@@ -157,9 +157,9 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         vm.prank(address(poolFactory)); // some repos require factory to deploy
         hook = deployHook(
             IVault(address(vault)),
-            0.02e9, // default max fee (2%)
-            0.02e9, // default threshold (2%)
-            1e9,
+            0.02e18, // default max fee (2%)
+            0.02e18, // default threshold (2%)
+            1e18,
             string("test")
         );
 
@@ -231,9 +231,9 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
     /// Small, permissive thresholds in ppb (1e9)
     function _configThresholds() internal {
         vm.startPrank(admin);
-        hook.setMaxSurgeFeePercentage(address(pool), 50_000_000, IHyperSurgeHook.TradeType.NOISE); // 5%
-        hook.setSurgeThresholdPercentage(address(pool), 1_000_000, IHyperSurgeHook.TradeType.NOISE); // 0.1%
-        hook.setCapDeviationPercentage(address(pool), 500_000_000, IHyperSurgeHook.TradeType.NOISE); // 50%
+        hook.setMaxSurgeFeePercentage(address(pool), 50_000_000_000000000, IHyperSurgeHook.TradeType.NOISE); // 5%
+        hook.setSurgeThresholdPercentage(address(pool), 1_000_000_000000000, IHyperSurgeHook.TradeType.NOISE); // 0.1%
+        hook.setCapDeviationPercentage(address(pool), 500_000_000_000000000, IHyperSurgeHook.TradeType.NOISE); // 50%
         vm.stopPrank();
     }
 
@@ -657,5 +657,534 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             ""
         );
         assertTrue(ok, "improving/neutral deviation must allow");
+    }
+
+    /// CASE 1: Starts outside threshold and worsens ⇒ must BLOCK.
+    /// Old: token0 5% BELOW proportional (above-price, |dev|=5%).
+    /// Remove: further 2% from token0 ⇒ |dev| increases (remains outside).
+    function testFuzz_onAfterRemoveLiquidity_case1_outside_worsens_blocks_n(
+        uint8 nSeed,
+        uint32 pairSeed,
+        uint8 szSeed
+    ) public {
+        uint8 n = _registerBasePoolWithPoolN(uint8(bound(nSeed, 2, 8)));
+        _configHLForAll(n, pairSeed, szSeed);
+        _configThresholds(); // ~2%
+
+        // Balanced baseline
+        uint256[] memory base = _balancesProportionalToWeights(n);
+
+        // Old state O: token0 reduced by 5%
+        uint256 d5 = base[0] / 20;
+        if (d5 == 0) d5 = 1;
+        uint256[] memory deviatedBalances = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            deviatedBalances[k] = base[k];
+        }
+        deviatedBalances[0] = base[0] - d5;
+
+        // Post B' : remove an additional 2% from token0
+        uint256 d2 = base[0] / 50;
+        if (d2 == 0) d2 = 1;
+        uint256[] memory Bprime = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            Bprime[k] = deviatedBalances[k];
+        }
+        Bprime[0] = deviatedBalances[0] - d2;
+
+        // Amounts = O - B'
+        uint256[] memory amountsScaled18 = new uint256[](n);
+        uint256[] memory amountsRaw = new uint256[](n);
+        amountsScaled18[0] = deviatedBalances[0] - Bprime[0];
+        amountsRaw[0] = amountsScaled18[0];
+
+        (bool ok, ) = hook.onAfterRemoveLiquidity(
+            address(this),
+            address(pool),
+            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
+            0,
+            amountsScaled18,
+            amountsRaw,
+            Bprime,
+            ""
+        );
+
+        assertFalse(ok, "outside + worsened must block");
+    }
+
+    /// CASE 2: Starts outside threshold, improves but still outside ⇒ must ALLOW.
+    /// Old: token0 5% BELOW proportional (|dev|=5%).
+    /// Remove: 1% from token1 ⇒ shrinks |dev| to ~4% (>2%) but improves.
+    function testFuzz_onAfterRemoveLiquidity_case2_outside_improves_but_outside_allows_n(
+        uint8 nSeed,
+        uint32 pairSeed,
+        uint8 szSeed
+    ) public {
+        uint8 n = _registerBasePoolWithPoolN(uint8(bound(nSeed, 2, 8)));
+        _configHLForAll(n, pairSeed, szSeed);
+        _configThresholds();
+
+        uint256[] memory base = _balancesProportionalToWeights(n);
+
+        // Old O: token0 5% low
+        uint256 d5 = base[0] / 20;
+        if (d5 == 0) {
+            d5 = 1;
+        }
+        uint256[] memory deviatedBalances = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            deviatedBalances[k] = base[k];
+        }
+        deviatedBalances[0] = base[0] - d5;
+
+        // Post B' : remove 1% from token1 -> reduces deviation but stays > 2%
+        uint256 d1 = base[1] / 100;
+        if (d1 == 0) {
+            d1 = 1;
+        }
+        uint256[] memory Bprime = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            Bprime[k] = deviatedBalances[k];
+        }
+        Bprime[1] = deviatedBalances[1] - d1;
+
+        uint256[] memory amountsScaled18 = new uint256[](n);
+        uint256[] memory amountsRaw = new uint256[](n);
+        amountsScaled18[1] = deviatedBalances[1] - Bprime[1];
+        amountsRaw[1] = amountsScaled18[1];
+
+        (bool ok, ) = hook.onAfterRemoveLiquidity(
+            address(this),
+            address(pool),
+            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
+            0,
+            amountsScaled18,
+            amountsRaw,
+            Bprime,
+            ""
+        );
+
+        assertTrue(ok, "outside but improving (still outside) must allow");
+    }
+
+    /// CASE 3: Starts inside threshold, worsens but stays inside ⇒ must ALLOW.
+    /// Old: token0 1% BELOW proportional (|dev|=1% < 2%).
+    /// Remove: extra 0.5% from token0 ⇒ |dev|~1.5% still inside.
+    function testFuzz_onAfterRemoveLiquidity_case3_inside_worsens_but_inside_allows_n(
+        uint8 nSeed,
+        uint32 pairSeed,
+        uint8 szSeed
+    ) public {
+        uint8 n = _registerBasePoolWithPoolN(uint8(bound(nSeed, 2, 8)));
+        _configHLForAll(n, pairSeed, szSeed);
+        _configThresholds();
+
+        vm.startPrank(admin);
+        // 2% in ppm9 (2e7); use NOISE lane because onAfterRemoveLiquidity checks NOISE
+        hook.setSurgeThresholdPercentage(address(pool), 20_000_000_000000000, IHyperSurgeHook.TradeType.NOISE);
+        vm.stopPrank();
+
+        uint256[] memory base = _balancesProportionalToWeights(n);
+
+        uint256 d1 = base[0] / 100;
+        if (d1 == 0) {
+            d1 = 1;
+        } // 1%
+        uint256 d05 = base[0] / 200;
+        if (d05 == 0) {
+            d05 = 1;
+        } // 0.5%
+
+        uint256[] memory deviatedBalances = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            deviatedBalances[k] = base[k];
+        }
+        deviatedBalances[0] = base[0] - d1;
+
+        uint256[] memory Bprime = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            Bprime[k] = deviatedBalances[k];
+        }
+        Bprime[0] = deviatedBalances[0] - d05; // worsens but still <= 2%
+
+        uint256[] memory amountsScaled18 = new uint256[](n);
+        uint256[] memory amountsRaw = new uint256[](n);
+        amountsScaled18[0] = deviatedBalances[0] - Bprime[0];
+        amountsRaw[0] = amountsScaled18[0];
+
+        (bool ok, ) = hook.onAfterRemoveLiquidity(
+            address(this),
+            address(pool),
+            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
+            0,
+            amountsScaled18,
+            amountsRaw,
+            Bprime,
+            ""
+        );
+
+        assertTrue(ok, "inside but worsening (still inside) must allow");
+    }
+
+    /// CASE 4: Starts inside threshold, worsens but stays inside (opposite orientation) ⇒ ALLOW.
+    /// Old: token0 1% ABOVE proportional (below-price, |dev|=1%).
+    /// Remove: 0.5% from token1 (reduces token1) ⇒ increases relative excess of token0 but still < 2%.
+    function testFuzz_onAfterRemoveLiquidity_case4_inside_worsens_but_inside_allows_alt_n(
+        uint8 nSeed,
+        uint32 pairSeed,
+        uint8 szSeed
+    ) public {
+        uint8 n = _registerBasePoolWithPoolN(uint8(bound(nSeed, 2, 8)));
+        _configHLForAll(n, pairSeed, szSeed);
+        _configThresholds();
+
+        vm.startPrank(admin);
+        // 2% in ppm9 (2e7); use NOISE lane because onAfterRemoveLiquidity checks NOISE
+        hook.setSurgeThresholdPercentage(address(pool), 20_000_000_000000000, IHyperSurgeHook.TradeType.NOISE);
+        vm.stopPrank();
+
+        uint256[] memory base = _balancesProportionalToWeights(n);
+
+        uint256 d1 = base[0] / 100;
+        if (d1 == 0) {
+            d1 = 1;
+        } // 1%
+        uint256 d05 = base[1] / 200;
+        if (d05 == 0) {
+            d05 = 1;
+        } // 0.5%
+
+        uint256[] memory deviatedBalances = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            deviatedBalances[k] = base[k];
+        }
+        deviatedBalances[0] = base[0] + d1; // token0 too large (below-price orientation)
+
+        uint256[] memory Bprime = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            Bprime[k] = deviatedBalances[k];
+        }
+        Bprime[1] = deviatedBalances[1] - d05; // makes token0 relatively larger ⇒ worsens but still inside
+
+        uint256[] memory amountsScaled18 = new uint256[](n);
+        uint256[] memory amountsRaw = new uint256[](n);
+        amountsScaled18[1] = deviatedBalances[1] - Bprime[1];
+        amountsRaw[1] = amountsScaled18[1];
+
+        vm.startPrank(address(vault));
+        (bool ok, ) = hook.onAfterRemoveLiquidity(
+            address(this),
+            address(pool),
+            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
+            0,
+            amountsScaled18,
+            amountsRaw,
+            Bprime,
+            ""
+        );
+        vm.stopPrank();
+
+        assertTrue(ok, "inside but worsening (alt orientation) must allow");
+    }
+
+    /// CASE 5: Starts outside ABOVE-price, ends outside BELOW-price ⇒ must BLOCK.
+    /// Old: token0 5% BELOW proportional (above-price).
+    /// Remove: 10% from token1 ⇒ cross to the other side with |dev| ≈ 5.6% (>2%).
+    function testFuzz_onAfterRemoveLiquidity_case5_outside_above_to_outside_below_blocks_n(
+        uint8 nSeed,
+        uint32 pairSeed,
+        uint8 szSeed
+    ) public {
+        uint8 n = _registerBasePoolWithPoolN(uint8(bound(nSeed, 2, 8)));
+        _configHLForAll(n, pairSeed, szSeed);
+        _configThresholds();
+
+        uint256[] memory base = _balancesProportionalToWeights(n);
+
+        uint256 d5 = base[0] / 20;
+        if (d5 == 0) {
+            d5 = 1;
+        } // 5%
+        uint256 d10 = base[1] / 10;
+        if (d10 == 0) {
+            d10 = 1;
+        } // 10%
+
+        uint256[] memory deviatedBalances = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            deviatedBalances[k] = base[k];
+        }
+        deviatedBalances[0] = base[0] - d5; // above-price
+
+        uint256[] memory Bprime = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            Bprime[k] = deviatedBalances[k];
+        }
+        Bprime[1] = deviatedBalances[1] - d10; // strong remove from token1 ⇒ flip and still outside
+
+        uint256[] memory amountsScaled18 = new uint256[](n);
+        uint256[] memory amountsRaw = new uint256[](n);
+        amountsScaled18[1] = deviatedBalances[1] - Bprime[1];
+        amountsRaw[1] = amountsScaled18[1];
+
+        vm.startPrank(address(vault));
+        (bool ok, ) = hook.onAfterRemoveLiquidity(
+            address(this),
+            address(pool),
+            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
+            0,
+            amountsScaled18,
+            amountsRaw,
+            Bprime,
+            ""
+        );
+        vm.stopPrank();
+
+        assertFalse(ok, "outside above -> outside below (worsened) must block");
+    }
+
+    /// CASE 6: Starts outside BELOW-price, ends outside ABOVE-price ⇒ must BLOCK.
+    /// Old: token0 5% ABOVE proportional (below-price).
+    /// Remove: amount so token0 ends ~0.95 * base (≈5% above-price) ⇒ still outside and worsened.
+    function testFuzz_onAfterRemoveLiquidity_case6_outside_below_to_same_above_allows_n(
+        uint8 nSeed,
+        uint32 pairSeed,
+        uint8 szSeed
+    ) public {
+        uint8 n = _registerBasePoolWithPoolN(uint8(bound(nSeed, 2, 8)));
+        _configHLForAll(n, pairSeed, szSeed);
+        _configThresholds();
+
+        uint256[] memory base = _balancesProportionalToWeights(n);
+
+        uint256 d5 = base[0] / 20;
+        if (d5 == 0) {
+            d5 = 1;
+        } // 5%
+
+        // Old O: token0 5% high (below-price)
+        uint256[] memory deviatedBalances = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            deviatedBalances[k] = base[k];
+        }
+        deviatedBalances[0] = base[0] + d5;
+
+        // Target post: token0 ≈ 95% of base ⇒ remove d = O0 - 0.95*base0 = (1.05 - 0.95)*base0 = 0.10*base0
+        uint256 dTarget = base[0] / 10;
+        if (dTarget == 0) dTarget = 1;
+
+        uint256[] memory Bprime = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            Bprime[k] = deviatedBalances[k];
+        }
+        // Safe by construction: O0 = 1.05*base0 ≥ base0/10
+        Bprime[0] = deviatedBalances[0] - dTarget;
+
+        uint256[] memory amountsScaled18 = new uint256[](n);
+        uint256[] memory amountsRaw = new uint256[](n);
+        amountsScaled18[0] = deviatedBalances[0] - Bprime[0];
+        amountsRaw[0] = amountsScaled18[0];
+
+        vm.startPrank(address(vault));
+        (bool ok, ) = hook.onAfterRemoveLiquidity(
+            address(this),
+            address(pool),
+            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
+            0,
+            amountsScaled18,
+            amountsRaw,
+            Bprime,
+            ""
+        );
+        vm.stopPrank();
+
+        assertTrue(ok, "must be greater than, equal is fine");
+    }
+
+    /// CASE 6 (worsened): Starts outside BELOW-price, ends outside ABOVE-price with *larger* deviation ⇒ must BLOCK.
+    /// Old: token0 slightly ABOVE proportional (≈2.5% → below-price).
+    /// Post: token0 well BELOW proportional (≈10% → above-price).
+    /// With _configThresholds() (e.g., ≈2%), both states are outside, and afterDev > beforeDev ⇒ hook blocks.
+    function testFuzz_onAfterRemoveLiquidity_case6_outside_below_to_outside_above_blocks_n(
+        uint8 nSeed,
+        uint32 pairSeed,
+        uint8 szSeed
+    ) public {
+        // Pool & oracle config (HL sets 1:1 ext px so deviations are driven by balances)
+        uint8 n = _registerBasePoolWithPoolN(uint8(bound(nSeed, 2, 8)));
+        _configHLForAll(n, pairSeed, szSeed);
+        _configThresholds(); // ensure a small threshold (≈2%) so both sides are outside
+
+        // Balanced baseline (proportional to weights)
+        uint256[] memory base = _balancesProportionalToWeights(n);
+
+        // Choose before/after magnitudes: before ≈ 2.5%, after ≈ 10% (both > threshold, and after > before).
+        uint256 dBefore = base[0] / 40; // 2.5%
+        if (dBefore == 0) {
+            dBefore = 1;
+        }
+        uint256 dAfter = base[0] / 10; // 10%
+        if (dAfter == 0) {
+            dAfter = 1;
+        }
+
+        // Old O: token0 2.5% HIGH (below-price side)
+        uint256[] memory deviatedBalances = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            deviatedBalances[k] = base[k];
+        }
+        deviatedBalances[0] = base[0] + dBefore;
+
+        // Post B': token0 10% LOW (above-price side); other tokens remain at base
+        uint256[] memory Bprime = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            Bprime[k] = deviatedBalances[k];
+        }
+        Bprime[0] = base[0] - dAfter;
+
+        // SINGLE_TOKEN_EXACT_IN remove: amounts = O - B' (only index 0 non-zero)
+        uint256[] memory amountsScaled18 = new uint256[](n);
+        uint256[] memory amountsRaw = new uint256[](n);
+        amountsScaled18[0] = deviatedBalances[0] - Bprime[0]; // dBefore + dAfter
+        amountsRaw[0] = amountsScaled18[0];
+
+        // Call must be from vault
+        vm.startPrank(address(vault));
+        (bool ok, ) = hook.onAfterRemoveLiquidity(
+            address(this),
+            address(pool),
+            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
+            0,
+            amountsScaled18,
+            amountsRaw,
+            Bprime,
+            ""
+        );
+        vm.stopPrank();
+
+        // Crossed sides and deviation magnitude increased -> afterDev > beforeDev and afterDev > threshold -> block
+        assertFalse(ok, "outside below -> outside above (worsened) must block");
+    }
+
+    /// CASE 7: Starts outside BELOW-price, ends inside ABOVE-price ⇒ must ALLOW (improves into threshold).
+    /// Old: token0 5% ABOVE proportional (below-price).
+    /// Remove: amount so token0 ends ~0.99 * base (≈1% above-price) ⇒ inside threshold and improved.
+    function testFuzz_onAfterRemoveLiquidity_case7_outside_below_to_inside_above_allows_n(
+        uint8 nSeed,
+        uint32 pairSeed,
+        uint8 szSeed
+    ) public {
+        uint8 n = _registerBasePoolWithPoolN(uint8(bound(nSeed, 2, 8)));
+        _configHLForAll(n, pairSeed, szSeed);
+        _configThresholds();
+
+        uint256[] memory base = _balancesProportionalToWeights(n);
+
+        uint256 d5 = base[0] / 20;
+        if (d5 == 0) {
+            d5 = 1;
+        } // 5%
+        uint256 d06 = base[0] / 16;
+        if (d06 == 0) {
+            d06 = 1;
+        } // ~6.25% (≈ from 1.05 -> ~0.9875), close enough; still < 2% if tuned
+
+        // Old: 5% high
+        uint256[] memory deviatedBalances = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            deviatedBalances[k] = base[k];
+        }
+        deviatedBalances[0] = base[0] + d5;
+
+        // Post: remove ~6% of base0 from token0 so it crosses to slightly low (~<=1–1.5%), inside threshold.
+        uint256[] memory Bprime = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            Bprime[k] = deviatedBalances[k];
+        }
+        if (d06 >= deviatedBalances[0]) {
+            d06 = deviatedBalances[0] - 1;
+        } // safety
+        Bprime[0] = deviatedBalances[0] - d06;
+
+        uint256[] memory amountsScaled18 = new uint256[](n);
+        uint256[] memory amountsRaw = new uint256[](n);
+        amountsScaled18[0] = deviatedBalances[0] - Bprime[0];
+        amountsRaw[0] = amountsScaled18[0];
+
+        vm.startPrank(address(vault));
+        (bool ok, ) = hook.onAfterRemoveLiquidity(
+            address(this),
+            address(pool),
+            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
+            0,
+            amountsScaled18,
+            amountsRaw,
+            Bprime,
+            ""
+        );
+        vm.stopPrank();
+
+        assertTrue(ok, "outside below -> inside above must allow");
+    }
+
+    /// CASE 8: Starts outside ABOVE-price, ends inside BELOW-price ⇒ must ALLOW (improves into threshold).
+    /// Old: token0 5% BELOW proportional (above-price).
+    /// Remove: ~6% from token1 ⇒ cross to slight below-price but |dev|<2%.
+    function testFuzz_onAfterRemoveLiquidity_case8_outside_above_to_inside_below_allows_n(
+        uint8 nSeed,
+        uint32 pairSeed,
+        uint8 szSeed
+    ) public {
+        uint8 n = _registerBasePoolWithPoolN(uint8(bound(nSeed, 2, 8)));
+        _configHLForAll(n, pairSeed, szSeed);
+        _configThresholds();
+
+        uint256[] memory base = _balancesProportionalToWeights(n);
+
+        uint256 d5 = base[0] / 20;
+        if (d5 == 0) {
+            d5 = 1;
+        } // 5%
+        uint256 d06 = base[1] / 16;
+        if (d06 == 0) {
+            d06 = 1;
+        } // ~6.25%
+
+        // Old: token0 5% low
+        uint256[] memory deviatedBalances = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            deviatedBalances[k] = base[k];
+        }
+        deviatedBalances[0] = base[0] - d5;
+
+        // Post: remove ~6% from token1 so the relative goes slightly to the other side but inside threshold
+        uint256[] memory Bprime = new uint256[](n);
+        for (uint256 k = 0; k < n; ++k) {
+            Bprime[k] = deviatedBalances[k];
+        }
+        if (d06 >= deviatedBalances[1]) {
+            d06 = deviatedBalances[1] - 1;
+        } // safety
+        Bprime[1] = deviatedBalances[1] - d06;
+
+        uint256[] memory amountsScaled18 = new uint256[](n);
+        uint256[] memory amountsRaw = new uint256[](n);
+        amountsScaled18[1] = deviatedBalances[1] - Bprime[1];
+        amountsRaw[1] = amountsScaled18[1];
+
+        vm.startPrank(address(vault));
+        (bool ok, ) = hook.onAfterRemoveLiquidity(
+            address(this),
+            address(pool),
+            RemoveLiquidityKind.SINGLE_TOKEN_EXACT_IN,
+            0,
+            amountsScaled18,
+            amountsRaw,
+            Bprime,
+            ""
+        );
+        vm.stopPrank();
+
+        assertTrue(ok, "outside above -> inside below must allow");
     }
 }

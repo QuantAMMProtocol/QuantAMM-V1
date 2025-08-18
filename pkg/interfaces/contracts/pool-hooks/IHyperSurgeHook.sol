@@ -95,22 +95,24 @@ interface IHyperSurgeHook {
 
     /**
      * @notice Set the per-pool maximum surge fee percentage (cap).
-     * @dev 1e18-scaled (e.g., 0.20e18 = 20%).
+     * @param pool Pool address
+     * @param pct18 New maximum surge fee percentage (1e18 scale)
      */
-    function setMaxSurgeFeePercentage(address pool, uint256 pct, TradeType tradeType) external;
+    function setMaxSurgeFeePercentage(address pool, uint256 pct18, TradeType tradeType) external;
 
     /**
      * @notice Set the per-pool surge threshold percentage (deviation level at which fees start ramping).
-     * @dev 1e18-scaled (e.g., 0.05e18 = 5%).
+     * @param pool Pool address
+     * @param pct18 New threshold percentage (1e18 scale)
      */
-    function setSurgeThresholdPercentage(address pool, uint256 pct, TradeType tradeType) external;
+    function setSurgeThresholdPercentage(address pool, uint256 pct18, TradeType tradeType) external;
 
     /**
         @notice sets the deviation where the max fee kicks in
         @param pool address of the pool
-        @param capDevPct the deviation to set the cap to in %
+        @param capDevPct18 the deviation to set the cap to in %
     */
-    function setCapDeviationPercentage(address pool, uint256 capDevPct, TradeType tradeType) external;
+    function setCapDeviationPercentage(address pool, uint256 capDevPct18, TradeType tradeType) external;
 
     // -------------------------------------------------------------------------
     // Getters (read-only)
@@ -143,13 +145,6 @@ interface IHyperSurgeHook {
      * @return numTokens Number of tokens in the pool (2..8)
      */
     function getNumTokens(address pool) external view returns (uint8);
-
-    /**
-     * @notice Whether the pool has been initialized/registered with this hook.
-     * @param pool Pool address
-     * @return True if the pool is registered, false otherwise.
-     */
-    function isPoolInitialized(address pool) external view returns (bool);
 
     /**
      * @notice Read the token price configuration for a specific token index.

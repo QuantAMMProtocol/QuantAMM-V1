@@ -23,32 +23,8 @@ import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Vers
 
 import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol";
 import { WeightedPool } from "@balancer-labs/v3-pool-weighted/contracts/WeightedPool.sol";
-
-/// -----------------------------------------------------------------------
-/// Hyperliquid helpers (precompiles) — original revert tags
-/// -----------------------------------------------------------------------
-library HyperPrice {
-    address internal constant PRECOMPILE = 0x0000000000000000000000000000000000000808; // spotPx
-    error PricePrecompileFailed();
-
-    function spot(uint32 pairIndex) internal view returns (uint64 price) {
-        (bool ok, bytes memory out) = PRECOMPILE.staticcall(abi.encode(pairIndex));
-        if (!ok) {
-            revert PricePrecompileFailed();
-        }
-        price = abi.decode(out, (uint64));
-    }
-}
-
-library HyperTokenInfo {
-    address internal constant PRECOMPILE = 0x0000000000000000000000000000000000000807; // tokenInfo
-
-    function szDecimals(uint32 pairIndex) internal view returns (uint8) {
-        (bool ok, bytes memory out) = PRECOMPILE.staticcall(abi.encode(pairIndex));
-        require(ok, "dec");
-        return abi.decode(out, (uint8));
-    }
-}
+import { HyperSpotPricePrecompile } from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperSpotPricePrecompile.sol";
+import { HyperTokenInfoPrecompile } from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperTokenInfoPrecompile.sol";
 
 /// -----------------------------------------------------------------------
 /// Multitoken Hyper Surge Hook — struct-per-index configuration
@@ -179,7 +155,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             revert TokenIndexOutOfRange();
         }
 
-        tempCfg.sz = HyperTokenInfo.szDecimals(hlTokenIdx); 
+        tempCfg.sz = HyperTokenInfoPrecompile.szDecimals(hlTokenIdx);
 
         if (tempCfg.sz > 8) {
             revert InvalidDecimals();
@@ -467,8 +443,8 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256 capDevPct18;
         uint256 bIn;
         uint256 bOut;
-        uint64 rawIn;
-        uint64 rawOut;
+        uint256 rawIn;
+        uint256 rawOut;
         uint256 wIn;
         uint256 wOut;
         uint256 span;
@@ -495,16 +471,16 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         TokenPriceCfg memory pInCfg = pc.tokenCfg[p.indexIn];
         TokenPriceCfg memory pOutCfg = pc.tokenCfg[p.indexOut];
 
-        locals.rawIn = HyperPrice.spot(pInCfg.pairIndex);
-        locals.rawOut = HyperPrice.spot(pOutCfg.pairIndex);
+        locals.rawIn = HyperSpotPricePrecompile.spotPrice(pInCfg.pairIndex);
+        locals.rawOut = HyperSpotPricePrecompile.spotPrice(pOutCfg.pairIndex);
 
         if (locals.rawIn == 0 || locals.rawOut == 0) {
             // Missing oracle data: safe path returns the pool’s static fee.
             return (true, staticSwapFee);
         }
 
-        locals.pxIn = uint256(locals.rawIn).divDown(_divisorFromSz(pInCfg.sz));
-        locals.pxOut = uint256(locals.rawOut).divDown(_divisorFromSz(pOutCfg.sz));
+        locals.pxIn = locals.rawIn.divDown(_divisorFromSz(pInCfg.sz));
+        locals.pxOut = locals.rawOut.divDown(_divisorFromSz(pOutCfg.sz));
 
         //Do not block if there is an issue with the hyperliquid price
         if (locals.pxIn == 0 || locals.pxOut == 0) {
@@ -648,7 +624,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     struct ComputeOracleDeviationLocals {
         uint256[8] px;
         uint256 maxDev;
-        uint64 raw;
+        uint256 raw;
         uint256 i;
         uint256 j;
         uint256 bi;
@@ -678,7 +654,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         for (locals.i = 0; locals.i < balancesScaled18.length; ++locals.i) {
             TokenPriceCfg memory cfg = pc.tokenCfg[locals.i];
             if (cfg.pairIndex != 0) {
-                locals.raw = HyperPrice.spot(cfg.pairIndex); // reverts if precompile fails
+                locals.raw = HyperSpotPricePrecompile.spotPrice(cfg.pairIndex); // reverts if precompile fails
                 if (locals.raw != 0) {
                     locals.priceDivisor = _divisorFromSz(cfg.sz);
                     if (locals.priceDivisor != 0) {

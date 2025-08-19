@@ -35,7 +35,7 @@ interface IHyperSurgeHook {
      * @param tokenIndex   Token index within the pool (0-based)
      * @param hlPairIndex    Hyperliquid pair/market index
      * @param hlTokenIndex   Hyperliquid token index
-     * @param szDecimals   Hyperliquid size-decimals for that pair
+     * @param szDecimals     Hyperliquid size-decimals for that pair
      */
     event TokenPriceConfiguredIndex(
         address indexed pool,

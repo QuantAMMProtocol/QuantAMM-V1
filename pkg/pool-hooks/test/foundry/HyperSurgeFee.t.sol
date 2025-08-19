@@ -28,10 +28,15 @@ import {
 // Local deployer + mock
 import { HyperSurgeHookDeployer } from "./utils/HyperSurgeHookDeployer.sol";
 import { HyperSurgeHookMock } from "../../contracts/test/HyperSurgeHookMock.sol";
+import { HyperSpotPricePrecompile } from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperSpotPricePrecompile.sol";
+import { HyperTokenInfoPrecompile } from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperTokenInfoPrecompile.sol";
+import { HypercorePrecompileMock } from "@balancer-labs/v3-standalone-utils/test/foundry/utils/HypercorePrecompileMock.sol";
+
 import {
     WeightedPoolContractsDeployer
 } from "@balancer-labs/v3-pool-weighted/test/foundry/utils/WeightedPoolContractsDeployer.sol";
 import { WeightedPool } from "@balancer-labs/v3-pool-weighted/contracts/WeightedPool.sol";
+
 
 contract HLPriceStub {
     mapping(uint32 => uint32) internal px; // slot 0
@@ -47,17 +52,25 @@ contract HLPriceStub {
 }
 
 contract HLTokenInfoStub {
-    mapping(uint32 => uint8) internal sz; // slot 0
-
+    mapping(uint32 => uint8) internal sz;
+     // Optional but nice for staticcall patterns:
     fallback(bytes calldata data) external returns (bytes memory ret) {
-        uint32 pairIndex = abi.decode(data, (uint32));
-        return abi.encode(sz[pairIndex]);
+        uint32 tokenIndex = abi.decode(data, (uint32));
+
+        // Read stored record and ensure the struct fields exist
+        HyperTokenInfoPrecompile.HyperTokenInfo memory t;
+
+        // Copy only what you care about; others can be zero/empty
+        t.szDecimals = sz[tokenIndex];
+
+        return abi.encode(t);          // <<< return the STRUCT
     }
 
     function set(uint32 pairIndex, uint8 decimals) external {
         sz[pairIndex] = decimals;
     }
 }
+
 
 contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolContractsDeployer {
     using ArrayHelpers for *;
@@ -67,8 +80,6 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
     uint256 constant STATIC_SWAP_FEE = 1e16; // 1% (1e18 scale)
 
     // MUST match addresses the hook libs read
-    address constant HL_PRICE_PRECOMPILE = 0x0000000000000000000000000000000000000808;
-    address constant HL_TOKENINFO_PRECOMPILE = 0x0000000000000000000000000000000000000807;
     uint256 internal constant DEFAULT_SWAP_FEE = 1e16; // 1%
     uint256 constant FEE_ONE = 1e18;
 
@@ -144,8 +155,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         // 2) Install precompile stubs at fixed addresses
         _pxStubDeployer = new HLPriceStub();
         _infoStubDeployer = new HLTokenInfoStub();
-        vm.etch(HL_PRICE_PRECOMPILE, address(_pxStubDeployer).code);
-        vm.etch(HL_TOKENINFO_PRECOMPILE, address(_infoStubDeployer).code);
+        vm.etch(HyperSpotPricePrecompile.SPOT_PRICE_PRECOMPILE_ADDRESS, address(_pxStubDeployer).code);
+        vm.etch(HyperTokenInfoPrecompile.TOKEN_INFO_PRECOMPILE_ADDRESS, address(_infoStubDeployer).code);
 
         // Seed a couple of pairs (pairIndex 1 and 2)
         _hlSetSzDecimals(1, 6);
@@ -185,12 +196,12 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
     function _hlSetSpot(uint32 pairIdx, uint32 price_1e6) internal {
         bytes32 slot = keccak256(abi.encode(bytes32(uint256(pairIdx)), bytes32(uint256(0))));
-        vm.store(HL_PRICE_PRECOMPILE, slot, bytes32(uint256(price_1e6)));
+        vm.store(HyperSpotPricePrecompile.SPOT_PRICE_PRECOMPILE_ADDRESS, slot, bytes32(uint256(price_1e6)));
     }
 
     function _hlSetSzDecimals(uint32 pairIdx, uint8 sz) internal {
         bytes32 slot = keccak256(abi.encode(bytes32(uint256(pairIdx)), bytes32(uint256(0))));
-        vm.store(HL_TOKENINFO_PRECOMPILE, slot, bytes32(uint256(sz)));
+        vm.store(HyperTokenInfoPrecompile.TOKEN_INFO_PRECOMPILE_ADDRESS, slot, bytes32(uint256(sz)));
     }
 
     struct HyperPriceSpotParams {

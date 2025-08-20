@@ -529,15 +529,22 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         locals.deviation18 = _relAbsDiff(locals.poolPx, locals.extPx); // |pool - ext| / ext
 
         if (locals.deviation18 > locals.deviationBefore18) {
-            // If the pool price is increasing, we are in an arbitrage situation
-            locals.capDevPct18 = _convertTo18Decimals(locals.poolDetails.arbCapDeviationPercentage9);
-            locals.maxPct18 = _convertTo18Decimals(locals.poolDetails.arbMaxSurgeFee9);
-            locals.threshold18 = _convertTo18Decimals(locals.poolDetails.arbThresholdPercentage9);
-        } else {
-            // If the pool price is decreasing, we are in a noise situation
             locals.capDevPct18 = _convertTo18Decimals(locals.poolDetails.noiseCapDeviationPercentage9);
             locals.maxPct18 = _convertTo18Decimals(locals.poolDetails.noiseMaxSurgeFee9);
             locals.threshold18 = _convertTo18Decimals(locals.poolDetails.noiseThresholdPercentage9);
+        } else {
+            locals.capDevPct18 = _convertTo18Decimals(locals.poolDetails.arbCapDeviationPercentage9);
+            locals.maxPct18 = _convertTo18Decimals(locals.poolDetails.arbMaxSurgeFee9);
+            locals.threshold18 = _convertTo18Decimals(locals.poolDetails.arbThresholdPercentage9);
+
+            //For the arbitrage direction we use the deviation before. 
+            //Why this is the case is in the readme but in essence
+            //if a large noise deviation is being corrected the arbitrage pays more 
+            //to take advantage of the larger arb opp and therefore greater profit
+            //as the fee decreases the closer you get to market price, another
+            //arb opportunity presents itself once the first arb is taken
+            //this means a large fee != a large no arb region and the pool stays close to market
+            locals.deviation18 = locals.deviationBefore18; 
         }
 
         if (locals.deviation18 <= locals.threshold18) {

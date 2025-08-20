@@ -77,6 +77,88 @@ contract HLTokenInfoStub {
     }
 }
 
+/**
+ * =============================
+ * Test Suite Summary (grouped)
+ * =============================
+ *
+ * INTEGRATION — Hyper Spot Path
+ * --------------------------------
+ * [testFuzz_hyper_price_spot_success_EXACT_IN_multi]
+ *   Fuzz multi-token EXACT_IN via hyper spot; call succeeds and fee is sane (≥ static, ≤ 100%).
+ * [testFuzz_hyper_price_spot_success_EXACT_OUT_multi]
+ *   Fuzz multi-token EXACT_OUT via hyper spot; call succeeds and fee is sane (≥ static, ≤ 100%).
+ * [testFuzz_hyper_price_spot_expected_failure_marker]
+ *   Drives hyper-spot into expected failure and verifies the failure marker/revert behavior.
+ *
+ * VIEW-ONLY BEHAVIOR
+ * --------------------
+ * [testFuzz_view_missingPrices_returnsStatic_orRevert]
+ *   With missing external prices, returns static fee (or cleanly reverts); never computes dynamic.
+ * [testFuzz_view_readsLaneParams_returnsStatic_onSafePath]
+ *   Safe path reads lane params and returns the configured static fee.
+ *
+ * MATH & INVARIANTS (Internal)
+ * ------------------------------
+ * [test_internal_exactValues_boundaries]
+ *   Boundary checks: static at/≤ threshold, linear mid-span ramp, clamp to max at/≥ cap.
+ * [testFuzz_internal_feeRamp_matches_expected_withParams]
+ *   Reference ramp formula matches internal math across fuzzed threshold/cap/max & deviations.
+ * [testFuzz_internal_monotone_inDeviation]
+ *   Dynamic fee is monotone non-decreasing in absolute deviation under fixed params.
+ * [testFuzz_internal_balanceScalingInvariance]
+ *   Fee is invariant (within tight tolerance) when scaling balances and trade size by same factor.
+ * [testFuzz_internal_exactIn_equals_exactOut_whenParamsSame]
+ *   With identical effective lane params, EXACT_IN == EXACT_OUT; opposite lane differs to catch wrong-lane usage.
+ *
+ * CONFIGURATION / DEGENERATES
+ * -----------------------------
+ * [test_cfg_fee_static_at_threshold_usingMockWrapper]
+ *   Exactly at threshold → static fee (no ramp kickoff).
+ * [test_cfg_fee_minimalRamp_just_above_threshold_usingMockWrapper]
+ *   Just above threshold → ramp starts from static with minimal positive slope.
+ * [test_cfg_fee_degenerateRamp_max_equals_static_usingMockWrapper]
+ *   max == static → degenerate schedule; dynamic == static for all deviations.
+ * [test_cfg_fee_misconfig_max_below_static_reverts_usingMockWrapper]
+ *   Misconfigured schedule (max < static) is rejected (reverts) rather than emitting an invalid fee.
+ *
+ * LANE LOGIC — NOISE (uses AFTER deviation)
+ * -------------------------------------------
+ * [testFuzz_logic_noise_worsens_outside_dynamic_after]
+ *   Start outside; trade worsens deviation → NOISE; dynamic fee from AFTER (≥ static).
+ * [testFuzz_logic_noise_inside_to_outside_dynamic_after]
+ *   Start inside; worsen enough to exit band → NOISE; dynamic fee from AFTER (≥ static).
+ * [testFuzz_logic_noise_outside_crosses_and_worsens_dynamic_after]
+ *   Start outside above; cross below and worsen absolute deviation → NOISE; AFTER basis (≥ static).
+ * [testFuzz_logic_noise_outside_below_worsens_dynamic_after]
+ *   Symmetric “below-side worsen” (no cross) → NOISE; AFTER basis (≥ static).
+ * [testFuzz_logic_noise_inside_worsens_but_inside_static]
+ *   Start inside; worsen but remain inside → NOISE; fee stays STATIC.
+ *
+ * LANE LOGIC — ARB (uses BEFORE deviation)
+ * -----------------------------------------
+ * [testFuzz_logic_arb_outside_improves_but_outside_dynamic_before]
+ *   Start outside; improve but remain outside → ARB; dynamic fee from BEFORE (≥ static).
+ * [testFuzz_logic_arb_outside_to_threshold_dynamic_before]
+ *   Start outside; improve to at/inside threshold (two-sided bound) → ARB; BEFORE basis (dynamic).
+ * [testFuzz_logic_arb_outside_to_inside_dynamic_before]
+ *   Start outside; end inside → ARB still uses BEFORE; expects dynamic (not static).
+ * [test_logic_arb_outside_nochange_dynamic_before]
+ *   No movement while outside → ARB; BEFORE-based dynamic fee (≥ static).
+ * [test_logic_arb_inside_nochange_static]
+ *   No movement while inside → ARB branch but fee is STATIC (since deviation ≤ threshold).
+ *
+ * BOUNDARY & CLAMPING PRECISION
+ * -------------------------------
+ * [testFuzz_bound_noise_after_gt_cap_clamps_to_max_after]
+ *   Start near threshold, worsen so AFTER > cap → NOISE clamps to noiseMax (AFTER basis).
+ * [testFuzz_bound_arb_before_gt_cap_clamps_to_max_before]
+ *   BEFORE > cap; improve without crossing so AFTER ≤ cap → ARB clamps to arbMax (BEFORE basis).
+ * [testFuzz_bound_noise_after_at_threshold_static]
+ *   Start inside and worsen to land exactly at threshold → NOISE returns STATIC (no ramp).
+ *
+ * */
+
 contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolContractsDeployer {
     using ArrayHelpers for *;
     using CastingHelpers for address[];
@@ -96,7 +178,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
     function setUp() public virtual override {
         super.setUp(); // vault, poocomputeLocals, poolFactory, admin, authorizer, tokens, routers, ...
 
-        vm.prank(address(poolFactory)); // some repos require factory to deploy
+        vm.prank(address(poolFactory));
         hook = deployHook(
             IVault(address(vault)),
             0.02e18, // default max fee (2%)
@@ -155,11 +237,11 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
     }
 
     function testFuzz_hyper_price_spot_success_EXACT_IN_multi(
-        uint32 raw, // external spot (HL precompile)
-        uint32 divisor, // choose szDecimals in [0..6]
-        uint256 amtSeed, // fuzz trade amount (EXACT_IN)
-        uint256 feeSeed, // fuzz fee seed
-        uint8 outSeed // fuzz which token is indexOut
+        uint32 raw,
+        uint32 divisor,
+        uint256 amtSeed,
+        uint256 feeSeed,
+        uint8 outSeed
     ) public {
         HyperPriceSpotParams memory params;
 
@@ -339,19 +421,15 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 n;
         uint8 indexIn;
         uint8 indexOut;
-        // price source (HL) config
         uint32 pairIdx;
         uint8 sz;
-        // fee knobs (1e9 scale)
         uint256 maxPct;
         uint256 thr;
         uint256 cap;
         uint256 staticFee;
-        // balances + limits
         uint256[] balances;
-        uint256 maxRatio; // 30e16 (30% in 1e18 basis)
+        uint256 maxRatio;
         uint256 maxIn;
-        // results
         bool ok;
         uint256 dyn;
         uint256 max9;
@@ -363,7 +441,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 amtSeed;
     }
 
-    function testFuzz_hyper_price_spot_failure_marker(uint256 marker) public {
+    function testFuzz_hyper_price_spot_expected_failure_marker(uint256 marker) public {
         // Keep the seed bounded and lively
         marker = bound(marker, 4, type(uint32).max - 1);
 
@@ -383,7 +461,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         // 3) Build VALID lane params (9), then upscale ONCE to 18dp
         //    max9 ∈ [1..1e9], thr9 ∈ [1..max9], cap9 ∈ (thr9..1e9]
         locals.max9 = 1 + (marker % 1_000_000_000); // avoid 0
-        locals.thr9 = 1 + ((marker >> 8) % locals.max9); // ≥1 and ≤ max9
+        locals.thr9 = 1 + ((marker >> 8) % locals.max9); // greater than or equal to1 and less than or equal to max9
         locals.capRoom = 1_000_000_000 - locals.thr9; // room above thr
         locals.cap9 = locals.thr9 + 1; // strictly > thr
         if (locals.capRoom > 0) {
@@ -449,7 +527,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         (locals.ok, locals.dyn) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), locals.staticFee);
 
-        // If ok=false (spot=0 path), that's fine; just ensure no revert. If ok=true, fee ≤ 100%.
+        // If ok=false (spot=0 path), that's fine; just ensure no revert. If ok=true, fee less than or equal to 100%.
         if (locals.ok) {
             assertLe(locals.dyn, 1e18, "fee must be <= 100%");
         }
@@ -659,14 +737,6 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 fee2;
     }
 
-    /// Balance + amount scaling invariance with branch-aware tolerance.
-    /// Rationale:
-    /// - With the new arb path (which resets deviation to deviationBefore), the fee
-    ///   function ceases to be strictly homogeneous in (balances, amount). Integer
-    ///   rounding inside piecewise clamps can flip at different steps after scaling,
-    ///   yielding a tiny but non-zero drift.
-    /// - We therefore keep a strict invariant when behavior is noise-like (delta ≤ 100 wei),
-    ///   and allow a tiny, bounded absolute drift in the arb-like case.
     function testFuzz_internal_balanceScalingInvariance(
         uint8 nSeed,
         uint256 wSeed,
@@ -709,7 +779,6 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.baseAmt = locals.bMin / 1e12;
         if (locals.baseAmt == 0) locals.baseAmt = 1;
 
-        // --- Mock + params ---
         HyperSurgeHookMock mock = new HyperSurgeHookMock(
             IVault(vault),
             fee_ppm9To1e18(locals.maxPPM9),
@@ -723,12 +792,10 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         p1.kind = SwapKind.EXACT_IN;
         p1.amountGivenScaled18 = locals.baseAmt;
 
-        // Same relative trade after scaling balances by k -> also scale amount by k
         PoolSwapParams memory p2;
         p2.kind = SwapKind.EXACT_IN;
         p2.amountGivenScaled18 = locals.baseAmt * locals.scaleSeed;
 
-        // --- Compute fees ---
         (, locals.fee1) = mock.ComputeSurgeFee(
             fee_makeLocals(
                 locals.b[locals.i],
@@ -828,117 +895,110 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
             fee_ppm9To1e18(locals.cap),
             "fee-boundary"
         );
+        HyperSurgeHookMock.ComputeSurgeFeeLocals memory computeLocals;
         PoolSwapParams memory p;
         p.kind = SwapKind.EXACT_IN;
 
         // Below threshold
-        {
-            locals.D = fee_ppm9To1e18(locals.thr) - 1;
-            (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, locals.D);
+        locals.D = fee_ppm9To1e18(locals.thr) - 1;
+        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, locals.D);
 
-            HyperSurgeHookMock.ComputeSurgeFeeLocals memory computeLocals;
-            computeLocals.bIn = locals.b0;
-            computeLocals.wIn = locals.w0;
-            computeLocals.bOut = locals.b1;
-            computeLocals.wOut = locals.w1;
-            computeLocals.pxIn = locals.pxIn;
-            computeLocals.pxOut = locals.pxOut;
-            computeLocals.calcAmountScaled18 = 0;
+        computeLocals.bIn = locals.b0;
+        computeLocals.wIn = locals.w0;
+        computeLocals.bOut = locals.b1;
+        computeLocals.wOut = locals.w1;
+        computeLocals.pxIn = locals.pxIn;
+        computeLocals.pxOut = locals.pxOut;
+        computeLocals.calcAmountScaled18 = 0;
 
-            // ARB lane = locals’ params (since deviation doesn’t increase with calcAmount=0)
-            computeLocals.poolDetails.arbThresholdPercentage9 = locals.thr;
-            computeLocals.poolDetails.arbCapDeviationPercentage9 = locals.cap;
-            computeLocals.poolDetails.arbMaxSurgeFee9 = locals.maxp;
+        // ARB lane = locals’ params (since deviation doesn’t increase with calcAmount=0)
+        computeLocals.poolDetails.arbThresholdPercentage9 = locals.thr;
+        computeLocals.poolDetails.arbCapDeviationPercentage9 = locals.cap;
+        computeLocals.poolDetails.arbMaxSurgeFee9 = locals.maxp;
 
-            // Make NOISE lane different
-            computeLocals.poolDetails.noiseThresholdPercentage9 = locals.thr + 1;
-            computeLocals.poolDetails.noiseCapDeviationPercentage9 = locals.cap - 1;
-            computeLocals.poolDetails.noiseMaxSurgeFee9 = locals.maxp + 1;
+        // Make NOISE lane different
+        computeLocals.poolDetails.noiseThresholdPercentage9 = locals.thr + 1;
+        computeLocals.poolDetails.noiseCapDeviationPercentage9 = locals.cap - 1;
+        computeLocals.poolDetails.noiseMaxSurgeFee9 = locals.maxp + 1;
 
-            (, locals.feeA) = mock.ComputeSurgeFee(computeLocals, p, STATIC_SWAP_FEE);
-            assertEq(locals.feeA, STATIC_SWAP_FEE, "below threshold means static fee");
-        }
+        (, locals.feeA) = mock.ComputeSurgeFee(computeLocals, p, STATIC_SWAP_FEE);
+        assertEq(locals.feeA, STATIC_SWAP_FEE, "below threshold means static fee");
 
-        // Mid-span
-        {
-            locals.D = (fee_ppm9To1e18(locals.thr) + fee_ppm9To1e18(locals.cap)) / 2;
-            (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, locals.D);
+        locals.D = (fee_ppm9To1e18(locals.thr) + fee_ppm9To1e18(locals.cap)) / 2;
+        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, locals.D);
 
-            HyperSurgeHookMock.ComputeSurgeFeeLocals memory computeLocals;
-            computeLocals.bIn = locals.b0;
-            computeLocals.wIn = locals.w0;
-            computeLocals.bOut = locals.b1;
-            computeLocals.wOut = locals.w1;
-            computeLocals.pxIn = locals.pxIn;
-            computeLocals.pxOut = locals.pxOut;
-            computeLocals.calcAmountScaled18 = 0;
+        computeLocals.bIn = locals.b0;
+        computeLocals.wIn = locals.w0;
+        computeLocals.bOut = locals.b1;
+        computeLocals.wOut = locals.w1;
+        computeLocals.pxIn = locals.pxIn;
+        computeLocals.pxOut = locals.pxOut;
+        computeLocals.calcAmountScaled18 = 0;
 
-            computeLocals.poolDetails.arbThresholdPercentage9 = locals.thr;
-            computeLocals.poolDetails.arbCapDeviationPercentage9 = locals.cap;
-            computeLocals.poolDetails.arbMaxSurgeFee9 = locals.maxp;
+        computeLocals.poolDetails.arbThresholdPercentage9 = locals.thr;
+        computeLocals.poolDetails.arbCapDeviationPercentage9 = locals.cap;
+        computeLocals.poolDetails.arbMaxSurgeFee9 = locals.maxp;
 
-            computeLocals.poolDetails.noiseThresholdPercentage9 = locals.thr + 1;
-            computeLocals.poolDetails.noiseCapDeviationPercentage9 = locals.cap - 1;
-            computeLocals.poolDetails.noiseMaxSurgeFee9 = locals.maxp + 1;
+        computeLocals.poolDetails.noiseThresholdPercentage9 = locals.thr + 1;
+        computeLocals.poolDetails.noiseCapDeviationPercentage9 = locals.cap - 1;
+        computeLocals.poolDetails.noiseMaxSurgeFee9 = locals.maxp + 1;
 
-            (, locals.feeB) = mock.ComputeSurgeFee(computeLocals, p, STATIC_SWAP_FEE);
+        (, locals.feeB) = mock.ComputeSurgeFee(computeLocals, p, STATIC_SWAP_FEE);
 
-            uint256 expected = fee_expectedFeeWithParams(
-                locals.P,
-                locals.pxIn,
-                locals.pxOut,
-                STATIC_SWAP_FEE,
-                locals.thr,
-                locals.cap,
-                locals.maxp
-            );
-            assertEq(locals.feeB, expected, "mid-span linear ramp");
-        }
+        uint256 expected = fee_expectedFeeWithParams(
+            locals.P,
+            locals.pxIn,
+            locals.pxOut,
+            STATIC_SWAP_FEE,
+            locals.thr,
+            locals.cap,
+            locals.maxp
+        );
+        assertEq(locals.feeB, expected, "mid-span linear ramp");
 
         // At cap and above cap
-        {
-            uint256 Dcap = fee_ppm9To1e18(locals.cap);
-            (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, Dcap);
 
-            HyperSurgeHookMock.ComputeSurgeFeeLocals memory computeLocals1;
-            computeLocals1.bIn = locals.b0;
-            computeLocals1.wIn = locals.w0;
-            computeLocals1.bOut = locals.b1;
-            computeLocals1.wOut = locals.w1;
-            computeLocals1.pxIn = locals.pxIn;
-            computeLocals1.pxOut = locals.pxOut;
-            computeLocals1.calcAmountScaled18 = 0;
-            computeLocals1.poolDetails.arbThresholdPercentage9 = locals.thr;
-            computeLocals1.poolDetails.arbCapDeviationPercentage9 = locals.cap;
-            computeLocals1.poolDetails.arbMaxSurgeFee9 = locals.maxp;
-            computeLocals1.poolDetails.noiseThresholdPercentage9 = locals.thr + 1;
-            computeLocals1.poolDetails.noiseCapDeviationPercentage9 = locals.cap - 1;
-            computeLocals1.poolDetails.noiseMaxSurgeFee9 = locals.maxp + 1;
+        uint256 Dcap = fee_ppm9To1e18(locals.cap);
+        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, Dcap);
 
-            (, locals.feeC) = mock.ComputeSurgeFee(computeLocals1, p, STATIC_SWAP_FEE);
-            assertEq(locals.feeC, fee_ppm9To1e18(locals.maxp), "at cap means max fee");
+        HyperSurgeHookMock.ComputeSurgeFeeLocals memory computeLocals1;
+        computeLocals1.bIn = locals.b0;
+        computeLocals1.wIn = locals.w0;
+        computeLocals1.bOut = locals.b1;
+        computeLocals1.wOut = locals.w1;
+        computeLocals1.pxIn = locals.pxIn;
+        computeLocals1.pxOut = locals.pxOut;
+        computeLocals1.calcAmountScaled18 = 0;
+        computeLocals1.poolDetails.arbThresholdPercentage9 = locals.thr;
+        computeLocals1.poolDetails.arbCapDeviationPercentage9 = locals.cap;
+        computeLocals1.poolDetails.arbMaxSurgeFee9 = locals.maxp;
+        computeLocals1.poolDetails.noiseThresholdPercentage9 = locals.thr + 1;
+        computeLocals1.poolDetails.noiseCapDeviationPercentage9 = locals.cap - 1;
+        computeLocals1.poolDetails.noiseMaxSurgeFee9 = locals.maxp + 1;
 
-            uint256 Dbeyond = Dcap + 1;
-            (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, Dbeyond);
+        (, locals.feeC) = mock.ComputeSurgeFee(computeLocals1, p, STATIC_SWAP_FEE);
+        assertEq(locals.feeC, fee_ppm9To1e18(locals.maxp), "at cap means max fee");
 
-            HyperSurgeHookMock.ComputeSurgeFeeLocals memory computeLocals2;
-            computeLocals2.bIn = locals.b0;
-            computeLocals2.wIn = locals.w0;
-            computeLocals2.bOut = locals.b1;
-            computeLocals2.wOut = locals.w1;
-            computeLocals2.pxIn = locals.pxIn;
-            computeLocals2.pxOut = locals.pxOut;
-            computeLocals2.calcAmountScaled18 = 0;
-            computeLocals2.poolDetails.arbThresholdPercentage9 = locals.thr;
-            computeLocals2.poolDetails.arbCapDeviationPercentage9 = locals.cap;
-            computeLocals2.poolDetails.arbMaxSurgeFee9 = locals.maxp;
-            computeLocals2.poolDetails.noiseThresholdPercentage9 = locals.thr + 1;
-            computeLocals2.poolDetails.noiseCapDeviationPercentage9 = locals.cap - 1;
-            computeLocals2.poolDetails.noiseMaxSurgeFee9 = locals.maxp + 1;
+        uint256 Dbeyond = Dcap + 1;
+        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, Dbeyond);
 
-            (, locals.feeD) = mock.ComputeSurgeFee(computeLocals2, p, STATIC_SWAP_FEE);
-            assertEq(locals.feeD, fee_ppm9To1e18(locals.maxp), "above cap means clamped to max fee");
-        }
+        HyperSurgeHookMock.ComputeSurgeFeeLocals memory computeLocals2;
+        computeLocals2.bIn = locals.b0;
+        computeLocals2.wIn = locals.w0;
+        computeLocals2.bOut = locals.b1;
+        computeLocals2.wOut = locals.w1;
+        computeLocals2.pxIn = locals.pxIn;
+        computeLocals2.pxOut = locals.pxOut;
+        computeLocals2.calcAmountScaled18 = 0;
+        computeLocals2.poolDetails.arbThresholdPercentage9 = locals.thr;
+        computeLocals2.poolDetails.arbCapDeviationPercentage9 = locals.cap;
+        computeLocals2.poolDetails.arbMaxSurgeFee9 = locals.maxp;
+        computeLocals2.poolDetails.noiseThresholdPercentage9 = locals.thr + 1;
+        computeLocals2.poolDetails.noiseCapDeviationPercentage9 = locals.cap - 1;
+        computeLocals2.poolDetails.noiseMaxSurgeFee9 = locals.maxp + 1;
+
+        (, locals.feeD) = mock.ComputeSurgeFee(computeLocals2, p, STATIC_SWAP_FEE);
+        assertEq(locals.feeD, fee_ppm9To1e18(locals.maxp), "above cap means clamped to max fee");
     }
 
     struct ExactInEqualsExactOutLocals {
@@ -1048,10 +1108,6 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         assertEq(locals.feeIn, locals.feeOut, "with equal lane params, kind should not change math result");
     }
 
-    /// Missing external prices path (deterministic):
-    /// For safely small trade sizes (well below pool ratio guards), the hook MUST
-    /// fall back to the provided STATIC_SWAP_FEE (both EXACT_IN and EXACT_OUT).
-    /// This test avoids any possibility of pool guard reverts, so there is no try/catch.
     function testFuzz_view_missingPrices_returnsStatic_orRevert(
         uint8 nSeed,
         uint256 /* wSeed */,
@@ -1114,7 +1170,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         assertEq(feeOut, STATIC_SWAP_FEE, "missing prices: EXACT_OUT must return static fee");
     }
 
-    function testFuzz_view_readsLaneParams_and_safePath(uint8 nSeed) public {
+    function testFuzz_view_readsLaneParams_returnsStatic_onSafePath(uint8 nSeed) public {
         uint8 n = uint8(bound(nSeed, 2, 8));
         _registerBasePoolWithN(n);
 
@@ -1171,7 +1227,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
     }
 
     /// 1) deviation == threshold => returns static fee (boundary counted as "inside")
-    function test_fee_static_whenDeviationEqualsThreshold_usingMockWrapper() public view {
+    function test_cfg_fee_static_at_threshold_usingMockWrapper() public view {
         DeviationEqualsThreshold memory locals;
 
         locals.staticFee = 30e14; // 30 bps = 0.003 * 1e18
@@ -1220,8 +1276,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 expected;
     }
 
-    /// 2) deviation = threshold + 1 wei => minimal ramp above static
-    function test_fee_minimalRamp_justAboveThreshold_usingMockWrapper() public view {
+    function test_cfg_fee_minimalRamp_just_above_threshold() public view {
         justAboveThreshold memory locals;
 
         locals.staticFee = 30e14; // 30 bps
@@ -1279,7 +1334,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
     }
 
     /// 3) degenerate: max == static => always static (even outside threshold)
-    function test_fee_degenerateRamp_maxEqualsStatic_usingMockWrapper() public view {
+    function test_cfg_fee_degenerateRamp_max_equals_static() public view {
         MaxEqualsStatic memory locals;
 
         locals.staticFee = 45e14; // 45 bps
@@ -1434,7 +1489,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint32 arbMax9;
         uint256 thr;
         uint256 cap;
-        uint256 deviation_before;
+        uint256 deviationBefore;
         uint256 price_before;
         uint256 price_after;
         HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
@@ -1465,10 +1520,10 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         locals.thr = uint256(locals.noiseThr9) * 1e9;
         locals.cap = uint256(locals.noiseCap9) * 1e9;
-        locals.deviation_before = locals.thr + (locals.cap - locals.thr) / 3; // strictly outside
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3; // strictly outside
 
-        // Start BELOW E: price_before = E * (1 - deviation_before)
-        locals.price_before = locals.E - (locals.E * locals.deviation_before) / 1e18;
+        // Start BELOW E: price_before = E * (1 - deviationBefore)
+        locals.price_before = locals.E - (locals.E * locals.deviationBefore) / 1e18;
 
         // Build compute locals + swap that worsens deviation (EXACT_IN; calc=0 → P decreases further)
         locals.comp.wIn = 1e18;
@@ -1524,7 +1579,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint32 noiseMax9;
         uint256 thr;
         uint256 cap;
-        uint256 deviation_before;
+        uint256 deviationBefore;
         uint256 price_before;
         uint256 price_after;
         uint256 xMax;
@@ -1534,8 +1589,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 dyn;
     }
 
-    /// 2) Arb: starts outside threshold, deviation improves but stays outside → ARB lane, dynamic fee based on **before** deviation.
-    function testFuzz_logic_arb_better_still_outside_dynamic_before(
+    function testFuzz_logic_arb_outside_improves_but_outside_dynamic_before(
         uint256 eSeed,
         uint32 arbThrSeed,
         uint32 arbCapSeed,
@@ -1556,13 +1610,13 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         locals.thr = uint256(locals.arbThr9) * 1e9;
         locals.cap = uint256(locals.arbCap9) * 1e9;
-        locals.deviation_before = locals.thr + (locals.cap - locals.thr) / 3; // strictly outside
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3; // strictly outside
 
         // Start ABOVE E
-        locals.price_before = locals.E + (locals.E * locals.deviation_before) / 1e18;
+        locals.price_before = locals.E + (locals.E * locals.deviationBefore) / 1e18;
 
         // Compute xMax to remain outside after: price_after >= E*(1 + thr)
-        // price_after = price_before / (1 + x)  means x ≤ (price_before / (E*(1+thr)) - 1) * 1e18
+        // price_after = price_before / (1 + x)  means x less than or equal to (price_before / (E*(1+thr)) - 1) * 1e18
         vm.assume(locals.E * (1e18 + locals.thr) != 0); // defensive
         uint256 denom = (locals.E * (1e18 + locals.thr)) / 1e18;
         vm.assume(denom != 0);
@@ -1612,10 +1666,10 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // Still outside afterward (sanity)
         locals.price_after = (locals.price_before * 1e18) / (1e18 + locals.p.amountGivenScaled18);
-        uint256 dAfter = ((
+        uint256 deviationAfter = ((
             locals.price_after > locals.E ? (locals.price_after - locals.E) : (locals.E - locals.price_after)
         ) * 1e18) / locals.E;
-        assertGt(dAfter, locals.thr, "should remain outside threshold after improving");
+        assertGt(deviationAfter, locals.thr, "should remain outside threshold after improving");
 
         assertEq(locals.dyn, locals.expected, "arb path must use BEFORE deviation for dynamic fee");
         assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee >= static");
@@ -1630,7 +1684,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint32 arbCap9;
         uint32 arbMax9;
         uint256 thr;
-        uint256 deviation_before;
+        uint256 deviationBefore;
         uint256 price_before;
         uint256 price_after;
         uint256 xMax;
@@ -1662,18 +1716,18 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.thr = uint256(locals.noiseThr9) * 1e9; // Q18
 
         // Start just inside threshold BELOW E (safely away from boundary)
-        locals.deviation_before = locals.thr / 4 + 1; // Q18
-        locals.price_before = locals.E - (locals.E * locals.deviation_before) / 1e18;
+        locals.deviationBefore = locals.thr / 4 + 1; // Q18
+        locals.price_before = locals.E - (locals.E * locals.deviationBefore) / 1e18;
 
-        // Choose x to worsen but keep AFTER ≤ thr:
-        // price_after/E = (price_before/E) / (1 + t) ≥ (1 - thr)  means  t ≤ R/(1 - thr) - 1
-        // where R = price_before/E = 1 - deviation_before.
+        // Choose x to worsen but keep AFTER less than or equal to thr:
+        // price_after/E = (price_before/E) / (1 + t) greater than or equal to (1 - thr)  means  t less than or equal to R/(1 - thr) - 1
+        // where R = price_before/E = 1 - deviationBefore.
         uint256 R1e18 = (locals.price_before * 1e18) / locals.E; // Q18
         uint256 denom = 1e18 - locals.thr; // Q18, > 0
         uint256 q = (R1e18 * 1e18) / denom; // Q18
         locals.xMax = q > 1e18 ? (q - 1e18) : 0; // Q18 (x = t*1e18)
         // Soften extremes to avoid huge swaps in the mock path
-        if (locals.xMax > 5e17) locals.xMax = 5e17; // cap at t≤0.5
+        if (locals.xMax > 5e17) locals.xMax = 5e17; // cap at tless than or equal to0.5
 
         // Build locals
         locals.comp.wIn = 1e18;
@@ -1715,10 +1769,10 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // Sanity: still inside after worsening
         locals.price_after = (locals.price_before * 1e18) / (1e18 + locals.p.amountGivenScaled18);
-        uint256 dAfter = ((
+        uint256 deviationAfter = ((
             locals.price_after > locals.E ? (locals.price_after - locals.E) : (locals.E - locals.price_after)
         ) * 1e18) / locals.E;
-        assertLe(dAfter, locals.thr, "must remain inside threshold");
+        assertLe(deviationAfter, locals.thr, "must remain inside threshold");
 
         // Inside-after on NOISE → static
         assertEq(locals.fee, STATIC_SWAP_FEE, "inside threshold after worsening must still return static (noise path)");
@@ -1734,7 +1788,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint32 arbMax9;
         uint256 thr;
         uint256 cap;
-        uint256 deviation_before;
+        uint256 deviationBefore;
         uint256 price_before;
         uint256 price_after;
         uint256 tCross; // Q18: min t to cross below E   (t > Db)
@@ -1748,16 +1802,14 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 span; // range for x selection
         uint256 lo; // lower bound for x
         uint256 hi; // upper bound for x
-        uint256 dBefore; // absolute deviation before
-        uint256 dAfter; // absolute deviation after
+        uint256 deviationAfter; // absolute deviation after
         HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
         PoolSwapParams p;
         uint256 expected;
         uint256 dyn;
     }
 
-    /// 4) Noise: start outside above, end further outside below (cross + worsen) → NOISE lane, dynamic on **after**.
-    function testFuzz_logic_noise_crosses_price_worsens_dynamic(
+    function testFuzz_logic_noise_outside_crosses_and_worsens_dynamic_after(
         uint256 eSeed,
         uint32 noiseThrSeed,
         uint32 noiseCapSeed,
@@ -1783,8 +1835,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.cap = uint256(locals.noiseCap9) * 1e9; // Q18
 
         // Start ABOVE E with a deviation strictly outside the threshold:
-        locals.deviation_before = locals.thr + (locals.cap - locals.thr) / 4; // Q18 in (thr, cap)
-        locals.price_before = locals.E + (locals.E * locals.deviation_before) / 1e18;
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 4; // Q18 in (thr, cap)
+        locals.price_before = locals.E + (locals.E * locals.deviationBefore) / 1e18;
 
         // Build compute locals
         locals.comp.wIn = 1e18;
@@ -1807,14 +1859,14 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         //  (1) Cross: price_after < E  means  t > Db                       (R = 1 + Db)
         //  (2) Worsen: |after| > |before| when ending below:
         //      1 - R/(1+t) > Db  means  (1 - Db)(1 + t) > 1 + Db  means  t > 2Db/(1 - Db)
-        locals.tCross = locals.deviation_before; // Q18
+        locals.tCross = locals.deviationBefore; // Q18
         // tWorse = ceil( (2*Db) / (1 - Db) ) in Q18
-        locals.num = (2 * locals.deviation_before) * 1e18; // Q36
-        locals.den = 1e18 - locals.deviation_before; // Q18, > 0 by bounds
+        locals.num = (2 * locals.deviationBefore) * 1e18; // Q36
+        locals.den = 1e18 - locals.deviationBefore; // Q18, > 0 by bounds
         locals.q = (locals.num + locals.den - 1) / locals.den; // ceilDiv -> Q18
         locals.tWorse = locals.q;
 
-        // Add a safety margin to overcome integer rounding in price_after and dAfter.
+        // Add a safety margin to overcome integer rounding in price_after and deviationAfter.
         // Use 1e13 in Q18 (i.e., 1e-5) which is ample even for E as large as 1e24.
         locals.epsT = 1e13;
         locals.tMin = (locals.tWorse > locals.tCross ? locals.tWorse : locals.tCross) + locals.epsT;
@@ -1838,10 +1890,10 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.price_after = (locals.price_before * 1e18) / (1e18 + locals.x);
 
         // Sanity: crossed and worsened absolute deviation
-        locals.dBefore = ((locals.price_before - locals.E) * 1e18) / locals.E;
-        locals.dAfter = ((locals.E - locals.price_after) * 1e18) / locals.E;
+        locals.deviationBefore = ((locals.price_before - locals.E) * 1e18) / locals.E;
+        locals.deviationAfter = ((locals.E - locals.price_after) * 1e18) / locals.E;
         require(locals.price_after < locals.E, "must cross below E");
-        require(locals.dAfter > locals.dBefore, "must worsen absolute deviation after crossing");
+        require(locals.deviationAfter > locals.deviationBefore, "must worsen absolute deviation after crossing");
 
         locals.expected = fee_expectedFeeWithParams(
             locals.price_after,
@@ -1880,12 +1932,12 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint32 noiseMax9;
         uint256 thr;
         uint256 cap;
-        uint256 deviation_before;
+        uint256 deviationBefore;
         uint256 price_before;
         uint256 price_after;
         uint256 R1e18; // R in 1e18 scale: R = price_before / E
-        uint256 xLower; // min x to get price_after ≤ E*(1+thr)
-        uint256 xUpper; // max x to keep price_after ≥ E*(1−thr)
+        uint256 xLower; // min x to get price_after less than or equal to E*(1+thr)
+        uint256 xUpper; // max x to keep price_after greater than or equal to E*(1−thr)
         uint256 x; // chosen amountGivenScaled18 inside [xLower, xUpper]
         HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
         PoolSwapParams p;
@@ -1917,23 +1969,23 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.thr = uint256(locals.arbThr9) * 1e9; // Q18
         locals.cap = uint256(locals.arbCap9) * 1e9;
 
-        // Start ABOVE E with an outside deviation deviation_before > thr
-        locals.deviation_before = locals.thr + (locals.cap - locals.thr) / 3; // strictly outside
-        locals.price_before = locals.E + (locals.E * locals.deviation_before) / 1e18; // price_before = E * (1 + deviation_before)
-        locals.R1e18 = (locals.price_before * 1e18) / locals.E; // R = 1e18 + deviation_before
+        // Start ABOVE E with an outside deviation deviationBefore > thr
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3; // strictly outside
+        locals.price_before = locals.E + (locals.E * locals.deviationBefore) / 1e18; // price_before = E * (1 + deviationBefore)
+        locals.R1e18 = (locals.price_before * 1e18) / locals.E; // R = 1e18 + deviationBefore
 
-        // Two-sided “inside” band: 1 − thr ≤ price_after/E ≤ 1 + thr,
+        // Two-sided “inside” band: 1 − thr less than or equal to price_after/E less than or equal to 1 + thr,
         // with price_after/E = R / (1 + t), t = x / 1e18.
 
-        // Lower bound on t (bring down to ≤ 1+thr):
-        //   t ≥ R/(1+thr) − 1  means  xLower = ceil( (R1e18 * 1e18) / (1e18 + thr) ) − 1e18
+        // Lower bound on t (bring down to less than or equal to 1+thr):
+        //   t greater than or equal to R/(1+thr) − 1  means  xLower = ceil( (R1e18 * 1e18) / (1e18 + thr) ) − 1e18
         uint256 denomPlus = 1e18 + locals.thr; // Q18
         uint256 numPlus = locals.R1e18 * 1e18; // Q36
         uint256 qPlus = (numPlus + denomPlus - 1) / denomPlus; // ceilDiv to Q18
         locals.xLower = qPlus > 1e18 ? (qPlus - 1e18) : 0;
 
         // Upper bound on t (don’t overshoot below 1 − thr):
-        //   t ≤ R/(1−thr) − 1  means  xUpper = floor( (R1e18 * 1e18) / (1e18 − thr) ) − 1e18
+        //   t less than or equal to R/(1−thr) − 1  means  xUpper = floor( (R1e18 * 1e18) / (1e18 − thr) ) − 1e18
         uint256 denomMinus = 1e18 - locals.thr; // > 0 by bound
         uint256 numMinus = locals.R1e18 * 1e18; // Q36
         uint256 qMinus = numMinus / denomMinus; // floorDiv to Q18
@@ -1991,10 +2043,10 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // Sanity: end is inside (two-sided)
         locals.price_after = (locals.price_before * 1e18) / (1e18 + locals.p.amountGivenScaled18);
-        uint256 dAfter = ((
+        uint256 deviationAfter = ((
             locals.price_after > locals.E ? (locals.price_after - locals.E) : (locals.E - locals.price_after)
         ) * 1e18) / locals.E;
-        assertLe(dAfter, locals.thr, "end should be inside threshold");
+        assertLe(deviationAfter, locals.thr, "end should be inside threshold");
 
         assertEq(
             locals.dyn,
@@ -2002,6 +2054,773 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
             "arb path must use BEFORE deviation even if the end state is inside threshold"
         );
         assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee >= static");
+    }
+
+    struct InsideToOutsideDynamicAfterLocals {
+        uint256 E;
+        uint32 noiseThr9;
+        uint32 noiseCap9;
+        uint32 noiseMax9;
+        uint32 arbThr9;
+        uint32 arbCap9;
+        uint32 arbMax9;
+        uint256 thr;
+        uint256 cap;
+        uint256 deviationBefore;
+        uint256 priceBefore;
+        uint256 priceAfter;
+        uint256 R1e18; // = priceBefore/E (Q18)
+        uint256 tLower; // min t to make priceAfter/E less than or equal to 1 - thr (Q18)
+        uint256 x; // = t * 1e18 (amount in)
+        uint256 num; // numerator for tLower calculation
+        uint256 den; // denominator for tLower calculation
+        uint256 q; // intermediate value for tLower calculation
+        uint256 eps; // epsilon for x calculation
+        uint256 lo; // lower bound for x
+        uint256 hi; // upper bound for x
+        HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
+        PoolSwapParams p;
+        uint256 expected;
+        uint256 dyn;
+    }
+
+    /// [LANE] Inside → cross outside (NOISE, dynamic with AFTER)
+    function testFuzz_logic_noise_inside_to_outside_dynamic_after(
+        uint256 eSeed,
+        uint32 noiseThrSeed,
+        uint32 noiseCapSeed,
+        uint32 noiseMaxSeed,
+        uint64 amtSeed
+    ) public {
+        InsideToOutsideDynamicAfterLocals memory locals;
+
+        // Lane params (NOISE fuzzed, ARB fixed and different)
+        locals.E = bound(eSeed, 1e16, 1e24);
+        locals.noiseThr9 = uint32(bound(noiseThrSeed, 1, 900_000_000 - 1));
+        locals.noiseCap9 = uint32(bound(noiseCapSeed, locals.noiseThr9 + 1, 1_000_000_000));
+        locals.noiseMax9 = uint32(bound(noiseMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
+        locals.arbThr9 = 1_000_000;
+        locals.arbCap9 = 300_000_000;
+        locals.arbMax9 = 50_000_000;
+
+        locals.thr = uint256(locals.noiseThr9) * 1e9;
+        locals.cap = uint256(locals.noiseCap9) * 1e9;
+
+        // Start BELOW E but inside: deviationBefore ∈ [0, thr)
+        locals.deviationBefore = (locals.thr / 3) + 1; // safely inside
+        locals.priceBefore = locals.E - (locals.E * locals.deviationBefore) / 1e18; // P/E = 1 - deviationBefore
+        locals.R1e18 = (locals.priceBefore * 1e18) / locals.E;
+
+        // Need priceAfter/E less than or equal to 1 - thr  ⇒  t greater than or equal to R/(1 - thr) - 1
+
+        locals.num = locals.R1e18 * 1e18; // Q36
+        locals.den = 1e18 - locals.thr; // Q18
+        locals.q = (locals.num + locals.den - 1) / locals.den; // ceilDiv → Q18
+        locals.tLower = locals.q > 1e18 ? (locals.q - 1e18) : 0; // Q18
+
+        // Pick x greater than or equal to tLower (plus small epsilon) to cross outside
+        locals.eps = 1e12;
+        locals.lo = locals.tLower + locals.eps;
+        if (locals.lo == 0) locals.lo = 1;
+        locals.hi = locals.lo + 5e17; // allow up to +0.5 in t
+        locals.x = bound(uint256(amtSeed), locals.lo, locals.hi);
+
+        // Build locals
+        locals.comp.wIn = 1e18;
+        locals.comp.wOut = 1e18;
+        locals.comp.bIn = 1e18;
+        locals.comp.bOut = locals.priceBefore;
+        locals.comp.pxIn = 1e18;
+        locals.comp.pxOut = locals.E;
+        locals.comp.calcAmountScaled18 = 0;
+        locals.comp.poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
+        locals.comp.poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
+        locals.comp.poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+        locals.comp.poolDetails.arbThresholdPercentage9 = locals.arbThr9;
+        locals.comp.poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
+        locals.comp.poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+
+        locals.p.kind = SwapKind.EXACT_IN;
+        locals.p.amountGivenScaled18 = locals.x;
+
+        // Expected (NOISE) uses AFTER
+        locals.priceAfter = (locals.priceBefore * 1e18) / (1e18 + locals.x);
+        uint256 deviationAfter = ((
+            locals.priceAfter > locals.E ? (locals.priceAfter - locals.E) : (locals.E - locals.priceAfter)
+        ) * 1e18) / locals.E;
+        assertGt(deviationAfter, locals.thr, "must end outside threshold (worsened)");
+        locals.expected = fee_expectedFeeWithParams(
+            locals.priceAfter,
+            locals.comp.pxIn,
+            locals.comp.pxOut,
+            STATIC_SWAP_FEE,
+            locals.noiseThr9,
+            locals.noiseCap9,
+            locals.noiseMax9
+        );
+
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(
+            IVault(vault),
+            fee_ppm9To1e18(locals.arbMax9),
+            fee_ppm9To1e18(locals.arbThr9),
+            fee_ppm9To1e18(locals.arbCap9),
+            "lane-inside2outside"
+        );
+        (, locals.dyn) = mock.ComputeSurgeFee(locals.comp, locals.p, STATIC_SWAP_FEE);
+
+        assertEq(locals.dyn, locals.expected, "noise/after: dynamic fee must match expected");
+        assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee greater than or equal to static");
+    }
+
+    struct OutsideToThresholdDynamicBeforeLocals {
+        uint256 E;
+        uint32 arbThr9;
+        uint32 arbCap9;
+        uint32 arbMax9;
+        uint32 noiseThr9;
+        uint32 noiseCap9;
+        uint32 noiseMax9;
+        uint256 thr;
+        uint256 cap;
+        uint256 deviationBefore;
+        uint256 priceBefore;
+        uint256 priceAfter;
+        uint256 R1e18;
+        uint256 tLower;
+        uint256 tUpper;
+        uint256 x;
+        uint256 epsT;
+        uint256 lo;
+        uint256 hi;
+        HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
+        PoolSwapParams p;
+        uint256 expected;
+        uint256 dyn;
+    }
+
+    /// [LANE] Outside → to (or just inside) threshold (ARB, dynamic with BEFORE)
+    function testFuzz_logic_arb_outside_to_threshold_dynamic_before(
+        uint256 eSeed,
+        uint32 arbThrSeed,
+        uint32 arbCapSeed,
+        uint32 arbMaxSeed,
+        uint64 amtSeed
+    ) public {
+        OutsideToThresholdDynamicBeforeLocals memory locals;
+
+        locals.E = bound(eSeed, 1e16, 1e24);
+        locals.arbThr9 = uint32(bound(arbThrSeed, 1, 900_000_000 - 1));
+        locals.arbCap9 = uint32(bound(arbCapSeed, locals.arbThr9 + 1, 1_000_000_000));
+        locals.arbMax9 = uint32(bound(arbMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
+        // Distinct NOISE lane (unused in expected but kept different)
+        locals.noiseThr9 = 5_000_000;
+        locals.noiseCap9 = 400_000_000;
+        locals.noiseMax9 = 25_000_000;
+
+        locals.thr = uint256(locals.arbThr9) * 1e9; // Q18
+        locals.cap = uint256(locals.arbCap9) * 1e9;
+
+        // Start ABOVE, outside
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3; // strictly outside
+        locals.priceBefore = locals.E + (locals.E * locals.deviationBefore) / 1e18;
+
+        // R = priceBefore / E in Q18; compute both ceil and floor variants to bound tightly
+        // R_up   = ceil( (priceBefore * 1e18) / E )
+        // R_down = floor( (priceBefore * 1e18) / E )
+        uint256 numR = locals.priceBefore * 1e18;
+        locals.R1e18 = (numR + locals.E - 1) / locals.E;
+
+        // We need 1 - thr less than or equal to priceAfter/E less than or equal to 1 + thr, and priceAfter/E = R / (1 + t), with t = x/1e18 (Q18).
+        // Lower bound on t (to get under the upper edge 1 + thr):
+        //   t ≥ R/(1 + thr) − 1
+        // Use R_up and ceil-div to be conservative, then subtract 1e18.
+        uint256 denomPlus = 1e18 + locals.thr; // Q18
+        uint256 numPlus = locals.R1e18 * 1e18; // Q36
+        uint256 qPlus = (numPlus + denomPlus - 1) / denomPlus; // ceilDiv → Q18
+        locals.tLower = qPlus > 1e18 ? (qPlus - 1e18) : 0; // Q18
+
+        // Upper bound on t (don’t drop below the lower edge 1 − thr):
+        //   t less than or equal to R/(1 − thr) − 1
+        // Use R_down and floor-div to be conservative, then subtract 1e18.
+        uint256 denomMinus = 1e18 - locals.thr; // Q18 (> 0 by bounds on thr)
+        uint256 numMinus = locals.R1e18 * 1e18; // Q36
+        uint256 qMinus = numMinus / denomMinus; // floorDiv → Q18
+        locals.tUpper = qMinus > 1e18 ? (qMinus - 1e18) : 0; // Q18
+
+        // Choose t inside [tLower + eps, tUpper − eps] and map amtSeed with bound(...).
+        // eps helps avoid equality-edge flips due to integer rounding.
+        locals.epsT = 1; // one Q18 unit (~1e-18) is ample given we used ceil/floor conservatively
+        locals.lo = locals.tLower + locals.epsT;
+        locals.hi = (locals.tUpper > locals.epsT) ? (locals.tUpper - locals.epsT) : locals.tUpper;
+
+        // If interval collapses or inverted (can happen with extreme tiny thr), clamp to a point and proceed.
+        if (locals.hi < locals.lo) {
+            locals.hi = locals.lo;
+        }
+        if (locals.lo == 0) {
+            locals.lo = 1;
+            if (locals.hi < locals.lo) locals.hi = locals.lo;
+        }
+
+        locals.x = bound(uint256(amtSeed), locals.lo, locals.hi);
+
+        // Build locals
+        locals.comp.wIn = 1e18;
+        locals.comp.wOut = 1e18;
+        locals.comp.bIn = 1e18;
+        locals.comp.bOut = locals.priceBefore;
+        locals.comp.pxIn = 1e18;
+        locals.comp.pxOut = locals.E;
+        locals.comp.calcAmountScaled18 = 0;
+        locals.comp.poolDetails.arbThresholdPercentage9 = locals.arbThr9;
+        locals.comp.poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
+        locals.comp.poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+        locals.comp.poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
+        locals.comp.poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
+        locals.comp.poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+
+        locals.p.kind = SwapKind.EXACT_IN;
+        locals.p.amountGivenScaled18 = locals.x;
+
+        // Sanity: end is inside (two-sided)
+        locals.priceAfter = (locals.priceBefore * 1e18) / (1e18 + locals.p.amountGivenScaled18);
+        uint256 dAfter = ((
+            locals.priceAfter > locals.E ? (locals.priceAfter - locals.E) : (locals.E - locals.priceAfter)
+        ) * 1e18) / locals.E;
+        assertLe(dAfter, locals.thr, "end should be at/inside threshold");
+
+        // Expected (ARB) uses BEFORE even if end is at/inside threshold
+        locals.expected = fee_expectedFeeWithParams(
+            locals.priceBefore,
+            locals.comp.pxIn,
+            locals.comp.pxOut,
+            STATIC_SWAP_FEE,
+            locals.arbThr9,
+            locals.arbCap9,
+            locals.arbMax9
+        );
+
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(
+            IVault(vault),
+            fee_ppm9To1e18(locals.arbMax9),
+            fee_ppm9To1e18(locals.arbThr9),
+            fee_ppm9To1e18(locals.arbCap9),
+            "lane-out2thr"
+        );
+        (, locals.dyn) = mock.ComputeSurgeFee(locals.comp, locals.p, STATIC_SWAP_FEE);
+
+        assertEq(
+            locals.dyn,
+            locals.expected,
+            "arb/before: dynamic fee must use BEFORE deviation even at threshold end"
+        );
+        assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee greater than or equal to static");
+    }
+
+    struct ArbNoMoveOutsideDynamicLocals {
+        uint256 E;
+        uint32 arbThr9;
+        uint32 arbCap9;
+        uint32 arbMax9;
+        uint32 noiseThr9;
+        uint32 noiseCap9;
+        uint32 noiseMax9;
+        uint256 thr;
+        uint256 cap;
+        uint256 deviationBefore;
+        uint256 priceBefore;
+        HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
+        PoolSwapParams p;
+        uint256 expected;
+        uint256 dyn;
+    }
+
+    function test_logic_arb_outside_nochange_dynamic_before(
+        uint256 eSeed,
+        uint32 arbThrSeed,
+        uint32 arbCapSeed,
+        uint32 arbMaxSeed
+    ) public {
+        ArbNoMoveOutsideDynamicLocals memory locals;
+
+        locals.E = bound(eSeed, 1e16, 1e24);
+        locals.arbThr9 = uint32(bound(arbThrSeed, 1, 900_000_000 - 1));
+        locals.arbCap9 = uint32(bound(arbCapSeed, locals.arbThr9 + 1, 1_000_000_000));
+        locals.arbMax9 = uint32(bound(arbMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
+        // NOISE lane different (unused)
+        locals.noiseThr9 = 5_000_000;
+        locals.noiseCap9 = 400_000_000;
+        locals.noiseMax9 = 25_000_000;
+
+        locals.thr = uint256(locals.arbThr9) * 1e9;
+        locals.cap = uint256(locals.arbCap9) * 1e9;
+
+        // Start ABOVE, outside
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3;
+        locals.priceBefore = locals.E + (locals.E * locals.deviationBefore) / 1e18;
+
+        // No movement: amount = 0, so deviationAfter == deviationBefore → ARB path
+        locals.comp.wIn = 1e18;
+        locals.comp.wOut = 1e18;
+        locals.comp.bIn = 1e18;
+        locals.comp.bOut = locals.priceBefore;
+        locals.comp.pxIn = 1e18;
+        locals.comp.pxOut = locals.E;
+        locals.comp.calcAmountScaled18 = 0;
+        locals.comp.poolDetails.arbThresholdPercentage9 = locals.arbThr9;
+        locals.comp.poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
+        locals.comp.poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+        locals.comp.poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
+        locals.comp.poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
+        locals.comp.poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+
+        locals.p.kind = SwapKind.EXACT_IN;
+        locals.p.amountGivenScaled18 = 0;
+
+        locals.expected = fee_expectedFeeWithParams(
+            locals.priceBefore,
+            locals.comp.pxIn,
+            locals.comp.pxOut,
+            STATIC_SWAP_FEE,
+            locals.arbThr9,
+            locals.arbCap9,
+            locals.arbMax9
+        );
+
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(
+            IVault(vault),
+            fee_ppm9To1e18(locals.arbMax9),
+            fee_ppm9To1e18(locals.arbThr9),
+            fee_ppm9To1e18(locals.arbCap9),
+            "lane-nomove-outside"
+        );
+        (, locals.dyn) = mock.ComputeSurgeFee(locals.comp, locals.p, STATIC_SWAP_FEE);
+
+        assertEq(locals.dyn, locals.expected, "no-move/outside must be ARB, dynamic from BEFORE");
+        assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee greater than or equal to static");
+    }
+
+    struct ArbNoMoveInsideLocals {
+        uint256 E;
+        uint32 arbThr9;
+        uint32 arbCap9;
+        uint32 arbMax9;
+        uint32 noiseThr9;
+        uint32 noiseCap9;
+        uint32 noiseMax9;
+        uint256 thr;
+        uint256 deviationBefore;
+        uint256 priceBefore;
+        uint256 fee;
+        HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
+        PoolSwapParams p;
+    }
+
+    /// [LANE] No movement, inside: ARB path, but STATIC fee (since BEFORE less than or equal to thr)
+    function test_logic_arb_inside_nochange_static(
+        uint256 eSeed,
+        uint32 arbThrSeed,
+        uint32 arbCapSeed,
+        uint32 arbMaxSeed
+    ) public {
+        ArbNoMoveInsideLocals memory locals;
+
+        locals.E = bound(eSeed, 1e16, 1e24);
+        locals.arbThr9 = uint32(bound(arbThrSeed, 1, 1_000_000_000 - 1));
+        locals.arbCap9 = uint32(bound(arbCapSeed, locals.arbThr9 + 1, 1_000_000_000));
+        locals.arbMax9 = uint32(bound(arbMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
+        locals.noiseThr9 = 5_000_000;
+        locals.noiseCap9 = 400_000_000;
+        locals.noiseMax9 = 25_000_000;
+
+        locals.thr = uint256(locals.arbThr9) * 1e9;
+
+        // Start BELOW, inside
+        locals.deviationBefore = (locals.thr / 3) + 1; // strictly inside
+        locals.priceBefore = locals.E - (locals.E * locals.deviationBefore) / 1e18;
+
+        // No movement: deviationAfter == deviationBefore → ARB branch, but less than or equal to thr ⇒ static
+        locals.comp.wIn = 1e18;
+        locals.comp.wOut = 1e18;
+        locals.comp.bIn = 1e18;
+        locals.comp.bOut = locals.priceBefore;
+        locals.comp.pxIn = 1e18;
+        locals.comp.pxOut = locals.E;
+        locals.comp.calcAmountScaled18 = 0;
+        locals.comp.poolDetails.arbThresholdPercentage9 = locals.arbThr9;
+        locals.comp.poolDetails.arbCapDeviationPercentage9 = uint32(locals.arbCap9);
+        locals.comp.poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+        locals.comp.poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
+        locals.comp.poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
+        locals.comp.poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+
+        locals.p.kind = SwapKind.EXACT_IN;
+        locals.p.amountGivenScaled18 = 0;
+
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(
+            IVault(vault),
+            fee_ppm9To1e18(locals.arbMax9),
+            fee_ppm9To1e18(locals.arbThr9),
+            fee_ppm9To1e18(locals.arbCap9),
+            "lane-nomove-inside"
+        );
+        (, locals.fee) = mock.ComputeSurgeFee(locals.comp, locals.p, STATIC_SWAP_FEE);
+
+        assertEq(
+            locals.fee,
+            STATIC_SWAP_FEE,
+            "no-move/inside must return static (ARB branch, but less than or equal to thr)"
+        );
+    }
+
+    struct NoiseCrossesPriceWorsensDymanicLocals {
+        uint256 E;
+        uint32 noiseThr9;
+        uint32 noiseCap9;
+        uint32 noiseMax9;
+        uint32 arbThr9;
+        uint32 arbCap9;
+        uint32 arbMax9;
+        uint256 thr;
+        uint256 cap;
+        uint256 deviationBefore;
+        uint256 priceBefore;
+        uint256 priceAfter;
+        uint256 tCross;
+        uint256 tWorse;
+        uint256 tMin;
+        uint256 x;
+        uint256 num;
+        uint256 den;
+        uint256 q;
+        uint256 epsT;
+        uint256 lo;
+        uint256 hi;
+        uint256 deviationAfter;
+        HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
+        PoolSwapParams p;
+        uint256 expected;
+        uint256 dyn;
+    }
+
+    /// [LANE] Symmetric “below” case: start outside BELOW, worsen further BELOW (no cross) → NOISE uses AFTER
+    /// Note: With calc=0 and this simplified price update, EXACT_IN can only decrease P,
+    /// so a true below→above cross is not representable without changing the price update model.
+    /// This test locks the symmetric NOISE/AFTER behavior from the “below” side.
+    function testFuzz_logic_noise_outside_below_worsens_dynamic_after(
+        uint256 eSeed,
+        uint32 noiseThrSeed,
+        uint32 noiseCapSeed,
+        uint32 noiseMaxSeed,
+        uint64 amtSeed
+    ) public {
+        NoiseCrossesPriceWorsensDymanicLocals memory locals;
+
+        // External price (pxOut/pxIn -> E); keep as in all other tests
+        locals.E = bound(eSeed, 1e16, 1e24);
+
+        // Distinct NOISE lane params (fuzzed) and different ARB params (unused in expected but distinct to catch wrong-lane)
+        locals.noiseThr9 = uint32(bound(noiseThrSeed, 1, 900_000_000 - 1));
+        locals.noiseCap9 = uint32(bound(noiseCapSeed, locals.noiseThr9 + 1, 1_000_000_000));
+        locals.noiseMax9 = uint32(bound(noiseMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
+        locals.arbThr9 = 1_000_000;
+        locals.arbCap9 = 300_000_000;
+        locals.arbMax9 = 50_000_000;
+
+        locals.thr = uint256(locals.noiseThr9) * 1e9; // Q18
+        locals.cap = uint256(locals.noiseCap9) * 1e9; // Q18
+
+        // Start OUTSIDE BELOW price: priceBefore = E * (1 - D_before), with D_before in (thr, cap)
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3; // Q18: strictly outside
+        locals.priceBefore = locals.E - (locals.E * locals.deviationBefore) / 1e18;
+
+        // Build compute locals with the standard orientation (pxIn=1e18, pxOut=E)
+        locals.comp.wIn = 1e18;
+        locals.comp.wOut = 1e18;
+        locals.comp.bIn = 1e18;
+        locals.comp.bOut = locals.priceBefore;
+        locals.comp.pxIn = 1e18; // keep the usual frame
+        locals.comp.pxOut = locals.E;
+        locals.comp.calcAmountScaled18 = 0;
+        locals.comp.poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
+        locals.comp.poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
+        locals.comp.poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+        locals.comp.poolDetails.arbThresholdPercentage9 = locals.arbThr9;
+        locals.comp.poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
+        locals.comp.poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+
+        // EXACT_IN reduces P further → deviation worsens from the BELOW side (NOISE lane)
+        locals.p.kind = SwapKind.EXACT_IN;
+        // ensure a measurable worsening but no overflow; avoid 1-wei knife edges
+        uint256 lo = 1e9; // Q18 t = 1e-9
+        uint256 hi = 5e17; // Q18 t less than or equal to 0.5
+        locals.p.amountGivenScaled18 = bound(uint256(amtSeed), lo, hi);
+
+        // AFTER price for expected (NOISE uses AFTER)
+        locals.priceAfter = (locals.priceBefore * 1e18) / (1e18 + locals.p.amountGivenScaled18);
+
+        // Sanity: still BELOW E and deviation increased
+        uint256 dBefore = ((locals.E - locals.priceBefore) * 1e18) / locals.E;
+        uint256 dAfter = ((locals.E - locals.priceAfter) * 1e18) / locals.E;
+        assertGt(dAfter, dBefore, "deviation must worsen from the below side");
+
+        // Expected NOISE fee from AFTER deviation
+        locals.expected = fee_expectedFeeWithParams(
+            locals.priceAfter,
+            locals.comp.pxIn,
+            locals.comp.pxOut,
+            STATIC_SWAP_FEE,
+            locals.noiseThr9,
+            locals.noiseCap9,
+            locals.noiseMax9
+        );
+
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(
+            IVault(vault),
+            fee_ppm9To1e18(locals.arbMax9),
+            fee_ppm9To1e18(locals.arbThr9),
+            fee_ppm9To1e18(locals.arbCap9),
+            "lane-below-worsen"
+        );
+        (, locals.dyn) = mock.ComputeSurgeFee(locals.comp, locals.p, STATIC_SWAP_FEE);
+
+        assertEq(locals.dyn, locals.expected, "noise/after (below side): dynamic fee must match expected");
+        assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee greater than or equal to static");
+    }
+
+    struct BoundArbBeforeClampToMaxLocals {
+        uint256 E;
+        uint32 arbThr9;
+        uint32 arbCap9;
+        uint32 arbMax9;
+        uint32 noiseThr9;
+        uint32 noiseCap9;
+        uint32 noiseMax9;
+        uint256 thr;
+        uint256 cap;
+        uint256 Db; // Q18
+        uint256 priceBefore;
+        uint256 priceAfter;
+        uint256 tLower;
+        uint256 tUpperNoCross;
+        uint256 x; // Q18
+        HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
+        PoolSwapParams p;
+        uint256 fee;
+        uint256 expected;
+    }
+
+    /// [BOUND] ARB with BEFORE > cap, AFTER < cap: ARB clamps to maxArb (basis = BEFORE)
+    /// Start ABOVE with BEFORE deviation > cap, improve so AFTER less than or equal to cap (stay above; no cross).
+    /// Assert: ARB lane; fee == arbMax (clamped by BEFORE).
+    function testFuzz_bound_arb_before_gt_cap_clamps_to_max_before(
+        uint256 eSeed,
+        uint32 arbThrSeed,
+        uint32 arbCapSeed,
+        uint32 arbMaxSeed,
+        uint64 amtSeed
+    ) public {
+        BoundArbBeforeClampToMaxLocals memory locals;
+
+        // External price
+        locals.E = bound(eSeed, 1e16, 1e24);
+
+        // ARB lane params (ensure thr < cap < 1.0)
+        locals.arbThr9 = uint32(bound(arbThrSeed, 1, 900_000_000 - 1)); // (0, 0.9)
+        locals.arbCap9 = uint32(bound(arbCapSeed, locals.arbThr9 + 1, 1_000_000_000 - 1)); // (thr, 1)
+        locals.arbMax9 = uint32(bound(arbMaxSeed, uint32(STATIC_SWAP_FEE / 1e9) + 1, 1_000_000_000));
+
+        // Distinct NOISE params (unused in expected but kept different to catch wrong-lane)
+        locals.noiseThr9 = 5_000_000;
+        locals.noiseCap9 = 400_000_000;
+        locals.noiseMax9 = 25_000_000;
+
+        locals.thr = uint256(locals.arbThr9) * 1e9; // Q18
+        locals.cap = uint256(locals.arbCap9) * 1e9; // Q18
+        assertLt(locals.cap, 1e18, "cap must be < 100%");
+
+        // BEFORE deviation strictly above cap but < 1, with safe margin
+        // margin = max(1, (1e18 - cap)/16) keeps Db < 1 while staying comfortably > cap
+        uint256 margin = (1e18 - locals.cap) / 16;
+        if (margin == 0) {
+            margin = 1;
+        }
+        locals.Db = locals.cap + margin;
+        if (locals.Db >= 1e18) {
+            locals.Db = 1e18 - 1;
+        }
+
+        // Sanity: BEFORE > cap
+        assertGt(locals.Db, locals.cap, "setup must have BEFORE > cap");
+
+        // Price ABOVE E with BEFORE deviation Db
+        locals.priceBefore = locals.E + (locals.E * locals.Db) / 1e18;
+
+        // ABOVE side with EXACT_IN:
+        // D_after_pos (no-cross) = (Db - t)/(1 + t). Want AFTER less than or equal to cap ⇒ t ≥ (Db - cap)/(1 + cap).
+
+        uint256 num = (locals.Db - locals.cap) * 1e18; // Q36 (Db > cap guaranteed)
+        uint256 den = 1e18 + locals.cap; // Q18
+        uint256 q = (num + den - 1) / den; // ceilDiv → Q18
+        locals.tLower = q;
+
+        // Avoid crossing E: need t < Db. Use tiny epsilon below Db to stay strictly above E.
+        uint256 epsCross = 1; // one Q18 unit
+        locals.tUpperNoCross = (locals.Db > epsCross) ? (locals.Db - epsCross) : 0;
+
+        // Pick t ∈ [tLower, tUpperNoCross]
+        uint256 lo = (locals.tLower == 0 ? 1 : locals.tLower);
+        uint256 hi = locals.tUpperNoCross;
+        if (hi < lo) {
+            hi = lo;
+        } // clamp if degenerate/narrow
+        locals.x = bound(uint256(amtSeed), lo, hi);
+
+        // Build locals
+        locals.comp.wIn = 1e18;
+        locals.comp.wOut = 1e18;
+        locals.comp.bIn = 1e18;
+        locals.comp.bOut = locals.priceBefore;
+        locals.comp.pxIn = 1e18;
+        locals.comp.pxOut = locals.E;
+        locals.comp.calcAmountScaled18 = 0;
+        locals.comp.poolDetails.arbThresholdPercentage9 = locals.arbThr9;
+        locals.comp.poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
+        locals.comp.poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+        locals.comp.poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
+        locals.comp.poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
+        locals.comp.poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+
+        locals.p.kind = SwapKind.EXACT_IN;
+        locals.p.amountGivenScaled18 = locals.x;
+
+        // AFTER should be less than or equal to cap (improved) and we shouldn’t have crossed E.
+        locals.priceAfter = (locals.priceBefore * 1e18) / (1e18 + locals.x);
+        uint256 dAfter = ((
+            locals.priceAfter > locals.E ? (locals.priceAfter - locals.E) : (locals.E - locals.priceAfter)
+        ) * 1e18) / locals.E;
+        assertLe(dAfter, locals.cap, "AFTER should be less than or equal to cap (improved)");
+
+        // ARB uses BEFORE and must clamp to maxArb
+        (, locals.fee) = new HyperSurgeHookMock(
+            IVault(vault),
+            fee_ppm9To1e18(locals.arbMax9),
+            fee_ppm9To1e18(locals.arbThr9),
+            fee_ppm9To1e18(locals.arbCap9),
+            "arb-before-cap"
+        ).ComputeSurgeFee(locals.comp, locals.p, STATIC_SWAP_FEE);
+
+        locals.expected = fee_expectedFeeWithParams(
+            locals.priceBefore,
+            locals.comp.pxIn,
+            locals.comp.pxOut,
+            STATIC_SWAP_FEE,
+            locals.arbThr9,
+            locals.arbCap9,
+            locals.arbMax9
+        );
+        assertEq(locals.fee, locals.expected, "ARB should compute from BEFORE and clamp at cap->max");
+        assertEq(locals.fee, fee_ppm9To1e18(locals.arbMax9), "ARB fee must equal arbMax");
+    }
+
+    struct BoundNoiseExactThresholdLocals {
+        uint256 E;
+        uint32 noiseThr9;
+        uint32 noiseCap9;
+        uint32 noiseMax9;
+        uint32 arbThr9;
+        uint32 arbCap9;
+        uint32 arbMax9;
+        uint256 thr;
+        uint256 Db; // Q18
+        uint256 priceBefore;
+        uint256 priceAfter;
+        uint256 tEdge; // Q18
+        uint256 x; // Q18
+        uint256 fee; // Computed fee
+        HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
+        PoolSwapParams p;
+    }
+
+    /// [BOUND] Exactly-at-threshold for NOISE end-state: static (no ramp)
+    /// Start inside (below E), worsen to land at (or just under, by rounding) the threshold.
+    /// Assert: fee == static.
+    function testFuzz_bound_noise_after_at_threshold_static(
+        uint256 eSeed,
+        uint32 noiseThrSeed,
+        uint32 noiseCapSeed,
+        uint32 noiseMaxSeed,
+        uint64 amtSeed
+    ) public {
+        BoundNoiseExactThresholdLocals memory locals;
+
+        locals.E = bound(eSeed, 1e16, 1e24);
+        locals.noiseThr9 = uint32(bound(noiseThrSeed, 1, 900_000_000 - 1)); // (0, 0.9)
+        locals.noiseCap9 = uint32(bound(noiseCapSeed, locals.noiseThr9 + 1, 1_000_000_000)); // (thr, 1]
+        locals.noiseMax9 = uint32(bound(noiseMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
+        // Distinct ARB lane (unused in assertion but kept different)
+        locals.arbThr9 = 1_000_000;
+        locals.arbCap9 = 300_000_000;
+        locals.arbMax9 = 50_000_000;
+
+        locals.thr = uint256(locals.noiseThr9) * 1e9; // Q18
+
+        // Start BELOW inside: Db < thr
+        locals.Db = locals.thr / 4 + 1; // strictly inside
+        locals.priceBefore = locals.E - (locals.E * locals.Db) / 1e18; // P/E = 1 - Db
+
+        // For below side: D_after = (Db + t)/(1 + t). To land AT threshold: t* = (thr - Db)/(1 - thr).
+        // Use floor for an upper bound that guarantees D_after less than or equal to thr after integer rounding.
+        {
+            uint256 num = (locals.thr - locals.Db) * 1e18; // Q36
+            uint256 den = 1e18 - locals.thr; // Q18 (> 0 by bound)
+            locals.tEdge = den == 0 ? 0 : (num / den); // Q18, floor
+        }
+
+        // Choose t ∈ [max(1, tEdge - eps), tEdge] so we never overshoot (keeps AFTER less than or equal to thr).
+        uint256 epsT = 1e6; // 1e-12 in Q18; stays near the threshold
+        uint256 lo = (locals.tEdge > epsT) ? (locals.tEdge - epsT) : 1;
+        uint256 hi = locals.tEdge;
+        if (hi < lo) {
+            hi = lo;
+        } // clamp if degenerate
+        locals.x = bound(uint256(amtSeed), lo, hi);
+
+        // Build locals
+        locals.comp.wIn = 1e18;
+        locals.comp.wOut = 1e18;
+        locals.comp.bIn = 1e18;
+        locals.comp.bOut = locals.priceBefore;
+        locals.comp.pxIn = 1e18;
+        locals.comp.pxOut = locals.E;
+        locals.comp.calcAmountScaled18 = 0;
+        locals.comp.poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
+        locals.comp.poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
+        locals.comp.poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+        locals.comp.poolDetails.arbThresholdPercentage9 = locals.arbThr9;
+        locals.comp.poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
+        locals.comp.poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+
+        locals.p.kind = SwapKind.EXACT_IN;
+        locals.p.amountGivenScaled18 = locals.x;
+
+        // Sanity: AFTER less than or equal to threshold and > BEFORE (worsened)
+        locals.priceAfter = (locals.priceBefore * 1e18) / (1e18 + locals.p.amountGivenScaled18);
+        uint256 dBefore = ((locals.E - locals.priceBefore) * 1e18) / locals.E;
+        uint256 dAfter = ((locals.E - locals.priceAfter) * 1e18) / locals.E;
+        assertLe(dAfter, locals.thr, "AFTER should be less than or equal to threshold (at-or-just-inside)");
+        assertGt(dAfter, dBefore, "deviation must worsen (positive t)");
+
+        // Inside-after on NOISE → static
+        (, locals.fee) = new HyperSurgeHookMock(
+            IVault(vault),
+            fee_ppm9To1e18(locals.arbMax9),
+            fee_ppm9To1e18(locals.arbThr9),
+            fee_ppm9To1e18(locals.arbCap9),
+            "noise-exact-thr"
+        ).ComputeSurgeFee(locals.comp, locals.p, STATIC_SWAP_FEE);
+
+        assertEq(locals.fee, STATIC_SWAP_FEE, "At threshold end-state: NOISE must return static (no ramp)");
     }
 
     // Helper: for “bad/missing external prices”, either revert OR return (ok && static fee).

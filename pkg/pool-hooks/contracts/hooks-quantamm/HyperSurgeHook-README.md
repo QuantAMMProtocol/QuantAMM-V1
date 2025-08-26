@@ -51,6 +51,17 @@ $$
 
 which is conservative and cheap for $n\le 8$.
 
+### 2.1 Swap Modeling Specifics
+
+To measure deviation directionality accurately, the hook simulates the **post-trade pool price**.  
+- For **EXACT_IN** swaps, the output amount is computed from the input.  
+- For **EXACT_OUT** swaps, the required input is computed from the output.  
+
+This ensures Δδ is always measured against the correctly projected pool state.
+This is done calling the pools onswap functionality. Given this is a view function and not 
+all pools specify this function as view, this hook is specific to WeightedPools and another
+deployment would need to be made for other pool types.
+
 ---
 
 ## 3) Why deviation helps separate **noise** from **arbitrage**
@@ -68,6 +79,11 @@ Intuition:
 
 Thus $\delta$ (and its directional change) is a natural **toxicity** proxy.
 
+### Arb vs Noise Parameterization
+
+The hook maintains **two independent parameter sets**: one for trades that **worsen deviation** ("noise") and one for trades that **improve deviation** ("arb"). Each has its own threshold, cap deviation, and maximum surge values.  
+- **Noise path**: uses post-trade deviation to determine the fee.  
+- **Arb path**: uses **pre-trade deviation** to determine the fee, rewarding price-improving flow with a distinct ramp profile.  
 ---
 
 ## 4) Fee model and directionality
@@ -112,6 +128,11 @@ f_{scalar}(\delta), & \Delta\delta > 0 \\
 $$
 
 where $\alpha \in [0,1]$ is an optional **arbitrage discount**.  
+
+
+### 4.3 Oracle Failure Handling
+
+If any oracle price is unavailable or returned as zero, the hook **falls back to the pool's static fee**. In these cases, surge and add/remove guards are disabled, effectively failing open to maintain liveness.
 
 ---
 

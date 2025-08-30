@@ -1075,7 +1075,7 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         defaultThreshold *= 1e9;
         defaultCap *= 1e9;
         defaultMaxFee *= 1e9;
-        
+
         HyperSurgeHookMock h = new HyperSurgeHookMock(
             IVault(vault),
             defaultMaxFee,
@@ -1088,5 +1088,43 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         assertTrue(f.shouldCallComputeDynamicSwapFee, "computeDynamicSwapFee flag should be true");
         assertTrue(f.shouldCallAfterAddLiquidity, "afterAddLiquidity flag should be true");
         assertTrue(f.shouldCallAfterRemoveLiquidity, "afterRemoveLiquidity flag should be true");
+    }
+
+    function testFuzz_getNumTokens_ReturnsConfiguredCount(
+        address pool,
+        uint8 n,
+        uint256 defaultThreshold,
+        uint256 defaultMaxFee,
+        uint256 defaultCap
+    ) public {
+        vm.assume(pool != address(0));
+        n = uint8(bound(n, 2, 8));
+        defaultThreshold = bound(defaultThreshold, 1, 1e9 - 1);
+        defaultCap = bound(defaultCap, defaultThreshold + 1, 1e9);
+        defaultMaxFee = bound(defaultMaxFee, 1, 1e9);
+
+        defaultThreshold *= 1e9;
+        defaultCap *= 1e9;
+        defaultMaxFee *= 1e9;
+
+        HyperSurgeHookMock h = new HyperSurgeHookMock(
+            IVault(vault),
+            defaultMaxFee,
+            defaultThreshold,
+            defaultCap,
+            "test"
+        );
+
+        TokenConfig[] memory cfgs = new TokenConfig[](n);
+        LiquidityManagement memory lm;
+
+        vm.startPrank(address(vault));
+        h.onRegister(address(0), pool, cfgs, lm);
+        vm.stopPrank();
+
+        assertEq(uint256(h.getNumTokens(pool)), uint256(n), "numTokens should equal configured length");
+
+        address other = pool == address(0xdead) ? address(0xbeef) : address(0xdead);
+        assertEq(uint256(h.getNumTokens(other)), 0, "unregistered pool should report 0 tokens");
     }
 }

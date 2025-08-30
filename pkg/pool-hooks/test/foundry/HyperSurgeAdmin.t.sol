@@ -22,20 +22,28 @@ import {
     LiquidityManagement,
     PoolSwapParams,
     SwapKind,
-    PoolRoleAccounts
+    PoolRoleAccounts,
+    HookFlags
 } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 
 // Local deployer + mock
 import { HyperSurgeHookDeployer } from "./utils/HyperSurgeHookDeployer.sol";
 import { HyperSurgeHookMock } from "../../contracts/test/HyperSurgeHookMock.sol";
+import { HyperSurgeHook } from "../../contracts/hooks-quantamm/HyperSurgeHook.sol";
 import {
     WeightedPoolContractsDeployer
 } from "@balancer-labs/v3-pool-weighted/test/foundry/utils/WeightedPoolContractsDeployer.sol";
 import { WeightedPool } from "@balancer-labs/v3-pool-weighted/contracts/WeightedPool.sol";
 
-import { HyperSpotPricePrecompile } from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperSpotPricePrecompile.sol";
-import { HyperTokenInfoPrecompile } from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperTokenInfoPrecompile.sol";
-import { HypercorePrecompileMock } from "@balancer-labs/v3-standalone-utils/test/foundry/utils/HypercorePrecompileMock.sol";
+import {
+    HyperSpotPricePrecompile
+} from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperSpotPricePrecompile.sol";
+import {
+    HyperTokenInfoPrecompile
+} from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperTokenInfoPrecompile.sol";
+import {
+    HypercorePrecompileMock
+} from "@balancer-labs/v3-standalone-utils/test/foundry/utils/HypercorePrecompileMock.sol";
 
 contract HLPriceStub {
     mapping(uint32 => uint32) internal px; // slot 0
@@ -54,7 +62,8 @@ contract HLTokenInfoStub {
     mapping(uint32 => uint8) internal sz; // slot 0
 
     mapping(uint32 => HyperTokenInfoPrecompile.HyperTokenInfo) internal info; // slot 0
- // Optional but nice for staticcall patterns:
+
+    // Optional but nice for staticcall patterns:
     fallback(bytes calldata data) external returns (bytes memory ret) {
         uint32 tokenIndex = abi.decode(data, (uint32));
 
@@ -64,7 +73,7 @@ contract HLTokenInfoStub {
         // Copy only what you care about; others can be zero/empty
         t.szDecimals = sz[tokenIndex];
 
-        return abi.encode(t);          // <<< return the STRUCT
+        return abi.encode(t); // <<< return the STRUCT
     }
 
     function set(uint32 pairIndex, uint8 decimals) external {
@@ -346,7 +355,6 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         n = _registerBasePoolWithN(n);
         idx = uint8(bound(idx, 0, n - 1));
         pairIdx = uint32(bound(pairIdx, 21, type(uint32).max - 20)); // non-zero for pair mapping
-
 
         vm.startPrank(admin);
         hook.setTokenPriceConfigIndex(address(pool), idx, pairIdx, pairIdx + 20); // pair mapping
@@ -896,7 +904,7 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         // Two rows targeting same index, second should overwrite first
         uint8[] memory indices = new uint8[](2);
         uint32[] memory pairs = new uint32[](2);
-        
+
         indices[0] = idx;
         pairs[0] = pA;
         indices[1] = idx;
@@ -989,5 +997,96 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         assertEq(hook.getMaxSurgeFeePercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), 0.02e18);
         assertEq(hook.getSurgeThresholdPercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), 0.02e18);
         assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), 1e18);
+    }
+
+    function testFuzz_onRegister_RevertWhenTokenCountBelowTwo(
+        uint8 n,
+        uint256 defaultThreshold,
+        uint256 defaultMaxFee,
+        uint256 defaultCap
+    ) public {
+        n = uint8(bound(n, 0, 1));
+        defaultThreshold = bound(defaultThreshold, 1, 1e9 - 1);
+        defaultCap = bound(defaultCap, defaultThreshold + 1, 1e9);
+        defaultMaxFee = bound(defaultMaxFee, 1, 1e9);
+
+        defaultThreshold *= 1e9;
+        defaultCap *= 1e9;
+        defaultMaxFee *= 1e9;
+
+        HyperSurgeHookMock h = new HyperSurgeHookMock(
+            IVault(vault),
+            defaultMaxFee,
+            defaultThreshold,
+            defaultCap,
+            "test"
+        );
+
+        TokenConfig[] memory cfgs = new TokenConfig[](n);
+        LiquidityManagement memory lm;
+
+        vm.startPrank(address(vault));
+        vm.expectRevert(HyperSurgeHook.NumTokensOutOfRange.selector);
+        h.onRegister(address(0), address(0), cfgs, lm);
+        vm.stopPrank();
+    }
+
+    function testFuzz_onRegister_RevertWhenTokenCountAboveEight(
+        uint256 n,
+        uint256 defaultThreshold,
+        uint256 defaultMaxFee,
+        uint256 defaultCap
+    ) public {
+        n = bound(n, 9, type(uint8).max);
+        defaultThreshold = bound(defaultThreshold, 1, 1e9 - 1);
+        defaultCap = bound(defaultCap, defaultThreshold + 1, 1e9);
+        defaultMaxFee = bound(defaultMaxFee, 1, 1e9);
+
+        defaultThreshold *= 1e9;
+        defaultCap *= 1e9;
+        defaultMaxFee *= 1e9;
+
+        HyperSurgeHookMock h = new HyperSurgeHookMock(
+            IVault(vault),
+            defaultMaxFee,
+            defaultThreshold,
+            defaultCap,
+            "test"
+        );
+
+        TokenConfig[] memory cfgs = new TokenConfig[](n);
+        LiquidityManagement memory lm;
+
+        vm.startPrank(address(vault));
+        vm.expectRevert(HyperSurgeHook.NumTokensOutOfRange.selector);
+        h.onRegister(address(0), address(0), cfgs, lm);
+        vm.stopPrank();
+    }
+
+    function test_getHookFlags_SignalsAreSet(
+        uint256 defaultThreshold,
+        uint256 defaultMaxFee,
+        uint256 defaultCap
+    ) public {
+        defaultThreshold = bound(defaultThreshold, 1, 1e9 - 1);
+        defaultCap = bound(defaultCap, defaultThreshold + 1, 1e9);
+        defaultMaxFee = bound(defaultMaxFee, 1, 1e9);
+
+        defaultThreshold *= 1e9;
+        defaultCap *= 1e9;
+        defaultMaxFee *= 1e9;
+        
+        HyperSurgeHookMock h = new HyperSurgeHookMock(
+            IVault(vault),
+            defaultMaxFee,
+            defaultThreshold,
+            defaultCap,
+            "test"
+        );
+
+        HookFlags memory f = h.getHookFlags();
+        assertTrue(f.shouldCallComputeDynamicSwapFee, "computeDynamicSwapFee flag should be true");
+        assertTrue(f.shouldCallAfterAddLiquidity, "afterAddLiquidity flag should be true");
+        assertTrue(f.shouldCallAfterRemoveLiquidity, "afterRemoveLiquidity flag should be true");
     }
 }

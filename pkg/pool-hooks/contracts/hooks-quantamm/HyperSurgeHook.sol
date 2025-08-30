@@ -23,8 +23,12 @@ import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Vers
 
 import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol";
 import { WeightedPool } from "@balancer-labs/v3-pool-weighted/contracts/WeightedPool.sol";
-import { HyperSpotPricePrecompile } from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperSpotPricePrecompile.sol";
-import { HyperTokenInfoPrecompile } from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperTokenInfoPrecompile.sol";
+import {
+    HyperSpotPricePrecompile
+} from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperSpotPricePrecompile.sol";
+import {
+    HyperTokenInfoPrecompile
+} from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperTokenInfoPrecompile.sol";
 
 /// -----------------------------------------------------------------------
 /// Multitoken Hyper Surge Hook — struct-per-index configuration
@@ -537,14 +541,14 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             locals.maxPct18 = _convertTo18Decimals(locals.poolDetails.arbMaxSurgeFee9);
             locals.threshold18 = _convertTo18Decimals(locals.poolDetails.arbThresholdPercentage9);
 
-            //For the arbitrage direction we use the deviation before. 
+            //For the arbitrage direction we use the deviation before.
             //Why this is the case is in the readme but in essence
-            //if a large noise deviation is being corrected the arbitrage pays more 
+            //if a large noise deviation is being corrected the arbitrage pays more
             //to take advantage of the larger arb opp and therefore greater profit
             //as the fee decreases the closer you get to market price, another
             //arb opportunity presents itself once the first arb is taken
             //this means a large fee != a large no arb region and the pool stays close to market
-            locals.deviation18 = locals.deviationBefore18; 
+            locals.deviation18 = locals.deviationBefore18;
         }
 
         if (locals.deviation18 <= locals.threshold18) {
@@ -604,19 +608,9 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     }
 
     function _ensureValidPct(uint256 pct) internal pure {
-        if (pct > 1e18) {
+        if (pct < 1e9 || pct > 1e18 || pct % 1e9 != 0) {
             revert InvalidPercentage();
         }
-        if (pct < 1e9 || (pct > 1e9 && (pct / 1e9) * 1e9 != pct)) {
-            revert InvalidPercentage();
-        }
-    }
-
-    function _convertToStorage9Dp(uint256 value) internal pure returns (uint32) {
-        if (value > 1e9) {
-            revert InvalidPercentage();
-        }
-        return uint32(value);
     }
 
     ///@notice Converts a 9 decimal places fixed point number to 18 decimal places.

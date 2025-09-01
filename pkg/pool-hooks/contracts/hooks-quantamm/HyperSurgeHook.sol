@@ -187,8 +187,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint32[] calldata pairIdx,
         uint32[] calldata hlTokenIdx
     ) external onlySwapFeeManagerOrGovernance(pool) {
-        //TODO should this be done on construction? Not sure there is any reason to change it
-        //or at least be blocked once set
         PoolDetails storage detail = _poolCfg[pool].details;
         SetBatchConfigs memory cfg;
 

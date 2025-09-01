@@ -1708,28 +1708,21 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.noiseCap9 = uint32(bound(noiseCapSeed, locals.noiseThr9 + 1, 1_000_000_000));
         locals.noiseMax9 = uint32(bound(noiseMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
 
-        // ARB lane (kept distinct but unused in the assertion)
         locals.arbThr9 = 1_000_000;
         locals.arbCap9 = 300_000_000;
         locals.arbMax9 = 50_000_000;
-
         locals.thr = uint256(locals.noiseThr9) * 1e9;
-
-        // Start just inside threshold BELOW E (safely away from boundary)
         locals.deviationBefore = locals.thr / 4 + 1;
         locals.price_before = locals.E - (locals.E * locals.deviationBefore) / 1e18;
 
-        // Choose x to worsen but keep AFTER less than or equal to thr:
-        // price_after/E = (price_before/E) / (1 + t) greater than or equal to (1 - thr)  means  t less than or equal to R/(1 - thr) - 1
-        // where R = price_before/E = 1 - deviationBefore.
         uint256 R1e18 = (locals.price_before * 1e18) / locals.E;
-        uint256 denom = 1e18 - locals.thr;, > 0
+        uint256 denom = 1e18 - locals.thr;
         uint256 q = (R1e18 * 1e18) / denom;
-        locals.xMax = q > 1e18 ? (q - 1e18) : 0; (x = t*1e18)
-        // Soften extremes to avoid huge swaps in the mock path
-        if (locals.xMax > 5e17) locals.xMax = 5e17; // cap at tless than or equal to0.5
+        locals.xMax = q > 1e18 ? (q - 1e18) : 0;
+        if (locals.xMax > 5e17) {
+            locals.xMax = 5e17;
+        }
 
-        // Build locals
         locals.comp.wIn = 1e18;
         locals.comp.wOut = 1e18;
         locals.comp.bIn = 1e18;
@@ -1791,10 +1784,10 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 deviationBefore;
         uint256 price_before;
         uint256 price_after;
-        uint256 tCross;: min t to cross below E   (t > Db)
-        uint256 tWorse;: min t to worsen |dev|    (t > 2Db/(1-Db))
-        uint256 tMin;: max(tCross, tWorse) + margin
-        uint256 x;: amountGivenScaled18 (t = x / 1e18)
+        uint256 tCross;
+        uint256 tWorse;
+        uint256 tMin;
+        uint256 x;
         uint256 num; // numerator for tWorse calculation
         uint256 den; // denominator for tWorse calculation
         uint256 q; // intermediate value for tWorse calculation
@@ -1835,7 +1828,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.cap = uint256(locals.noiseCap9) * 1e9;
 
         // Start ABOVE E with a deviation strictly outside the threshold:
-        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 4; in (thr, cap)
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 4;
         locals.price_before = locals.E + (locals.E * locals.deviationBefore) / 1e18;
 
         // Build compute locals
@@ -1862,7 +1855,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.tCross = locals.deviationBefore;
         // tWorse = ceil( (2*Db) / (1 - Db) ) in Q18
         locals.num = (2 * locals.deviationBefore) * 1e18; // Q36
-        locals.den = 1e18 - locals.deviationBefore;, > 0 by bounds
+        locals.den = 1e18 - locals.deviationBefore;
         locals.q = (locals.num + locals.den - 1) / locals.den; // ceilDiv -> Q18
         locals.tWorse = locals.q;
 
@@ -2242,7 +2235,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         // Upper bound on t (don’t drop below the lower edge 1 − thr):
         //   t less than or equal to R/(1 − thr) − 1
         // Use R_down and floor-div to be conservative, then subtract 1e18.
-        uint256 denomMinus = 1e18 - locals.thr; (> 0 by bounds on thr)
+        uint256 denomMinus = 1e18 - locals.thr;
         uint256 numMinus = locals.R1e18 * 1e18; // Q36
         uint256 qMinus = numMinus / denomMinus; // floorDiv → Q18
         locals.tUpper = qMinus > 1e18 ? (qMinus - 1e18) : 0;
@@ -2531,7 +2524,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.cap = uint256(locals.noiseCap9) * 1e9;
 
         // Start OUTSIDE BELOW price: priceBefore = E * (1 - D_before), with D_before in (thr, cap)
-        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3;: strictly outside
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3;
         locals.priceBefore = locals.E - (locals.E * locals.deviationBefore) / 1e18;
 
         // Build compute locals with the standard orientation (pxIn=1e18, pxOut=E)
@@ -2552,8 +2545,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         // EXACT_IN reduces P further → deviation worsens from the BELOW side (NOISE lane)
         locals.p.kind = SwapKind.EXACT_IN;
         // ensure a measurable worsening but no overflow; avoid 1-wei knife edges
-        uint256 lo = 1e9; t = 1e-9
-        uint256 hi = 5e17; t less than or equal to 0.5
+        uint256 lo = 1e9;
+        uint256 hi = 5e17;
         locals.p.amountGivenScaled18 = bound(uint256(amtSeed), lo, hi);
 
         // AFTER price for expected (NOISE uses AFTER)
@@ -2670,10 +2663,10 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         uint256 lo = (locals.tLower == 0 ? 1 : locals.tLower);
         uint256 hi = locals.tUpperNoCross;
-        
+
         if (hi < lo) {
             hi = lo;
-        } 
+        }
         locals.x = bound(uint256(amtSeed), lo, hi);
 
         locals.comp.wIn = 1e18;
@@ -2760,19 +2753,19 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         locals.thr = uint256(locals.noiseThr9) * 1e9;
 
-        locals.Db = locals.thr / 4 + 1; 
+        locals.Db = locals.thr / 4 + 1;
         locals.priceBefore = locals.E - (locals.E * locals.Db) / 1e18;
 
-            uint256 num = (locals.thr - locals.Db) * 1e18;
-            uint256 den = 1e18 - locals.thr;
-            locals.tEdge = den == 0 ? 0 : (num / den);
+        uint256 num = (locals.thr - locals.Db) * 1e18;
+        uint256 den = 1e18 - locals.thr;
+        locals.tEdge = den == 0 ? 0 : (num / den);
 
         uint256 epsT = 1e6;
         uint256 lo = (locals.tEdge > epsT) ? (locals.tEdge - epsT) : 1;
         uint256 hi = locals.tEdge;
         if (hi < lo) {
             hi = lo;
-        } 
+        }
 
         locals.x = bound(uint256(amtSeed), lo, hi);
         locals.comp.wIn = 1e18;
@@ -2873,7 +2866,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         LiquidityManagement memory lm;
         vm.prank(address(vault));
         hook.onRegister(poolFactory, address(pool), cfg, lm);
-        
+
         vm.startPrank(admin);
         hook.setTokenPriceConfigIndex(address(pool), uint8(idxIn), pairIn, HL_IDX_SZ_8); // div=1
         hook.setTokenPriceConfigIndex(address(pool), uint8(idxOut), pairOut, HL_IDX_SZ_8); // div=1

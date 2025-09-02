@@ -40,7 +40,7 @@ runs = 1000
 max_test_rejects = 60000
 
 [profile.coverage.fuzz]
-runs = 1
+runs = 1000
 max_test_rejects = 60000
 
 [profile.intense.fuzz]

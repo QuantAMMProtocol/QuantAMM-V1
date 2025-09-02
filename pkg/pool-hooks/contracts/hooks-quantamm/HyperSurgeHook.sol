@@ -559,6 +559,8 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256 num = bOut.mulDown(wIn);
         uint256 den = bIn.mulDown(wOut);
 
+        //would be impossible given normal balances and weights but given
+        //it is on the withdraw path keep the defensive check
         if (den == 0) {
             return 0;
         }

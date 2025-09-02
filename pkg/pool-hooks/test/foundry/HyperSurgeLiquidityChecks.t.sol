@@ -35,9 +35,16 @@ import {
 } from "@balancer-labs/v3-pool-weighted/test/foundry/utils/WeightedPoolContractsDeployer.sol";
 import { WeightedPool } from "@balancer-labs/v3-pool-weighted/contracts/WeightedPool.sol";
 
-import { HyperSpotPricePrecompile } from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperSpotPricePrecompile.sol";
-import { HyperTokenInfoPrecompile } from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperTokenInfoPrecompile.sol";
-import { HypercorePrecompileMock } from "@balancer-labs/v3-standalone-utils/test/foundry/utils/HypercorePrecompileMock.sol";
+import {
+    HyperSpotPricePrecompile
+} from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperSpotPricePrecompile.sol";
+import {
+    HyperTokenInfoPrecompile
+} from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperTokenInfoPrecompile.sol";
+import {
+    HypercorePrecompileMock
+} from "@balancer-labs/v3-standalone-utils/test/foundry/utils/HypercorePrecompileMock.sol";
+
 contract HLPriceStub {
     mapping(uint32 => uint32) internal px; // slot 0
 
@@ -54,7 +61,7 @@ contract HLPriceStub {
 contract HLTokenInfoStub {
     mapping(uint32 => uint8) internal sz; // slot 0
 
-     // Optional but nice for staticcall patterns:
+    // Optional but nice for staticcall patterns:
     fallback(bytes calldata data) external returns (bytes memory ret) {
         uint32 tokenIndex = abi.decode(data, (uint32));
 
@@ -63,15 +70,14 @@ contract HLTokenInfoStub {
 
         // Copy only what you care about; others can be zero/empty
         t.szDecimals = sz[tokenIndex];
-        
-        return abi.encode(t);          // <<< return the STRUCT
+
+        return abi.encode(t); // <<< return the STRUCT
     }
 
     function set(uint32 pairIndex, uint8 decimals) external {
         sz[pairIndex] = decimals;
     }
 }
-
 
 contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoolContractsDeployer {
     using ArrayHelpers for *;
@@ -159,7 +165,7 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
             1e18,
             string("test")
         );
-        
+
         _pxStubDeployer = new HLPriceStub();
         _infoStubDeployer = new HLTokenInfoStub();
         vm.etch(HyperSpotPricePrecompile.SPOT_PRICE_PRECOMPILE_ADDRESS, address(_pxStubDeployer).code);
@@ -1181,5 +1187,71 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         vm.stopPrank();
 
         assertTrue(ok, "outside above -> inside below must allow");
+    }
+
+    struct DefenciveZeroCheck {
+        uint256 bIn;
+        uint256 bOut;
+        uint256 pxIn;
+        uint256 pxOut;
+        uint256 pxBase;
+        uint256 amountGiven;
+        uint256 calcAmount;
+        bool ok;
+        uint256 fee;
+        uint256 staticFee;
+    }
+
+    function testFuzz_ComputeSurgeFee_defensive_denominator_zero_allows(
+        bool exactIn,
+        uint256 bInRaw,
+        uint256 bOutRaw,
+        uint256 amtGivenRaw,
+        uint256 calcAmtRaw
+    ) public view {
+        DefenciveZeroCheck memory check;
+        check.bIn = bound(bInRaw, 1e18, 1e22);
+        check.bOut = bound(bOutRaw, 1e18, 1e22);
+        check.pxIn = 1e18;
+        check.pxOut = 1e18;
+        check.amountGiven = bound(amtGivenRaw, 1, check.bIn / 1_000_000); // ≤ 1e-6 of bIn
+        check.calcAmount = bound(calcAmtRaw, 1, check.bOut / 1_000_000); // ≤ 1e-6 of bOut
+
+        HyperSurgeHookMock.ComputeSurgeFeeLocals memory L;
+        L.bIn = check.bIn;
+        L.bOut = check.bOut;
+        L.wIn = 1e18;
+        L.wOut = 0; // <<< makes den = bIn.mulDown(wOut) == 0 → poolPx == 0
+        L.pxIn = check.pxIn;
+        L.pxOut = check.pxOut;
+        L.calcAmountScaled18 = check.calcAmount;
+        L.poolDetails.noiseThresholdPercentage9 = 10_000_000; // 1%
+        L.poolDetails.noiseCapDeviationPercentage9 = 50_000_000; // 5%
+        L.poolDetails.noiseMaxSurgeFee9 = 100_000_000; // 10%
+        L.poolDetails.arbThresholdPercentage9 = 10_000_000; // 1%
+        L.poolDetails.arbCapDeviationPercentage9 = 50_000_000; // 5%
+        L.poolDetails.arbMaxSurgeFee9 = 200_000_000; // 20%
+        L.poolDetails.numTokens = 2;
+
+        uint256[] memory balances = new uint256[](2);
+        balances[0] = check.bIn;
+        balances[1] = check.bOut;
+
+        PoolSwapParams memory p = PoolSwapParams({
+            kind: exactIn ? SwapKind.EXACT_IN : SwapKind.EXACT_OUT,
+            amountGivenScaled18: check.amountGiven,
+            balancesScaled18: balances,
+            indexIn: 0,
+            indexOut: 1,
+            router: address(0),
+            userData: ""
+        });
+
+        check.staticFee = 1e16; // 1%
+        (check.ok, check.fee) = hook.ComputeSurgeFee(L, p, check.staticFee);
+
+        assertTrue(check.ok, "compute fee must not block when pool spot denominator is zero");
+        assertLe(check.fee, 1e18, "fee must be a valid 18-dec percentage");
+        assertGe(check.fee, check.staticFee, "fee must be at least the static fee");
     }
 }

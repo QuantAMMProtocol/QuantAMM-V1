@@ -475,20 +475,8 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
         locals.rawIn = HyperSpotPricePrecompile.spotPrice(pInCfg.pairIndex);
         locals.rawOut = HyperSpotPricePrecompile.spotPrice(pOutCfg.pairIndex);
-
-        if (locals.rawIn == 0 || locals.rawOut == 0) {
-            // Missing oracle data: safe path returns the pool’s static fee.
-            return (true, staticSwapFee);
-        }
-
         locals.pxIn = locals.rawIn.divDown(_divisorFromSz(pInCfg.sz));
         locals.pxOut = locals.rawOut.divDown(_divisorFromSz(pOutCfg.sz));
-
-        //Do not block if there is an issue with the hyperliquid price
-        if (locals.pxIn == 0 || locals.pxOut == 0) {
-            return (true, staticSwapFee);
-        }
-
         locals.bIn = p.balancesScaled18[p.indexIn];
         locals.bOut = p.balancesScaled18[p.indexOut];
 

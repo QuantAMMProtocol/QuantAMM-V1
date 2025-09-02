@@ -1104,12 +1104,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         assertEq(locals.feeIn, locals.feeOut, "with equal lane params, kind should not change math result");
     }
 
-    function testFuzz_view_missingPrices_reverts(
-        uint8 nSeed,
-        uint256 /* wSeed */,
-        uint256 bSeed,
-        uint8 iSeed
-    ) public {
+    function testFuzz_view_missingPrices_reverts(uint8 nSeed, uint256 /* wSeed */, uint256 bSeed, uint8 iSeed) public {
         // --- Register pool and adapt to its actual token count ---
         uint8 nTarget = uint8(bound(nSeed, 2, 8));
         _registerBasePoolWithN(nTarget);
@@ -2789,21 +2784,77 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         assertEq(locals.fee, STATIC_SWAP_FEE, "At threshold end-state: NOISE must return static (no ramp)");
     }
 
-    address constant _HYPER_SPOT_PRICE_PRECOMPILE = 0x0000000000000000000000000000000000000101;
-    bytes4 constant _SEL_SPOT_PRICE = bytes4(keccak256("spotPrice(uint32)"));
     uint32 constant HL_IDX_SZ_0 = 100;
     uint32 constant HL_IDX_SZ_8 = 108;
 
+    bytes4 constant _SEL_SPOT_PRICE = bytes4(keccak256("spotPrice(uint32)"));
+    address constant _HYPER_SPOT_PRICE_PRECOMPILE = 0x0000000000000000000000000000000000000808;
+
     function _mockHyperSpotPrice(uint32 pairIndex, uint64 raw) internal {
-        vm.mockCall(_HYPER_SPOT_PRICE_PRECOMPILE, abi.encodeWithSelector(_SEL_SPOT_PRICE, pairIndex), abi.encode(raw));
+        vm.mockCall(
+            _HYPER_SPOT_PRICE_PRECOMPILE,
+            abi.encode(pairIndex), // <- no selector
+            abi.encode(raw) // 32-byte padded uint64
+        );
     }
 
-    function testFuzz_Fee_Reverts_When_ExtPxZero(uint64 rawInHuge, bool givenIn) public {
-        // Make rawInHuge strictly greater than 1e18 to guarantee (pxOut*1e18)/pxIn == 0 with same HL size.
+    function testFuzz_Fee_FallbacksToStatic_When_ExtPxZero(bool givenIn, uint64 rawInHuge) public {
+        TokenConfig[] memory cfg = new TokenConfig[](2);
+        LiquidityManagement memory lm;
+        vm.prank(address(vault));
+        hook.onRegister(poolFactory, address(pool), cfg, lm);
+
+        // 2) Use the same HL token index you used (108 -> sz=0 -> divisor=1e8) on BOTH tokens
+        uint32 pairIn = 8001;
+        uint32 pairOut = 8002;
+
+        vm.startPrank(admin);
+        hook.setTokenPriceConfigIndex(address(pool), 0, pairIn, 108); // div=1e8
+        hook.setTokenPriceConfigIndex(address(pool), 1, pairOut, 108); // div=1e8
+        vm.stopPrank();
+
+        // 3) Force extPx == 0 with NON-ZERO raws:
+        //    extPx = floor((pxOut*1e18)/pxIn) = floor((rawOut*1e18)/rawIn)
+        //    => choose rawOut=1 and rawIn > 1e18 (fits in uint64), so extPx == 0
         rawInHuge = uint64(bound(uint256(rawInHuge), 1e18 + 1, type(uint64).max));
 
+        // (optional) prove we hit the correct precompile and calldata (no selector)
+        vm.expectCall(_HYPER_SPOT_PRICE_PRECOMPILE, abi.encode(pairIn));
+        vm.expectCall(_HYPER_SPOT_PRICE_PRECOMPILE, abi.encode(pairOut));
+
+        // Mock the spot prices with the correct calldata (NO selector)
+        _mockHyperSpotPrice(pairIn, rawInHuge); // pxIn  = rawInHuge * 1e10
+        _mockHyperSpotPrice(pairOut, 1); // pxOut = 1 * 1e10
+
+        // 4) Build params (all 7 fields)
+        uint256[] memory balances = new uint256[](2);
+        balances[0] = 1e18;
+        balances[1] = 1e18;
+
+        SwapKind kind = givenIn ? SwapKind.EXACT_IN : SwapKind.EXACT_OUT;
+
+        PoolSwapParams memory p = PoolSwapParams({
+            kind: kind,
+            amountGivenScaled18: 5e15,
+            balancesScaled18: balances,
+            indexIn: 0,
+            indexOut: 1,
+            router: address(0),
+            userData: ""
+        });
+
+        // 5) Expect: NO revert; the hook falls back to pool static fee because extPx == 0
+        uint256 staticFee = WeightedPool(address(pool)).getStaticSwapFeePercentage();
+        (bool ok, uint256 dynFee) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), staticFee);
+
+        assertTrue(ok, "extPx==0 must not block");
+        assertEq(dynFee, staticFee, "extPx==0 must return static fee");
+    }
+
+    function testFuzz_Fee_ClampsToMax_When_DeviationBeyondCap(bool givenIn, uint64 rawOutHuge) public {
         uint256 idxIn = 0;
         uint256 idxOut = 1;
+        uint256 amountGiven = 5e15;
 
         uint256[] memory balances = new uint256[](2);
         balances[0] = 1e18;
@@ -2814,27 +2865,88 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         vm.prank(address(vault));
         hook.onRegister(poolFactory, address(pool), cfg, lm);
 
-        uint32 pairIn = 5551;
-        uint32 pairOut = 5552;
-
+        uint32 pairIn = 91001;
+        uint32 pairOut = 91002;
         vm.startPrank(admin);
-        hook.setTokenPriceConfigIndex(address(pool), uint8(idxIn), pairIn, HL_IDX_SZ_8); // divisor = 1
-        hook.setTokenPriceConfigIndex(address(pool), uint8(idxOut), pairOut, HL_IDX_SZ_8); // divisor = 1
+        hook.setTokenPriceConfigIndex(address(pool), uint8(idxIn), pairIn, HL_IDX_SZ_8);
+        hook.setTokenPriceConfigIndex(address(pool), uint8(idxOut), pairOut, HL_IDX_SZ_8);
+
+        uint256 thr = 1e16; // 1%
+        uint256 cap = 2e16; // 2%
+        uint256 max = 15e15; // 1.5%
+
+        hook.setSurgeThresholdPercentage(address(pool), thr, IHyperSurgeHook.TradeType.ARBITRAGE);
+        hook.setSurgeThresholdPercentage(address(pool), thr, IHyperSurgeHook.TradeType.NOISE);
+        hook.setCapDeviationPercentage(address(pool), cap, IHyperSurgeHook.TradeType.ARBITRAGE);
+        hook.setCapDeviationPercentage(address(pool), cap, IHyperSurgeHook.TradeType.NOISE);
+        hook.setMaxSurgeFeePercentage(address(pool), max, IHyperSurgeHook.TradeType.ARBITRAGE);
+        hook.setMaxSurgeFeePercentage(address(pool), max, IHyperSurgeHook.TradeType.NOISE);
         vm.stopPrank();
 
-        // pxIn = rawInHuge * 1e18; pxOut = 1 * 1e18  => extPx = floor(1e18 / rawInHuge) = 0
-        _mockHyperSpotPrice(pairIn, rawInHuge);
-        _mockHyperSpotPrice(pairOut, 1);
+        // External price >> 1.0:
+        // extPx = (pxOut / pxIn) with same divisor. Set pxOut very large, pxIn = 1 unit.
+        // Use HL_IDX_SZ_8 (divisor 1e8) so raw numbers are easy: rawIn=1e8, rawOut in [5e9, max].
+        rawOutHuge = uint64(bound(uint256(rawOutHuge), 5e9, type(uint64).max));
+        _mockHyperSpotPrice(pairIn, uint64(1e8));
+        _mockHyperSpotPrice(pairOut, rawOutHuge);
 
         SwapKind kind = givenIn ? SwapKind.EXACT_IN : SwapKind.EXACT_OUT;
-        uint256 amountGiven = 1e15;
-
         PoolSwapParams memory p = _makeParams(idxIn, idxOut, kind, amountGiven, balances);
 
         uint256 staticFee = WeightedPool(address(pool)).getStaticSwapFeePercentage();
+        (bool ok, uint256 fee) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), staticFee);
 
-        vm.expectRevert();
-        hook.onComputeDynamicSwapFeePercentage(p, address(pool), staticFee);
+        assertTrue(ok, "fee path must not block");
+        assertEq(fee, max, "fee must clamp at configured maxPct");
+    }
+
+    function testFuzz_Fee_ReturnsStatic_When_DeviationBelowThreshold(bool givenIn, uint64 rawBase) public {
+        uint256 idxIn = 0;
+        uint256 idxOut = 1;
+        uint256 amountGiven = 5e15;
+
+        uint256[] memory balances = new uint256[](2);
+        balances[0] = 1e18;
+        balances[1] = 1e18;
+
+        TokenConfig[] memory cfg = new TokenConfig[](2);
+        LiquidityManagement memory lm;
+        vm.prank(address(vault));
+        hook.onRegister(poolFactory, address(pool), cfg, lm);
+
+        uint32 pairIn = 92001;
+        uint32 pairOut = 92002;
+        vm.startPrank(admin);
+        hook.setTokenPriceConfigIndex(address(pool), uint8(idxIn), pairIn, HL_IDX_SZ_8);
+        hook.setTokenPriceConfigIndex(address(pool), uint8(idxOut), pairOut, HL_IDX_SZ_8);
+
+        // Set a relatively generous threshold (5%) and a higher cap so we stay in "below threshold"
+        uint256 thr = 5e16; // 5%
+        uint256 cap = 20e16; // 20% (arbitrary > thr)
+        uint256 max = 50e16; // 50% (irrelevant here)
+
+        hook.setSurgeThresholdPercentage(address(pool), thr, IHyperSurgeHook.TradeType.ARBITRAGE);
+        hook.setSurgeThresholdPercentage(address(pool), thr, IHyperSurgeHook.TradeType.NOISE);
+        hook.setCapDeviationPercentage(address(pool), cap, IHyperSurgeHook.TradeType.ARBITRAGE);
+        hook.setCapDeviationPercentage(address(pool), cap, IHyperSurgeHook.TradeType.NOISE);
+        hook.setMaxSurgeFeePercentage(address(pool), max, IHyperSurgeHook.TradeType.ARBITRAGE);
+        hook.setMaxSurgeFeePercentage(address(pool), max, IHyperSurgeHook.TradeType.NOISE);
+        vm.stopPrank();
+
+        // Make extPx ≈ 1.0 within ~1e-8 relative drift, far below the 5% threshold.
+        // Same divisor (1e8): extPx = (rawOut/rawIn). Pick rawOut = rawBase + 1, rawIn = rawBase.
+        rawBase = uint64(bound(uint256(rawBase), 1e8, 5e9)); // ensure > 0 and leaves headroom for +1
+        _mockHyperSpotPrice(pairIn, rawBase);
+        _mockHyperSpotPrice(pairOut, rawBase + 1);
+
+        SwapKind kind = givenIn ? SwapKind.EXACT_IN : SwapKind.EXACT_OUT;
+        PoolSwapParams memory p = _makeParams(idxIn, idxOut, kind, amountGiven, balances);
+
+        uint256 staticFee = WeightedPool(address(pool)).getStaticSwapFeePercentage();
+        (bool ok, uint256 fee) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), staticFee);
+
+        assertTrue(ok, "below-threshold path must not block");
+        assertEq(fee, staticFee, "below-threshold deviation must return static fee");
     }
 
     function _makeParams(

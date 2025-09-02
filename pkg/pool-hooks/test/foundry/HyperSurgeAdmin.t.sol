@@ -1127,4 +1127,58 @@ contract HyperSurgeAdminTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedP
         address other = pool == address(0xdead) ? address(0xbeef) : address(0xdead);
         assertEq(uint256(h.getNumTokens(other)), 0, "unregistered pool should report 0 tokens");
     }
+
+    function testFuzz_SetSurgeThreshold_Reverts_When_Threshold_GE_CapDeviation(
+        uint256 rawCapDev18,
+        bool useArb,
+        bool equalToCap,
+        uint16 stepsAbove,
+        bool preSetBelowFirst
+    ) public {
+        TokenConfig[] memory cfg = new TokenConfig[](2);
+        LiquidityManagement memory lm;
+        vm.prank(address(vault));
+        hook.onRegister(poolFactory, address(pool), cfg, lm);
+
+        IHyperSurgeHook.TradeType tt = useArb ? IHyperSurgeHook.TradeType.ARBITRAGE : IHyperSurgeHook.TradeType.NOISE;
+
+        uint256 initThr = 1e9;
+        vm.startPrank(admin);
+        hook.setSurgeThresholdPercentage(address(pool), initThr, tt);
+
+        uint256 minCap = initThr + 1e9;
+        uint256 capDev18 = bound(rawCapDev18, minCap, 1e18);
+        capDev18 = (capDev18 / 1e9) * 1e9;
+        if (capDev18 <= initThr) {
+            capDev18 = minCap;
+        }
+
+        hook.setCapDeviationPercentage(address(pool), capDev18, tt);
+
+        if (preSetBelowFirst && capDev18 > 1e9) {
+            uint256 thrBelow = capDev18 - 1e9;
+            hook.setSurgeThresholdPercentage(address(pool), thrBelow, tt);
+        }
+
+        uint256 thrInvalid;
+        if (equalToCap) {
+            thrInvalid = capDev18;
+        } else {
+            uint256 maxSteps = (1e18 - capDev18) / 1e9;
+            if (maxSteps == 0) {
+                thrInvalid = capDev18;
+            } else {
+                uint256 steps = bound(uint256(stepsAbove), 1, maxSteps);
+                thrInvalid = capDev18 + steps * 1e9;
+            }
+            if (thrInvalid > 1e18) {
+                thrInvalid = 1e18;
+            }
+            thrInvalid = (thrInvalid / 1e9) * 1e9;
+        }
+
+        vm.expectRevert(HyperSurgeHook.InvalidThresholdDeviation.selector);
+        hook.setSurgeThresholdPercentage(address(pool), thrInvalid, tt);
+        vm.stopPrank();
+    }
 }

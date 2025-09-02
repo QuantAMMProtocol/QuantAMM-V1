@@ -512,10 +512,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
         // P_pool = (B_out/w_out) / (B_in/w_in) = (B_out * w_in) / (B_in * w_out)
         locals.poolPx = _pairSpotFromBalancesWeights(locals.bIn, locals.wIn, locals.bOut, locals.wOut);
-        if (locals.poolPx == 0) {
-            return (true, staticSwapFee);
-        }
-        // 5) Deviation
         locals.deviation18 = _relAbsDiff(locals.poolPx, locals.extPx); // |pool - ext| / ext
 
         if (locals.deviation18 > locals.deviationBefore18) {
@@ -550,7 +546,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
         locals.increment = (locals.maxPct18 - staticSwapFee).mulDown(locals.norm);
         locals.surgeFee18 = staticSwapFee + locals.increment;
-        if (locals.surgeFee18 > locals.maxPct18) locals.surgeFee18 = locals.maxPct18;
 
         return (true, locals.surgeFee18);
     }
@@ -645,7 +640,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
                 if (locals.raw != 0) {
                     locals.priceDivisor = _divisorFromSz(cfg.sz);
                     if (locals.priceDivisor != 0) {
-                        locals.px[locals.i] = (uint256(locals.raw) * 1e18) / uint256(locals.priceDivisor);
+                        locals.px[locals.i] = uint256(locals.raw).divDown(uint256(locals.priceDivisor));
                     }
                 }
             }
@@ -660,41 +655,30 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256[] memory w
     ) internal pure returns (uint256) {
         // Pairwise check (O(n^2), n<=8).
-        for (locals.i = 0; locals.i < balancesScaled18.length; ) {
+        for (locals.i = 0; locals.i < balancesScaled18.length; ++locals.i) {
             locals.bi = balancesScaled18[locals.i];
             locals.wi = w[locals.i];
             locals.pxi = locals.px[locals.i];
 
-            if (locals.pxi == 0) {
-                //Do not block if there is an issue with the hyperliquid price
-                return 0;
-            }
-
-            for (locals.j = locals.i + 1; locals.j < balancesScaled18.length; ) {
+            for (locals.j = locals.i + 1; locals.j < balancesScaled18.length; ++locals.j) {
                 locals.bj = balancesScaled18[locals.j];
                 locals.wj = w[locals.j];
                 locals.pxj = locals.px[locals.j];
 
-                if (locals.pxj == 0) {
-                    //Do not block if there is an issue with the hyperliquid price
-                    return 0;
-                }
-
                 // Pool-implied spot for j vs i: (Bj/wj) / (Bi/wi)
                 locals.poolPx = _pairSpotFromBalancesWeights(locals.bj, locals.wj, locals.bi, locals.wi);
-                if (locals.poolPx == 0) continue;
+                
+                if (locals.poolPx == 0) {
+                    continue;
+                }
 
                 // External ratio j/i
                 locals.extPx = locals.pxj.divDown(locals.pxi);
-
                 locals.dev = _relAbsDiff(locals.poolPx, locals.extPx);
-                if (locals.dev > locals.maxDev) locals.maxDev = locals.dev;
-                unchecked {
-                    ++locals.j;
+                
+                if (locals.dev > locals.maxDev) {
+                    locals.maxDev = locals.dev;
                 }
-            }
-            unchecked {
-                ++locals.i;
             }
         }
 

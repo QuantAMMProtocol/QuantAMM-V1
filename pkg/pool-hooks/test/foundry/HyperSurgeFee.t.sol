@@ -525,8 +525,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.amtSeed = (marker << 32) | marker;
         p.amountGivenScaled18 = bound(locals.amtSeed, 1, locals.maxIn == 0 ? 1 : locals.maxIn);
 
-        vm.expectRevert();
-        (locals.ok, locals.dyn) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), locals.staticFee);
+        vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
+        hook.onComputeDynamicSwapFeePercentage(p, address(pool), locals.staticFee);
     }
 
     struct FeeRampLocals {
@@ -1104,7 +1104,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         assertEq(locals.feeIn, locals.feeOut, "with equal lane params, kind should not change math result");
     }
 
-    function testFuzz_view_missingPrices_returnsStatic_orRevert(
+    function testFuzz_view_missingPrices_reverts(
         uint8 nSeed,
         uint256 /* wSeed */,
         uint256 bSeed,
@@ -1150,17 +1150,17 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         p.kind = SwapKind.EXACT_IN;
         p.amountGivenScaled18 = safeInAmt;
 
-        vm.expectRevert();
+        vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
         hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
 
         p.kind = SwapKind.EXACT_OUT;
         p.amountGivenScaled18 = safeOutAmt;
 
-        vm.expectRevert();
+        vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
         hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
     }
 
-    function testFuzz_view_readsLaneParams_returnsStatic_onSafePath(uint8 nSeed) public {
+    function testFuzz_view_readsLaneParams_reverts_onSafePath(uint8 nSeed) public {
         uint8 n = uint8(bound(nSeed, 2, 8));
         _registerBasePoolWithN(n);
 
@@ -1194,12 +1194,12 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // EXACT_IN: either revert or static fee (but never a computed dynamic fee)
         p.kind = SwapKind.EXACT_IN;
-        vm.expectRevert();
+        vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
         hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
 
         // EXACT_OUT: same invariant
         p.kind = SwapKind.EXACT_OUT;
-        vm.expectRevert();
+        vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
         hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
     }
 
@@ -2798,47 +2798,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         vm.mockCall(_HYPER_SPOT_PRICE_PRECOMPILE, abi.encodeWithSelector(_SEL_SPOT_PRICE, pairIndex), abi.encode(raw));
     }
 
-    function test_Fee_FallbacksToStatic_When_ExtPxZero_Deterministic() public {
-        // Use 2-token pool indices
-        uint256 idxIn = 0;
-        uint256 idxOut = 1;
-
-        // Flat balances to avoid other branches influencing outcome
-        uint256[] memory balances = new uint256[](2);
-        balances[0] = 1e18;
-        balances[1] = 1e18;
-
-        // Register an empty config then wire pair indices + HL size (same size on both sides)
-        
-        TokenConfig[] memory cfg = new TokenConfig[](2);
-        LiquidityManagement memory lm;
-        vm.prank(address(vault));
-        hook.onRegister(poolFactory, address(pool), cfg, lm);
-
-        uint32 pairIn = 4444;
-        uint32 pairOut = 4445;
-
-        vm.startPrank(admin);
-        // HL_IDX_SZ_8 => divisor = 1 (no downscaling), making px = raw * 1e18
-        hook.setTokenPriceConfigIndex(address(pool), uint8(idxIn), pairIn, HL_IDX_SZ_8);
-        hook.setTokenPriceConfigIndex(address(pool), uint8(idxOut), pairOut, HL_IDX_SZ_8);
-        vm.stopPrank();
-
-        // Force pxIn >> pxOut so (pxOut * 1e18) / pxIn == 0
-        // pxIn = max * 1e18, pxOut = 1 * 1e18  => extPx = floor((1e18 * 1e18) / (max * 1e18)) = floor(1e18 / max) = 0
-        _mockHyperSpotPrice(pairIn, type(uint64).max);
-        _mockHyperSpotPrice(pairOut, 1);
-
-        // Any reasonable amount; EXACT_IN path is fine
-        uint256 amountGiven = 5e15;
-        PoolSwapParams memory p = _makeParams(idxIn, idxOut, SwapKind.EXACT_IN, amountGiven, balances);
-
-        uint256 staticFee = WeightedPool(address(pool)).getStaticSwapFeePercentage();
-        vm.expectRevert();
-        hook.onComputeDynamicSwapFeePercentage(p, address(pool), staticFee);
-    }
-
-    function testFuzz_Fee_FallbacksToStatic_When_ExtPxZero(uint64 rawInHuge, bool givenIn) public {
+    function testFuzz_Fee_Reverts_When_ExtPxZero(uint64 rawInHuge, bool givenIn) public {
         // Make rawInHuge strictly greater than 1e18 to guarantee (pxOut*1e18)/pxIn == 0 with same HL size.
         rawInHuge = uint64(bound(uint256(rawInHuge), 1e18 + 1, type(uint64).max));
 
@@ -2893,13 +2853,6 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
             router: address(0),
             userData: bytes("")
         });
-    }
-
-    function _assertStaticFeeOrRevert_MissingPrices(PoolSwapParams memory p) internal view {
-        (bool ok, uint256 fee) = hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
-
-        assertTrue(ok, "missing prices: ok must be true on success");
-        assertEq(fee, STATIC_SWAP_FEE, "missing prices: must return static fee");
     }
 
     function _assertStaticFeeOrRevert(PoolSwapParams memory p) internal view {

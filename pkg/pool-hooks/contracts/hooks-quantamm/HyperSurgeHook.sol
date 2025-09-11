@@ -669,7 +669,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
                 // Pool-implied spot for j vs i: (Bj/wj) / (Bi/wi)
                 locals.poolPx = _pairSpotFromBalancesWeights(locals.bj, locals.wj, locals.bi, locals.wi);
-                
+
                 if (locals.poolPx == 0) {
                     continue;
                 }
@@ -677,7 +677,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
                 // External ratio j/i
                 locals.extPx = locals.pxj.divDown(locals.pxi);
                 locals.dev = _relAbsDiff(locals.poolPx, locals.extPx);
-                
+
                 if (locals.dev > locals.maxDev) {
                     locals.maxDev = locals.dev;
                 }

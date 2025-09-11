@@ -162,7 +162,6 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         return fee;
     }
 
-
     /// 1) Below threshold ⇒ the dynamic fee must equal the static (minimum) fee.
     function testFuzz_feeBelowThreshold_min(uint8 nSeed, uint256 wSeed, uint256 bSeed, uint256 dSeed) public view {
         uint8 n = uint8(bound(nSeed, 2, 8));

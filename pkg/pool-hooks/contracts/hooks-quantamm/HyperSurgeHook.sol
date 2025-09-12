@@ -129,15 +129,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         return true;
     }
 
-    struct AddLiquidityLocals {
-        uint256[] oldBalances;
-        uint256 beforeDev;
-        uint256 afterDev;
-        uint256 threshold;
-        bool isWorseningSurge;
-    }
-
-    /// @notice Allow proportional adds, but block non-proportional adds that worsen deviation and end above threshold.
+    /// @inheritdoc IHooks
     function onAfterAddLiquidity(
         address,
         address pool,
@@ -148,39 +140,22 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256[] memory balancesScaled18,
         bytes memory // userData (unused)
     ) public view override returns (bool success, uint256[] memory hookAdjustedAmountsInRaw) {
-        AddLiquidityLocals memory locals;
-
-        // Proportional add is always allowed.
+        // Allow proportional adds, but block non-proportional adds that worsen deviation and end above threshold.
         if (kind == AddLiquidityKind.PROPORTIONAL) {
             return (true, amountsInRaw);
         }
 
-        locals.oldBalances = new uint256[](balancesScaled18.length);
+        uint256[] memory oldBalancesScaled18 = new uint256[](balancesScaled18.length);
         for (uint256 i = 0; i < balancesScaled18.length; ++i) {
-            locals.oldBalances[i] = balancesScaled18[i] - amountsInScaled18[i];
+            oldBalancesScaled18[i] = balancesScaled18[i] - amountsInScaled18[i];
         }
 
-        uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
-        locals.beforeDev = _computeOracleDeviationPct(pool, locals.oldBalances, weights);
-        locals.afterDev = _computeOracleDeviationPct(pool, balancesScaled18, weights);
-        locals.threshold = getSurgeThresholdPercentage(pool, TradeType.NOISE);
+        bool isWorseningSurge = _isWorseningSurge(pool, oldBalancesScaled18, balancesScaled18);
 
-        // Block only if deviation worsens AND exceeds threshold after the change.
-        locals.isWorseningSurge = (locals.afterDev > locals.beforeDev) && (locals.afterDev > locals.threshold);
-
-        return (!locals.isWorseningSurge, amountsInRaw);
+        return (isWorseningSurge == false, amountsInRaw);
     }
 
-    struct RemoveLiquidityLocals {
-        uint256 n;
-        uint256[] oldBalances;
-        uint256 beforeDev;
-        uint256 afterDev;
-        uint256 threshold;
-        bool isWorseningSurge;
-    }
-
-    /// @notice Allow proportional removes, but block non-proportional removes that worsen deviation and end above threshold.
+    /// @inheritdoc IHooks
     function onAfterRemoveLiquidity(
         address,
         address pool,
@@ -191,27 +166,34 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256[] memory balancesScaled18,
         bytes memory // userData (unused)
     ) public view override returns (bool success, uint256[] memory hookAdjustedAmountsOutRaw) {
-        RemoveLiquidityLocals memory locals;
-        locals.n = balancesScaled18.length;
-        // Proportional remove is always allowed. should we check?
+        // Allow proportional removes, but block non-proportional removes that worsen deviation and end above threshold.
         if (kind == RemoveLiquidityKind.PROPORTIONAL) {
             return (true, amountsOutRaw);
         }
 
         // Reconstruct pre-remove balances = post + out; if addition overflows, allow.
-        locals.oldBalances = new uint256[](locals.n);
-        for (uint256 i = 0; i < locals.n; ++i) {
-            locals.oldBalances[i] = balancesScaled18[i] + amountsOutScaled18[i];
+        uint256[] memory oldBalancesScaled18 = new uint256[](balancesScaled18.length);
+        for (uint256 i = 0; i < balancesScaled18.length; ++i) {
+            oldBalancesScaled18[i] = balancesScaled18[i] + amountsOutScaled18[i];
         }
 
+        bool isWorseningSurge = _isWorseningSurge(pool, oldBalancesScaled18, balancesScaled18);
+
+        return (isWorseningSurge == false, amountsOutRaw);
+    }
+
+    function _isWorseningSurge(
+        address pool,
+        uint256[] memory oldBalancesScaled18,
+        uint256[] memory newBalancesScaled18
+    ) internal view returns (bool) {
         uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
-        locals.beforeDev = _computeOracleDeviationPct(pool, locals.oldBalances, weights);
-        locals.afterDev = _computeOracleDeviationPct(pool, balancesScaled18, weights);
-        locals.threshold = getSurgeThresholdPercentage(pool, TradeType.NOISE);
+        uint256 oracleDeviationBefore = _computeOracleDeviationPct(pool, oldBalancesScaled18, weights);
+        uint256 oracleDeviationAfter = _computeOracleDeviationPct(pool, newBalancesScaled18, weights);
+        uint256 surgeThreshold = getSurgeThresholdPercentage(pool, TradeType.NOISE);
 
-        locals.isWorseningSurge = (locals.afterDev > locals.beforeDev) && (locals.afterDev > locals.threshold);
-
-        return (!locals.isWorseningSurge, amountsOutRaw);
+        // Block only if deviation worsens AND exceeds threshold after the change.
+        return (oracleDeviationAfter > oracleDeviationBefore) && (oracleDeviationAfter > surgeThreshold);
     }
 
     /**************************************************

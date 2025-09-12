@@ -71,9 +71,8 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     uint256 private immutable _defaultCapDeviationPercentage18;
 
     modifier ensureValidPercentage(uint256 percentageValue) {
-        if (percentageValue < 1e9 || percentageValue > 1e18 || percentageValue % 1e9 != 0) {
-            revert InvalidPercentage();
-        }
+        _ensureValidPercentage(percentageValue);
+
         _;
     }
 
@@ -84,9 +83,9 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256 defaultCapDeviationPercentage18,
         string memory version
     ) SingletonAuthentication(vault) VaultGuard(vault) Version(version) {
-        _ensureValidPct(defaultMaxSurgeFeePercentage18);
-        _ensureValidPct(defaultThresholdPercentage18);
-        _ensureValidPct(defaultCapDeviationPercentage18);
+        _ensureValidPercentage(defaultMaxSurgeFeePercentage18);
+        _ensureValidPercentage(defaultThresholdPercentage18);
+        _ensureValidPercentage(defaultCapDeviationPercentage18);
         _defaultMaxSurgeFeePercentage18 = defaultMaxSurgeFeePercentage18;
         _defaultThresholdPercentage18 = defaultThresholdPercentage18;
         _defaultCapDeviationPercentage18 = defaultCapDeviationPercentage18;
@@ -150,9 +149,9 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             oldBalancesScaled18[i] = balancesScaled18[i] - amountsInScaled18[i];
         }
 
-        bool isWorseningSurge = _isWorseningSurge(pool, oldBalancesScaled18, balancesScaled18);
+        bool isPriceDeviationWorsening = _isPriceDeviationWorsening(pool, oldBalancesScaled18, balancesScaled18);
 
-        return (isWorseningSurge == false, amountsInRaw);
+        return (isPriceDeviationWorsening == false, amountsInRaw);
     }
 
     /// @inheritdoc IHooks
@@ -177,23 +176,63 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             oldBalancesScaled18[i] = balancesScaled18[i] + amountsOutScaled18[i];
         }
 
-        bool isWorseningSurge = _isWorseningSurge(pool, oldBalancesScaled18, balancesScaled18);
+        bool isPriceDeviationWorsening = _isPriceDeviationWorsening(pool, oldBalancesScaled18, balancesScaled18);
 
-        return (isWorseningSurge == false, amountsOutRaw);
+        return (isPriceDeviationWorsening == false, amountsOutRaw);
     }
 
-    function _isWorseningSurge(
-        address pool,
-        uint256[] memory oldBalancesScaled18,
-        uint256[] memory newBalancesScaled18
-    ) internal view returns (bool) {
-        uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
-        uint256 oracleDeviationBefore = _computeOracleDeviationPct(pool, oldBalancesScaled18, weights);
-        uint256 oracleDeviationAfter = _computeOracleDeviationPct(pool, newBalancesScaled18, weights);
-        uint256 surgeThreshold = getSurgeThresholdPercentage(pool, TradeType.NOISE);
+    struct ComputeSurgeFeeLocals {
+        uint256 calcAmountScaled18;
+        uint256 poolPxBefore;
+        uint256 poolPx;
+        uint256 pxIn;
+        uint256 pxOut;
+        uint256 extPx;
+        uint256 deviationBefore18;
+        uint256 deviation18;
+        uint256 threshold18;
+        uint256 maxPct18;
+        uint256 increment;
+        uint256 surgeFee18;
+        uint256 capDevPct18;
+        uint256 bIn;
+        uint256 bOut;
+        uint256 rawIn;
+        uint256 rawOut;
+        uint256 wIn;
+        uint256 wOut;
+        uint256 span;
+        uint256 norm;
+        PoolDetails poolDetails;
+    }
 
-        // Block only if deviation worsens AND exceeds threshold after the change.
-        return (oracleDeviationAfter > oracleDeviationBefore) && (oracleDeviationAfter > surgeThreshold);
+    /// @inheritdoc IHooks
+    function onComputeDynamicSwapFeePercentage(
+        PoolSwapParams calldata p,
+        address pool,
+        uint256 staticSwapFee
+    ) public view override returns (bool, uint256) {
+        PoolCfg storage pc = _poolCfg[pool];
+        ComputeSurgeFeeLocals memory locals;
+        locals.poolDetails = pc.details;
+
+        uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
+        locals.wIn = weights[p.indexIn];
+        locals.wOut = weights[p.indexOut];
+
+        locals.calcAmountScaled18 = WeightedPool(pool).onSwap(p);
+
+        TokenPriceCfg memory pInCfg = pc.tokenCfg[p.indexIn];
+        TokenPriceCfg memory pOutCfg = pc.tokenCfg[p.indexOut];
+
+        locals.rawIn = HyperSpotPricePrecompile.spotPrice(pInCfg.pairIndex);
+        locals.rawOut = HyperSpotPricePrecompile.spotPrice(pOutCfg.pairIndex);
+        locals.pxIn = locals.rawIn.divDown(_divisorFromSz(pInCfg.sz));
+        locals.pxOut = locals.rawOut.divDown(_divisorFromSz(pOutCfg.sz));
+        locals.bIn = p.balancesScaled18[p.indexIn];
+        locals.bOut = p.balancesScaled18[p.indexOut];
+
+        return _computeSurgeFee(locals, p, staticSwapFee);
     }
 
     /**************************************************
@@ -439,60 +478,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         return _poolCfg[pool].details.numTokens;
     }
 
-    struct ComputeSurgeFeeLocals {
-        uint256 calcAmountScaled18;
-        uint256 poolPxBefore;
-        uint256 poolPx;
-        uint256 pxIn;
-        uint256 pxOut;
-        uint256 extPx;
-        uint256 deviationBefore18;
-        uint256 deviation18;
-        uint256 threshold18;
-        uint256 maxPct18;
-        uint256 increment;
-        uint256 surgeFee18;
-        uint256 capDevPct18;
-        uint256 bIn;
-        uint256 bOut;
-        uint256 rawIn;
-        uint256 rawOut;
-        uint256 wIn;
-        uint256 wOut;
-        uint256 span;
-        uint256 norm;
-        PoolDetails poolDetails;
-    }
-
-    /// @inheritdoc IHooks
-    function onComputeDynamicSwapFeePercentage(
-        PoolSwapParams calldata p,
-        address pool,
-        uint256 staticSwapFee
-    ) public view override returns (bool, uint256) {
-        PoolCfg storage pc = _poolCfg[pool];
-        ComputeSurgeFeeLocals memory locals;
-        locals.poolDetails = pc.details;
-
-        uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
-        locals.wIn = weights[p.indexIn];
-        locals.wOut = weights[p.indexOut];
-
-        locals.calcAmountScaled18 = WeightedPool(pool).onSwap(p);
-
-        TokenPriceCfg memory pInCfg = pc.tokenCfg[p.indexIn];
-        TokenPriceCfg memory pOutCfg = pc.tokenCfg[p.indexOut];
-
-        locals.rawIn = HyperSpotPricePrecompile.spotPrice(pInCfg.pairIndex);
-        locals.rawOut = HyperSpotPricePrecompile.spotPrice(pOutCfg.pairIndex);
-        locals.pxIn = locals.rawIn.divDown(_divisorFromSz(pInCfg.sz));
-        locals.pxOut = locals.rawOut.divDown(_divisorFromSz(pOutCfg.sz));
-        locals.bIn = p.balancesScaled18[p.indexIn];
-        locals.bOut = p.balancesScaled18[p.indexOut];
-
-        return _computeSurgeFee(locals, p, staticSwapFee);
-    }
-
     /// @notice pure function to compute surge fee
     /// @param locals the locals struct containing all the necessary variables
     /// @param p swap parameters
@@ -600,21 +585,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         return 1;
     }
 
-    function _ensureValidPct(uint256 pct) internal pure {
-        if (pct < 1e9 || pct > 1e18 || pct % 1e9 != 0) {
-            revert InvalidPercentage();
-        }
-    }
-
-    ///@notice Converts a 9 decimal places fixed point number to 18 decimal places.
-    function _convertTo18Decimals(uint32 setting9Dp) internal pure returns (uint256) {
-        return uint256(setting9Dp) * 1e9;
-    }
-
-    function _safeConvertTo9Decimals(uint256 setting18Dp) internal pure returns (uint32) {
-        return (setting18Dp / 1e9).toUint32();
-    }
-
     struct ComputeOracleDeviationLocals {
         uint256[8] px;
         uint256 maxDev;
@@ -695,5 +665,43 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
 
         return locals.maxDev;
+    }
+
+    /**
+     * @notice Checks if the pool price deviation is worsening after a add/remove liquidity operation.
+     * @dev The pool price deviation is worsening if the deviation between oracle and pool price increased and the
+     * deviation is greater than the surge threshold.
+     * @param pool The pool address
+     * @param oldBalancesScaled18 The balances before the add/remove liquidity operation
+     * @param newBalancesScaled18 The balances after the add/remove liquidity operation
+     * @return True if the pool price deviation is worsening, false otherwise
+     */
+    function _isPriceDeviationWorsening(
+        address pool,
+        uint256[] memory oldBalancesScaled18,
+        uint256[] memory newBalancesScaled18
+    ) internal view returns (bool) {
+        uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
+        uint256 priceDeviationBefore = _computeOracleDeviationPct(pool, oldBalancesScaled18, weights);
+        uint256 priceDeviationAfter = _computeOracleDeviationPct(pool, newBalancesScaled18, weights);
+        uint256 surgeThreshold = getSurgeThresholdPercentage(pool, TradeType.NOISE);
+
+        return (priceDeviationAfter > priceDeviationBefore) && (priceDeviationAfter > surgeThreshold);
+    }
+
+    ///@notice Converts a 9 decimal places fixed point number to 18 decimal places.
+    function _convertTo18Decimals(uint32 valueScaled9) internal pure returns (uint256) {
+        return uint256(valueScaled9) * 1e9;
+    }
+
+    ///@notice Converts a 18 decimal places fixed point number to 9 decimal places.
+    function _safeConvertTo9Decimals(uint256 valueScaled18) internal pure returns (uint32) {
+        return (valueScaled18 / 1e9).toUint32();
+    }
+
+    function _ensureValidPercentage(uint256 percentageValue) internal pure {
+        if (percentageValue < 1e9 || percentageValue > 1e18 || percentageValue % 1e9 != 0) {
+            revert InvalidPercentage();
+        }
     }
 }

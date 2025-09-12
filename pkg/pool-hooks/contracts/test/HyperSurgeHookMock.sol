@@ -51,7 +51,7 @@ contract HyperSurgeHookMock is HyperSurgeHook {
     }
 
     function EnsureValidPct(uint256 pct) external pure {
-        _ensureValidPct(pct);
+        _ensureValidPercentage(pct);
     }
 
     function ComputeSurgeFee(

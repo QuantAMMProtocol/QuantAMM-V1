@@ -79,6 +79,13 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     uint256 private immutable _defaultCapDeviationPercentage18;
 
+    modifier ensureValidPercentage(uint256 percentageValue) {
+        if (percentageValue < 1e9 || percentageValue > 1e18 || percentageValue % 1e9 != 0) {
+            revert InvalidPercentage();
+        }
+        _;
+    }
+
     constructor(
         IVault vault,
         uint256 defaultMaxSurgeFeePercentage18,
@@ -108,21 +115,21 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         TokenConfig[] memory tokenCfgs,
         LiquidityManagement calldata
     ) public override onlyVault returns (bool) {
-        PoolDetails memory details;
-        if (tokenCfgs.length >= 2 && tokenCfgs.length <= 8) {
-            details.arbMaxSurgeFee9 = _safeConvertTo9Decimals(_defaultMaxSurgeFeePercentage18);
-            details.arbThresholdPercentage9 = _safeConvertTo9Decimals(_defaultThresholdPercentage18);
-            details.arbCapDeviationPercentage9 = _safeConvertTo9Decimals(_defaultCapDeviationPercentage18);
-            details.noiseMaxSurgeFee9 = _safeConvertTo9Decimals(_defaultMaxSurgeFeePercentage18);
-            details.noiseThresholdPercentage9 = _safeConvertTo9Decimals(_defaultThresholdPercentage18);
-            details.noiseCapDeviationPercentage9 = _safeConvertTo9Decimals(_defaultCapDeviationPercentage18);
-
-            details.numTokens = uint8(tokenCfgs.length);
-
-            _poolCfg[pool].details = details;
-        } else {
+        if (tokenCfgs.length < 2 && tokenCfgs.length > 8) {
             revert NumTokensOutOfRange();
         }
+
+        PoolDetails memory details;
+        details.numTokens = uint8(tokenCfgs.length);
+        // Set the pool details, so we can use the setters and emit the proper events.
+        _poolCfg[pool].details = details;
+
+        setMaxSurgeFeePercentage(pool, _defaultMaxSurgeFeePercentage18, TradeType.ARBITRAGE);
+        setMaxSurgeFeePercentage(pool, _defaultMaxSurgeFeePercentage18, TradeType.NOISE);
+        setSurgeThresholdPercentage(pool, _defaultThresholdPercentage18, TradeType.ARBITRAGE);
+        setSurgeThresholdPercentage(pool, _defaultThresholdPercentage18, TradeType.NOISE);
+        setCapDeviationPercentage(pool, _defaultCapDeviationPercentage18, TradeType.ARBITRAGE);
+        setCapDeviationPercentage(pool, _defaultCapDeviationPercentage18, TradeType.NOISE);
 
         return true;
     }
@@ -202,74 +209,68 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     ///@inheritdoc IHyperSurgeHook
     function setMaxSurgeFeePercentage(
         address pool,
-        uint256 pct18,
+        uint256 newMaxSurgeFeePercentageScaled18,
         TradeType tradeType
-    ) external override onlySwapFeeManagerOrGovernance(pool) {
-        _ensureValidPct(pct18);
-
+    ) public override onlySwapFeeManagerOrGovernance(pool) ensureValidPercentage(newMaxSurgeFeePercentageScaled18) {
         if (tradeType == TradeType.ARBITRAGE) {
-            _poolCfg[pool].details.arbMaxSurgeFee9 = _safeConvertTo9Decimals(pct18);
+            _poolCfg[pool].details.arbMaxSurgeFee9 = _safeConvertTo9Decimals(newMaxSurgeFeePercentageScaled18);
         } else {
-            _poolCfg[pool].details.noiseMaxSurgeFee9 = _safeConvertTo9Decimals(pct18);
+            _poolCfg[pool].details.noiseMaxSurgeFee9 = _safeConvertTo9Decimals(newMaxSurgeFeePercentageScaled18);
         }
 
-        emit MaxSurgeFeePercentageChanged(msg.sender, pool, pct18, tradeType);
+        emit MaxSurgeFeePercentageChanged(msg.sender, pool, newMaxSurgeFeePercentageScaled18, tradeType);
     }
 
     ///@inheritdoc IHyperSurgeHook
     function setSurgeThresholdPercentage(
         address pool,
-        uint256 pct18,
+        uint256 newThresholdPercentageScaled18,
         TradeType tradeType
-    ) external override onlySwapFeeManagerOrGovernance(pool) {
-        _ensureValidPct(pct18); // keep a valid ramp span: threshold < capDev ≤ 1
-        uint32 capDev;
+    ) public override onlySwapFeeManagerOrGovernance(pool) ensureValidPercentage(newThresholdPercentageScaled18) {
+        uint256 capDeviationPercentageScaled18;
         PoolDetails memory poolDetails = _poolCfg[pool].details;
         if (tradeType == TradeType.ARBITRAGE) {
-            poolDetails.arbThresholdPercentage9 = _safeConvertTo9Decimals(pct18);
-            capDev = poolDetails.arbCapDeviationPercentage9;
+            poolDetails.arbThresholdPercentage9 = _safeConvertTo9Decimals(newThresholdPercentageScaled18);
+            capDeviationPercentageScaled18 = _convertTo18Decimals(poolDetails.arbCapDeviationPercentage9);
         } else {
-            poolDetails.noiseThresholdPercentage9 = _safeConvertTo9Decimals(pct18);
-            capDev = poolDetails.noiseCapDeviationPercentage9;
+            poolDetails.noiseThresholdPercentage9 = _safeConvertTo9Decimals(newThresholdPercentageScaled18);
+            capDeviationPercentageScaled18 = _convertTo18Decimals(poolDetails.noiseCapDeviationPercentage9);
         }
 
-        uint256 capDev18 = _convertTo18Decimals(capDev);
-        //could be done before with two if/elses but more compact code this way
-        if (capDev18 != 0 && pct18 >= capDev18) {
+        // Keep a valid ramp span: threshold < capDev ≤ 1
+        if (capDeviationPercentageScaled18 != 0 && newThresholdPercentageScaled18 >= capDeviationPercentageScaled18) {
             revert InvalidThresholdDeviation();
         }
 
         _poolCfg[pool].details = poolDetails;
 
-        emit ThresholdPercentageChanged(msg.sender, pool, pct18, tradeType);
+        emit ThresholdPercentageChanged(msg.sender, pool, newThresholdPercentageScaled18, tradeType);
     }
 
     /// @inheritdoc IHyperSurgeHook
     function setCapDeviationPercentage(
         address pool,
-        uint256 capDevPct18,
+        uint256 newCapDeviationPercentageScaled18,
         TradeType tradeType
-    ) external override onlySwapFeeManagerOrGovernance(pool) {
-        _ensureValidPct(capDevPct18);
-        uint32 thr;
+    ) public override onlySwapFeeManagerOrGovernance(pool) ensureValidPercentage(newCapDeviationPercentageScaled18) {
+        uint256 thresholdPercentageScaled18;
         PoolDetails memory poolDetails = _poolCfg[pool].details;
         if (tradeType == TradeType.ARBITRAGE) {
-            poolDetails.arbCapDeviationPercentage9 = _safeConvertTo9Decimals(capDevPct18);
-            thr = poolDetails.arbThresholdPercentage9;
+            poolDetails.arbCapDeviationPercentage9 = _safeConvertTo9Decimals(newCapDeviationPercentageScaled18);
+            thresholdPercentageScaled18 = _convertTo18Decimals(poolDetails.arbThresholdPercentage9);
         } else {
-            poolDetails.noiseCapDeviationPercentage9 = _safeConvertTo9Decimals(capDevPct18);
-            thr = poolDetails.noiseThresholdPercentage9;
+            poolDetails.noiseCapDeviationPercentage9 = _safeConvertTo9Decimals(newCapDeviationPercentageScaled18);
+            thresholdPercentageScaled18 = _convertTo18Decimals(poolDetails.noiseThresholdPercentage9);
         }
 
-        uint256 thr18 = _convertTo18Decimals(thr);
-
-        if (capDevPct18 <= thr18) {
+        // Keep a valid ramp span: threshold < capDev ≤ 1
+        if (newCapDeviationPercentageScaled18 <= thresholdPercentageScaled18) {
             revert InvalidCapDeviationPercentage();
         }
 
         _poolCfg[pool].details = poolDetails;
 
-        emit CapDeviationPercentageChanged(msg.sender, pool, capDevPct18, tradeType);
+        emit CapDeviationPercentageChanged(msg.sender, pool, newCapDeviationPercentageScaled18, tradeType);
     }
 
     struct AddLiquidityLocals {

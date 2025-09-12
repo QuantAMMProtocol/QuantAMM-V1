@@ -34,12 +34,12 @@ contract HyperSurgeHookMock is HyperSurgeHook {
     }
 
     function PairSpotFromBalancesWeights(
-        uint256 bIn,
-        uint256 wIn,
-        uint256 bOut,
-        uint256 wOut
+        uint256[] memory balancesScaled18,
+        uint256[] memory weights,
+        uint256 indexTokenIn,
+        uint256 indexTokenOut
     ) external pure returns (uint256) {
-        return _pairSpotFromBalancesWeights(bIn, wIn, bOut, wOut);
+        return _pairSpotFromBalancesWeights(balancesScaled18, weights, indexTokenIn, indexTokenOut);
     }
 
     function RelAbsDiff(uint256 a, uint256 b) external pure returns (uint256) {
@@ -55,10 +55,13 @@ contract HyperSurgeHookMock is HyperSurgeHook {
     }
 
     function ComputeSurgeFee(
-        ComputeSurgeFeeLocals memory locals,
         PoolSwapParams calldata p,
-        uint256 staticSwapFee
+        PoolDetails memory poolDetails,
+        uint256 staticSwapFee,
+        uint256[] memory weights,
+        uint256 calculatedAmountScaled18,
+        uint256 oraclePrice
     ) external pure returns (bool ok, uint256 surgeFee) {
-        return _computeSurgeFee(locals, p, staticSwapFee);
+        return _computeSurgeFee(p, poolDetails, staticSwapFee, weights, calculatedAmountScaled18, oraclePrice);
     }
 }

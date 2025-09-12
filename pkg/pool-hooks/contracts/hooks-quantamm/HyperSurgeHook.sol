@@ -181,58 +181,17 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         return (isPriceDeviationWorsening == false, amountsOutRaw);
     }
 
-    struct ComputeSurgeFeeLocals {
-        uint256 calcAmountScaled18;
-        uint256 poolPxBefore;
-        uint256 poolPx;
-        uint256 pxIn;
-        uint256 pxOut;
-        uint256 extPx;
-        uint256 deviationBefore18;
-        uint256 deviation18;
-        uint256 threshold18;
-        uint256 maxPct18;
-        uint256 increment;
-        uint256 surgeFee18;
-        uint256 capDevPct18;
-        uint256 bIn;
-        uint256 bOut;
-        uint256 rawIn;
-        uint256 rawOut;
-        uint256 wIn;
-        uint256 wOut;
-        uint256 span;
-        uint256 norm;
-        PoolDetails poolDetails;
-    }
-
     /// @inheritdoc IHooks
     function onComputeDynamicSwapFeePercentage(
         PoolSwapParams calldata p,
         address pool,
         uint256 staticSwapFee
     ) public view override returns (bool, uint256) {
-        PoolCfg storage pc = _poolCfg[pool];
-        ComputeSurgeFeeLocals memory locals;
-        locals.poolDetails = pc.details;
-
+        PoolCfg memory pc = _poolCfg[pool];
         uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
-        locals.wIn = weights[p.indexIn];
-        locals.wOut = weights[p.indexOut];
-
-        locals.calcAmountScaled18 = WeightedPool(pool).onSwap(p);
-
-        TokenPriceCfg memory pInCfg = pc.tokenCfg[p.indexIn];
-        TokenPriceCfg memory pOutCfg = pc.tokenCfg[p.indexOut];
-
-        locals.rawIn = HyperSpotPricePrecompile.spotPrice(pInCfg.pairIndex);
-        locals.rawOut = HyperSpotPricePrecompile.spotPrice(pOutCfg.pairIndex);
-        locals.pxIn = locals.rawIn.divDown(_divisorFromSz(pInCfg.sz));
-        locals.pxOut = locals.rawOut.divDown(_divisorFromSz(pOutCfg.sz));
-        locals.bIn = p.balancesScaled18[p.indexIn];
-        locals.bOut = p.balancesScaled18[p.indexOut];
-
-        return _computeSurgeFee(locals, p, staticSwapFee);
+        uint256 calculatedAmountScaled18 = WeightedPool(pool).onSwap(p);
+        uint256 oraclePrice = _computeExternalPrice(pc, p.indexIn, p.indexOut);
+        return _computeSurgeFee(p, pc.details, staticSwapFee, weights, calculatedAmountScaled18, oraclePrice);
     }
 
     /**************************************************
@@ -478,81 +437,133 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         return _poolCfg[pool].details.numTokens;
     }
 
-    /// @notice pure function to compute surge fee
-    /// @param locals the locals struct containing all the necessary variables
-    /// @param p swap parameters
-    /// @param staticSwapFee the static swap fee from the pool
     function _computeSurgeFee(
-        ComputeSurgeFeeLocals memory locals,
-        PoolSwapParams calldata p,
-        uint256 staticSwapFee
+        PoolSwapParams calldata params,
+        PoolDetails memory poolDetails,
+        uint256 staticSwapFee,
+        uint256[] memory weights,
+        uint256 calculatedAmountScaled18,
+        uint256 oraclePrice
     ) internal pure returns (bool ok, uint256 surgeFee) {
-        locals.extPx = locals.pxOut.divDown(locals.pxIn);
-
-        //Do not block if there is an issue with the hyperliquid price
-        if (locals.extPx == 0) {
+        // Do not block if there is an issue with the hyperliquid price
+        if (oraclePrice == 0) {
             return (true, staticSwapFee);
         }
 
-        locals.poolPxBefore = _pairSpotFromBalancesWeights(locals.bIn, locals.wIn, locals.bOut, locals.wOut);
-        locals.deviationBefore18 = _relAbsDiff(locals.poolPxBefore, locals.extPx);
+        (
+            uint256 deviation18,
+            uint256 capDevPct18,
+            uint256 maxPct18,
+            uint256 threshold18
+        ) = _computeDeviationAndSelectPoolDetails(params, weights, calculatedAmountScaled18, oraclePrice, poolDetails);
 
-        if (p.kind == SwapKind.EXACT_IN) {
-            locals.bIn += p.amountGivenScaled18;
-            locals.bOut -= locals.calcAmountScaled18;
+        if (deviation18 <= threshold18) {
+            return (true, staticSwapFee);
+        }
+
+        uint256 span = capDevPct18 - threshold18; // > 0 by fallback above
+        uint256 norm = (deviation18 - threshold18).divDown(span);
+
+        if (norm > FixedPoint.ONE) {
+            norm = FixedPoint.ONE;
+        }
+
+        uint256 increment = (maxPct18 - staticSwapFee).mulDown(norm);
+        uint256 surgeFee18 = staticSwapFee + increment;
+
+        return (true, surgeFee18);
+    }
+
+    function _computeDeviationAndSelectPoolDetails(
+        PoolSwapParams calldata params,
+        uint256[] memory weights,
+        uint256 calculatedAmountScaled18,
+        uint256 oraclePrice,
+        PoolDetails memory poolDetails
+    )
+        internal
+        pure
+        returns (
+            uint256 deviation18,
+            uint256 capDeviationScaled18,
+            uint256 maxSurgeFeeScaled18,
+            uint256 thresholdScaled18
+        )
+    {
+        uint256 poolPriceBefore = _pairSpotFromBalancesWeights(
+            params.balancesScaled18,
+            weights,
+            params.indexIn,
+            params.indexOut
+        );
+        uint256 deviationBefore18 = _relAbsDiff(poolPriceBefore, oraclePrice);
+
+        uint256[] memory newBalancesScaled18 = new uint256[](params.balancesScaled18.length);
+        for (uint256 i = 0; i < params.balancesScaled18.length; i++) {
+            newBalancesScaled18[i] = params.balancesScaled18[i];
+        }
+
+        if (params.kind == SwapKind.EXACT_IN) {
+            newBalancesScaled18[params.indexIn] += params.amountGivenScaled18;
+            newBalancesScaled18[params.indexOut] -= calculatedAmountScaled18;
         } else {
-            locals.bIn += locals.calcAmountScaled18;
-            locals.bOut -= p.amountGivenScaled18;
+            newBalancesScaled18[params.indexIn] += calculatedAmountScaled18;
+            newBalancesScaled18[params.indexOut] -= params.amountGivenScaled18;
         }
 
         // P_pool = (B_out/w_out) / (B_in/w_in) = (B_out * w_in) / (B_in * w_out)
-        locals.poolPx = _pairSpotFromBalancesWeights(locals.bIn, locals.wIn, locals.bOut, locals.wOut);
-        locals.deviation18 = _relAbsDiff(locals.poolPx, locals.extPx); // |pool - ext| / ext
+        uint256 poolPriceAfter = _pairSpotFromBalancesWeights(
+            newBalancesScaled18,
+            weights,
+            params.indexIn,
+            params.indexOut
+        );
+        deviation18 = _relAbsDiff(poolPriceAfter, oraclePrice); // |pool - ext| / ext
 
-        if (locals.deviation18 > locals.deviationBefore18) {
-            locals.capDevPct18 = _convertTo18Decimals(locals.poolDetails.noiseCapDeviationPercentage9);
-            locals.maxPct18 = _convertTo18Decimals(locals.poolDetails.noiseMaxSurgeFee9);
-            locals.threshold18 = _convertTo18Decimals(locals.poolDetails.noiseThresholdPercentage9);
+        // Check if the swap is a noise (deviation is worsening) or an arbitrage (deviation is improving).
+        if (deviation18 > deviationBefore18) {
+            // Deviation is worsening, use noise details.
+            capDeviationScaled18 = _convertTo18Decimals(poolDetails.noiseCapDeviationPercentage9);
+            maxSurgeFeeScaled18 = _convertTo18Decimals(poolDetails.noiseMaxSurgeFee9);
+            thresholdScaled18 = _convertTo18Decimals(poolDetails.noiseThresholdPercentage9);
         } else {
-            locals.capDevPct18 = _convertTo18Decimals(locals.poolDetails.arbCapDeviationPercentage9);
-            locals.maxPct18 = _convertTo18Decimals(locals.poolDetails.arbMaxSurgeFee9);
-            locals.threshold18 = _convertTo18Decimals(locals.poolDetails.arbThresholdPercentage9);
+            // Deviation is improving, use arb details (informed swap).
+            capDeviationScaled18 = _convertTo18Decimals(poolDetails.arbCapDeviationPercentage9);
+            maxSurgeFeeScaled18 = _convertTo18Decimals(poolDetails.arbMaxSurgeFee9);
+            thresholdScaled18 = _convertTo18Decimals(poolDetails.arbThresholdPercentage9);
 
-            //For the arbitrage direction we use the deviation before.
-            //Why this is the case is in the readme but in essence
-            //if a large noise deviation is being corrected the arbitrage pays more
-            //to take advantage of the larger arb opp and therefore greater profit
-            //as the fee decreases the closer you get to market price, another
-            //arb opportunity presents itself once the first arb is taken
-            //this means a large fee != a large no arb region and the pool stays close to market
-            locals.deviation18 = locals.deviationBefore18;
+            // For the arbitrage direction we use the deviation before. If a large noise deviation is being corrected
+            // the arbitrage pays more to take advantage of the larger arb opp and therefore greater profit as the fee
+            // decreases the closer you get to market price, another arb opportunity presents itself once the first arb
+            // is taken. This means a large fee != a large no arb region and the pool stays close to market. For more
+            // information, check the HyperSurgeHook-README.md file.
+            deviation18 = deviationBefore18;
         }
+    }
 
-        if (locals.deviation18 <= locals.threshold18) {
-            return (true, staticSwapFee);
-        }
+    function _computeExternalPrice(
+        PoolCfg memory pc,
+        uint256 indexTokenIn,
+        uint256 indexTokenOut
+    ) internal view returns (uint256) {
+        TokenPriceCfg memory pInCfg = pc.tokenCfg[indexTokenIn];
+        TokenPriceCfg memory pOutCfg = pc.tokenCfg[indexTokenOut];
 
-        locals.span = locals.capDevPct18 - locals.threshold18; // > 0 by fallback above
-        locals.norm = (locals.deviation18 - locals.threshold18).divDown(locals.span);
-
-        if (locals.norm > FixedPoint.ONE) {
-            locals.norm = FixedPoint.ONE;
-        }
-
-        locals.increment = (locals.maxPct18 - staticSwapFee).mulDown(locals.norm);
-        locals.surgeFee18 = staticSwapFee + locals.increment;
-
-        return (true, locals.surgeFee18);
+        uint256 rawPriceTokenIn = HyperSpotPricePrecompile.spotPrice(pInCfg.pairIndex);
+        uint256 rawPriceTokenOut = HyperSpotPricePrecompile.spotPrice(pOutCfg.pairIndex);
+        uint256 priceTokenInScaled18 = rawPriceTokenIn.divDown(_divisorFromSz(pInCfg.sz));
+        uint256 priceTokenOutScaled18 = rawPriceTokenOut.divDown(_divisorFromSz(pOutCfg.sz));
+        return priceTokenOutScaled18.divDown(priceTokenInScaled18);
     }
 
     function _pairSpotFromBalancesWeights(
-        uint256 bIn,
-        uint256 wIn,
-        uint256 bOut,
-        uint256 wOut
+        uint256[] memory balancesScaled18,
+        uint256[] memory weights,
+        uint256 indexTokenIn,
+        uint256 indexTokenOut
     ) internal pure returns (uint256) {
-        uint256 num = bOut.mulDown(wIn);
-        uint256 den = bIn.mulDown(wOut);
+        uint256 num = balancesScaled18[indexTokenOut].mulDown(weights[indexTokenIn]);
+        uint256 den = balancesScaled18[indexTokenIn].mulDown(weights[indexTokenOut]);
 
         //would be impossible given normal balances and weights but given
         //it is on the withdraw path keep the defensive check
@@ -648,7 +659,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
                 locals.pxj = locals.px[locals.j];
 
                 // Pool-implied spot for j vs i: (Bj/wj) / (Bi/wi)
-                locals.poolPx = _pairSpotFromBalancesWeights(locals.bj, locals.wj, locals.bi, locals.wi);
+                locals.poolPx = _pairSpotFromBalancesWeights(balancesScaled18, w, locals.i, locals.j);
 
                 if (locals.poolPx == 0) {
                     continue;

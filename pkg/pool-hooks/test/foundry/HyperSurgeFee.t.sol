@@ -934,163 +934,143 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         assertEq(locals.feeD, _convertTo18Decimals(locals.maxp), "above cap means clamped to max fee");
     }
 
-    // struct ExactInEqualsExactOutLocals {
-    //     uint8 n;
-    //     uint256[] w;
-    //     uint256[] b;
-    //     uint8 i;
-    //     uint8 j;
-    //     uint32 thr;
-    //     uint32 cap;
-    //     uint32 maxp;
-    //     uint256 P;
-    //     uint256 capDev;
-    //     uint256 D;
-    //     uint256 pxIn;
-    //     uint256 pxOut;
-    //     uint256 feeIn;
-    //     uint256 feeOut;
-    // }
+    struct ExactInEqualsExactOutLocals {
+        uint8 n;
+        uint256[] w;
+        uint256[] b;
+        uint8 i;
+        uint8 j;
+        uint32 thr;
+        uint32 cap;
+        uint32 maxp;
+        uint256 P;
+        uint256 capDev;
+        uint256 D;
+        uint256 pxIn;
+        uint256 pxOut;
+        uint256 feeIn;
+        uint256 feeOut;
+    }
 
-    // /// EXACT_IN vs EXACT_OUT: with identical lane params, the engine result must match.
-    // /// Correction: keep the *effective* lane params for the chosen direction the same,
-    // /// but make ARB and NOISE lanes different so a wrong-lane implementation would not hide here.
-    // // function testFuzz_internal_exactIn_equals_exactOut_whenParamsSame(
-    // //     uint8 nSeed,
-    // //     uint256 wSeed,
-    // //     uint256 bSeed,
-    // //     uint256 dSeed
-    // // ) public {
-    // //     ExactInEqualsExactOutLocals memory locals;
+    // EXACT_IN vs EXACT_OUT: with identical lane params, the engine result must match.
+    // Correction: keep the *effective* lane params for the chosen direction the same,
+    // but make ARB and NOISE lanes different so a wrong-lane implementation would not hide here.
+    function testFuzz_internal_exactIn_equals_exactOut_whenParamsSame(
+        uint8 nSeed,
+        uint256 wSeed,
+        uint256 bSeed,
+        uint256 dSeed
+    ) public {
+        ExactInEqualsExactOutLocals memory locals;
 
-    // //     locals.n = uint8(bound(nSeed, 2, 8));
-    // //     locals.w = fee_normWeights(locals.n, wSeed);
-    // //     locals.b = fee_balances(locals.n, bSeed);
+        locals.n = uint8(bound(nSeed, 2, 8));
+        locals.w = fee_normWeights(locals.n, wSeed);
+        locals.b = fee_balances(locals.n, bSeed);
 
-    // //     locals.i = uint8(bound(uint256(keccak256(abi.encode(dSeed, 41))), 0, locals.n - 1));
-    // //     locals.j = (locals.i + 1 + uint8(bound(uint256(keccak256(abi.encode(dSeed, 42))), 0, locals.n - 2))) % locals.n;
+        locals.i = uint8(bound(uint256(keccak256(abi.encode(dSeed, 41))), 0, locals.n - 1));
+        locals.j = (locals.i + 1 + uint8(bound(uint256(keccak256(abi.encode(dSeed, 42))), 0, locals.n - 2))) % locals.n;
 
-    // //     locals.thr = 1_000_000; // 0.1%
-    // //     locals.cap = 500_000_000; // 50%
-    // //     locals.maxp = 50_000_000; // 5%
+        locals.thr = 1_000_000; // 0.1%
+        locals.cap = 500_000_000; // 50%
+        locals.maxp = 50_000_000; // 5%
 
-    // //     locals.P = fee_pairSpotFromBW(locals.b[locals.i], locals.w[locals.i], locals.b[locals.j], locals.w[locals.j]);
-    // //     vm.assume(locals.P > 0);
+        locals.P = fee_pairSpotFromBW(locals.b[locals.i], locals.w[locals.i], locals.b[locals.j], locals.w[locals.j]);
+        vm.assume(locals.P > 0);
 
-    // //     locals.capDev = _convertTo18Decimals(locals.cap);
-    // //     locals.D = uint256(keccak256(abi.encode(dSeed))) % (locals.capDev + locals.capDev / 2 + 1);
-    // //     (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, locals.D);
+        locals.capDev = _convertTo18Decimals(locals.cap);
+        locals.D = uint256(keccak256(abi.encode(dSeed))) % (locals.capDev + locals.capDev / 2 + 1);
+        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, locals.D);
 
-    // //     HyperSurgeHookMock mock = new HyperSurgeHookMock(
-    // //         IVault(vault),
-    // //         _convertTo18Decimals(locals.maxp),
-    // //         _convertTo18Decimals(locals.thr),
-    // //         _convertTo18Decimals(locals.cap),
-    // //         "fee-io"
-    // //     );
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(
+            IVault(vault),
+            _convertTo18Decimals(locals.maxp),
+            _convertTo18Decimals(locals.thr),
+            _convertTo18Decimals(locals.cap),
+            "fee-io"
+        );
 
-    // //     // EXACT_IN
-    // //     PoolSwapParams memory pIn;
-    // //     pIn.kind = SwapKind.EXACT_IN;
+        // EXACT_IN
+        PoolSwapParams memory pIn = _createPoolSwapParams(SwapKind.EXACT_IN, locals.b, locals.i, locals.j, 0);
 
-    // //     // Build locals with NOISE = (thr/cap/maxp) and ARB deliberately different
-    // //     HyperSurgeHookMock.ComputeSurgeFeeLocals memory L1;
-    // //     L1.bIn = locals.b[locals.i];
-    // //     L1.wIn = locals.w[locals.i];
-    // //     L1.bOut = locals.b[locals.j];
-    // //     L1.wOut = locals.w[locals.j];
-    // //     L1.pxIn = locals.pxIn;
-    // //     L1.pxOut = locals.pxOut;
-    // //     L1.calcAmountScaled18 = 0;
+        // Build pool details with NOISE = (thr/cap/maxp) and ARB deliberately different
+        HyperSurgeHook.PoolDetails memory poolDetails;
+        poolDetails.numTokens = locals.n;
 
-    // //     // Effective (chosen) lane params
-    // //     L1.poolDetails.noiseThresholdPercentage9 = locals.thr;
-    // //     L1.poolDetails.noiseCapDeviationPercentage9 = locals.cap;
-    // //     L1.poolDetails.noiseMaxSurgeFee9 = locals.maxp;
+        // Effective (chosen) lane params
+        poolDetails.noiseThresholdPercentage9 = locals.thr;
+        poolDetails.noiseCapDeviationPercentage9 = locals.cap;
+        poolDetails.noiseMaxSurgeFee9 = locals.maxp;
 
-    // //     // Different ARB lane params so wrong-lane usage wouldn’t accidentally match
-    // //     L1.poolDetails.arbThresholdPercentage9 = locals.thr + 1;
-    // //     L1.poolDetails.arbCapDeviationPercentage9 = locals.cap - 1;
-    // //     L1.poolDetails.arbMaxSurgeFee9 = locals.maxp + 1;
+        // Different ARB lane params so wrong-lane usage wouldn’t accidentally match
+        poolDetails.arbThresholdPercentage9 = locals.thr + 1;
+        poolDetails.arbCapDeviationPercentage9 = locals.cap - 1;
+        poolDetails.arbMaxSurgeFee9 = locals.maxp + 1;
 
-    // //     (, locals.feeIn) = mock.ComputeSurgeFee(L1, pIn, STATIC_SWAP_FEE);
+        (, locals.feeIn) = mock.ComputeSurgeFee(
+            pIn,
+            poolDetails,
+            STATIC_SWAP_FEE,
+            locals.w,
+            0,
+            locals.pxOut.divDown(locals.pxIn)
+        );
 
-    // //     // EXACT_OUT
-    // //     PoolSwapParams memory pOut;
-    // //     pOut.kind = SwapKind.EXACT_OUT;
+        // EXACT_OUT
+        PoolSwapParams memory pOut = _createPoolSwapParams(SwapKind.EXACT_OUT, locals.b, locals.i, locals.j, 0);
 
-    // //     HyperSurgeHookMock.ComputeSurgeFeeLocals memory L2;
-    // //     L2.bIn = locals.b[locals.i];
-    // //     L2.wIn = locals.w[locals.i];
-    // //     L2.bOut = locals.b[locals.j];
-    // //     L2.wOut = locals.w[locals.j];
-    // //     L2.pxIn = locals.pxIn;
-    // //     L2.pxOut = locals.pxOut;
-    // //     L2.calcAmountScaled18 = 0;
+        (, locals.feeOut) = mock.ComputeSurgeFee(
+            pOut,
+            poolDetails,
+            STATIC_SWAP_FEE,
+            locals.w,
+            0,
+            locals.pxOut.divDown(locals.pxIn)
+        );
 
-    // //     L2.poolDetails.noiseThresholdPercentage9 = locals.thr;
-    // //     L2.poolDetails.noiseCapDeviationPercentage9 = locals.cap;
-    // //     L2.poolDetails.noiseMaxSurgeFee9 = locals.maxp;
+        assertEq(locals.feeIn, locals.feeOut, "with equal lane params, kind should not change math result");
+    }
 
-    // //     L2.poolDetails.arbThresholdPercentage9 = locals.thr + 1;
-    // //     L2.poolDetails.arbCapDeviationPercentage9 = locals.cap - 1;
-    // //     L2.poolDetails.arbMaxSurgeFee9 = locals.maxp + 1;
+    function testFuzz_view_missingPrices_reverts(uint8 nSeed, uint256 /* wSeed */, uint256 bSeed, uint8 iSeed) public {
+        // --- Register pool and adapt to its actual token count ---
+        uint8 nTarget = uint8(bound(nSeed, 2, 8));
+        _registerBasePoolWithN(nTarget);
 
-    // //     (, locals.feeOut) = mock.ComputeSurgeFee(L2, pOut, STATIC_SWAP_FEE);
+        uint256[] memory weights = WeightedPool(address(pool)).getNormalizedWeights();
+        uint256 m = weights.length;
+        assertGe(m, 2, "pool must have at least 2 tokens");
 
-    // //     assertEq(locals.feeIn, locals.feeOut, "with equal lane params, kind should not change math result");
-    // // }
+        // --- Random non-zero balances of exact pool length ---
+        uint256[] memory b = fee_balances(uint8(m), bSeed);
 
-    // function testFuzz_view_missingPrices_reverts(uint8 nSeed, uint256 /* wSeed */, uint256 bSeed, uint8 iSeed) public {
-    //     // --- Register pool and adapt to its actual token count ---
-    //     uint8 nTarget = uint8(bound(nSeed, 2, 8));
-    //     _registerBasePoolWithN(nTarget);
+        // --- Pick a valid distinct pair (i != j) ---
+        uint256 i = uint256(bound(iSeed, 0, m - 1));
+        uint256 j = (i + 1) % m;
 
-    //     uint256[] memory weights = WeightedPool(address(pool)).getNormalizedWeights();
-    //     uint256 m = weights.length;
-    //     assertGe(m, 2, "pool must have at least 2 tokens");
+        // --- Build base swap params template with those balances ---
+        uint256 bIn = b[i];
+        uint256 bOut = b[j];
 
-    //     // --- Random non-zero balances of exact pool length ---
-    //     uint256[] memory b = fee_balances(uint8(m), bSeed);
+        uint256 safeInAmt = bIn / 1e6;
+        if (safeInAmt == 0) safeInAmt = 1;
+        uint256 safeOutAmt = bOut / 1e6;
+        if (safeOutAmt == 0) safeOutAmt = 1;
 
-    //     // --- Pick a valid distinct pair (i != j) ---
-    //     uint256 i = uint256(bound(iSeed, 0, m - 1));
-    //     uint256 j = (i + 1) % m;
+        // Sanity: amounts are indeed tiny relative to balances to avoid accidental reverts
+        // (these checks also self-document the invariant we rely on)
+        assertLt(safeInAmt, bIn / 10, "safeInAmt too large vs balanceIn"); // < 10% (much stricter in practice)
+        assertLt(safeOutAmt, bOut / 10, "safeOutAmt too large vs balanceOut"); // < 10%
 
-    //     // --- Build base swap params template with those balances ---
-    //     PoolSwapParams memory p;
-    //     p.balancesScaled18 = new uint256[](m);
-    //     for (uint256 k = 0; k < m; ++k) {
-    //         p.balancesScaled18[k] = b[k];
-    //     }
-    //     p.indexIn = i;
-    //     p.indexOut = j;
+        PoolSwapParams memory p = _createPoolSwapParams(SwapKind.EXACT_IN, b, uint8(i), uint8(j), safeInAmt);
 
-    //     uint256 bIn = b[i];
-    //     uint256 bOut = b[j];
+        vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
+        hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
 
-    //     uint256 safeInAmt = bIn / 1e6;
-    //     if (safeInAmt == 0) safeInAmt = 1;
-    //     uint256 safeOutAmt = bOut / 1e6;
-    //     if (safeOutAmt == 0) safeOutAmt = 1;
+        p.kind = SwapKind.EXACT_OUT;
+        p.amountGivenScaled18 = safeOutAmt;
 
-    //     // Sanity: amounts are indeed tiny relative to balances to avoid accidental reverts
-    //     // (these checks also self-document the invariant we rely on)
-    //     assertLt(safeInAmt, bIn / 10, "safeInAmt too large vs balanceIn"); // < 10% (much stricter in practice)
-    //     assertLt(safeOutAmt, bOut / 10, "safeOutAmt too large vs balanceOut"); // < 10%
-
-    //     p.kind = SwapKind.EXACT_IN;
-    //     p.amountGivenScaled18 = safeInAmt;
-
-    //     vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
-    //     hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
-
-    //     p.kind = SwapKind.EXACT_OUT;
-    //     p.amountGivenScaled18 = safeOutAmt;
-
-    //     vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
-    //     hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
-    // }
+        vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
+        hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
+    }
 
     // function testFuzz_view_readsLaneParams_reverts_onSafePath(uint8 nSeed) public {
     //     uint8 n = uint8(bound(nSeed, 2, 8));

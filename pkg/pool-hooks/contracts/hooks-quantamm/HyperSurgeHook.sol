@@ -490,13 +490,16 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             uint256 thresholdScaled18
         )
     {
-        uint256 poolPriceBefore = _pairSpotFromBalancesWeights(
-            params.balancesScaled18,
-            weights,
-            params.indexIn,
-            params.indexOut
-        );
-        uint256 deviationBefore18 = _relAbsDiff(poolPriceBefore, oraclePrice);
+        uint256 deviationBefore18;
+        {
+            uint256 poolPriceBefore = _pairSpotFromBalancesWeights(
+                params.balancesScaled18,
+                weights,
+                params.indexIn,
+                params.indexOut
+            );
+            deviationBefore18 = _relAbsDiff(poolPriceBefore, oraclePrice);
+        }
 
         uint256[] memory newBalancesScaled18 = new uint256[](params.balancesScaled18.length);
         for (uint256 i = 0; i < params.balancesScaled18.length; i++) {
@@ -512,13 +515,15 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
 
         // P_pool = (B_out/w_out) / (B_in/w_in) = (B_out * w_in) / (B_in * w_out)
-        uint256 poolPriceAfter = _pairSpotFromBalancesWeights(
-            newBalancesScaled18,
-            weights,
-            params.indexIn,
-            params.indexOut
-        );
-        deviation18 = _relAbsDiff(poolPriceAfter, oraclePrice); // |pool - ext| / ext
+        {
+            uint256 poolPriceAfter = _pairSpotFromBalancesWeights(
+                newBalancesScaled18,
+                weights,
+                params.indexIn,
+                params.indexOut
+            );
+            deviation18 = _relAbsDiff(poolPriceAfter, oraclePrice); // |pool - ext| / ext
+        }
 
         // Check if the swap is a noise (deviation is worsening) or an arbitrage (deviation is improving).
         if (deviation18 > deviationBefore18) {

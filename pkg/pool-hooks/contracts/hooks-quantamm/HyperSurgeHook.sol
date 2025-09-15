@@ -567,16 +567,17 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256 indexTokenIn,
         uint256 indexTokenOut
     ) internal pure returns (uint256) {
-        uint256 num = balancesScaled18[indexTokenOut].mulDown(weights[indexTokenIn]);
-        uint256 den = balancesScaled18[indexTokenIn].mulDown(weights[indexTokenOut]);
-
-        //would be impossible given normal balances and weights but given
-        //it is on the withdraw path keep the defensive check
-        if (den == 0) {
+        // This would cause a division by zero error. In normal circumstances this should never happen,
+        // but we keep the defensive check since it is on the withdraw path.
+        if (balancesScaled18[indexTokenIn] == 0 || weights[indexTokenOut] == 0) {
             return 0;
         }
 
-        return num.divDown(den);
+        // Use pure math increases the precision of the operations and reduces gas cost.
+        return
+            ((balancesScaled18[indexTokenOut] * weights[indexTokenIn]) / weights[indexTokenOut]).divDown(
+                balancesScaled18[indexTokenIn]
+            );
     }
 
     function _relAbsDiff(uint256 a, uint256 b) internal pure returns (uint256) {

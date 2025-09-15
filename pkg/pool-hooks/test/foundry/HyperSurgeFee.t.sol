@@ -1398,379 +1398,388 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee >= static");
     }
 
-    // struct NoiseWorsensInsideButStaysInsideLocals {
-    //     uint256 E;
-    //     uint32 noiseThr9;
-    //     uint32 noiseCap9;
-    //     uint32 noiseMax9;
-    //     uint32 arbThr9;
-    //     uint32 arbCap9;
-    //     uint32 arbMax9;
-    //     uint256 thr;
-    //     uint256 deviationBefore;
-    //     uint256 price_before;
-    //     uint256 price_after;
-    //     uint256 xMax;
-    //     HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
-    //     PoolSwapParams p;
-    //     uint256 fee;
-    // }
+    struct NoiseWorsensInsideButStaysInsideLocals {
+        uint256 oraclePrice;
+        uint32 noiseThr9;
+        uint32 noiseCap9;
+        uint32 noiseMax9;
+        uint32 arbThr9;
+        uint32 arbCap9;
+        uint32 arbMax9;
+        uint256 thr;
+        uint256 deviationBefore;
+        uint256 price_before;
+        uint256 price_after;
+        uint256 xMax;
+        uint256 fee;
+        uint256 R1e18;
+        uint256 denom;
+        uint256 q;
+    }
 
-    // /// 3) Noise: starts inside threshold, worsens but stays inside → NOISE lane, **base (static)** fee.
-    // function testFuzz_logic_noise_inside_worse_but_inside_static(
-    //     uint256 eSeed,
-    //     uint32 noiseThrSeed,
-    //     uint32 noiseCapSeed,
-    //     uint32 noiseMaxSeed,
-    //     uint64 amtSeed
-    // ) public {
-    //     NoiseWorsensInsideButStaysInsideLocals memory locals;
+    /// 3) Noise: starts inside threshold, worsens but stays inside → NOISE lane, **base (static)** fee.
+    function testFuzz_logic_noise_inside_worse_but_inside_static(
+        uint256 eSeed,
+        uint32 noiseThrSeed,
+        uint32 noiseCapSeed,
+        uint32 noiseMaxSeed,
+        uint64 amtSeed
+    ) public {
+        NoiseWorsensInsideButStaysInsideLocals memory locals;
 
-    //     locals.E = bound(eSeed, 1e16, 1e24);
-    //     locals.noiseThr9 = uint32(bound(noiseThrSeed, 1, 1_000_000_000 - 1)); // (0,1)
-    //     locals.noiseCap9 = uint32(bound(noiseCapSeed, locals.noiseThr9 + 1, 1_000_000_000));
-    //     locals.noiseMax9 = uint32(bound(noiseMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
+        locals.oraclePrice = bound(eSeed, 1e16, 1e24);
+        locals.noiseThr9 = uint32(bound(noiseThrSeed, 1, 1_000_000_000 - 1)); // (0,1)
+        locals.noiseCap9 = uint32(bound(noiseCapSeed, locals.noiseThr9 + 1, 1_000_000_000));
+        locals.noiseMax9 = uint32(bound(noiseMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
 
-    //     locals.arbThr9 = 1_000_000;
-    //     locals.arbCap9 = 300_000_000;
-    //     locals.arbMax9 = 50_000_000;
-    //     locals.thr = uint256(locals.noiseThr9) * 1e9;
-    //     locals.deviationBefore = locals.thr / 4 + 1;
-    //     locals.price_before = locals.E - (locals.E * locals.deviationBefore) / 1e18;
+        locals.arbThr9 = 1_000_000;
+        locals.arbCap9 = 300_000_000;
+        locals.arbMax9 = 50_000_000;
+        locals.thr = uint256(locals.noiseThr9) * 1e9;
+        locals.deviationBefore = locals.thr / 4 + 1;
+        locals.price_before = locals.oraclePrice.mulDown(FixedPoint.ONE - locals.deviationBefore);
 
-    //     uint256 R1e18 = (locals.price_before * 1e18) / locals.E;
-    //     uint256 denom = 1e18 - locals.thr;
-    //     uint256 q = (R1e18 * 1e18) / denom;
-    //     locals.xMax = q > 1e18 ? (q - 1e18) : 0;
-    //     if (locals.xMax > 5e17) {
-    //         locals.xMax = 5e17;
-    //     }
+        locals.R1e18 = locals.price_before.divDown(locals.oraclePrice);
+        locals.denom = 1e18 - locals.thr;
+        locals.q = (locals.R1e18 * 1e18) / locals.denom;
+        locals.xMax = locals.q > 1e18 ? (locals.q - 1e18) : 0;
+        if (locals.xMax > 5e17) {
+            locals.xMax = 5e17;
+        }
 
-    //     locals.comp.wIn = 1e18;
-    //     locals.comp.wOut = 1e18;
-    //     locals.comp.bIn = 1e18;
-    //     locals.comp.bOut = locals.price_before;
-    //     locals.comp.pxIn = 1e18;
-    //     locals.comp.pxOut = locals.E;
-    //     locals.comp.calcAmountScaled18 = 0;
-    //     locals.comp.poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
-    //     locals.comp.poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
-    //     locals.comp.poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
-    //     locals.comp.poolDetails.arbThresholdPercentage9 = locals.arbThr9;
-    //     locals.comp.poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
-    //     locals.comp.poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+        uint256[] memory weights = [uint256(50e16), uint256(50e16)].toMemoryArray();
+        uint256[] memory balancesScaled18 = [FixedPoint.ONE, locals.price_before].toMemoryArray();
 
-    //     locals.p.kind = SwapKind.EXACT_IN;
+        HyperSurgeHook.PoolDetails memory poolDetails;
+        poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
+        poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
+        poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+        poolDetails.arbThresholdPercentage9 = locals.arbThr9;
+        poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
+        poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+        poolDetails.numTokens = 2;
 
-    //     // Ensure a *measurable* worsening so NOISE is chosen:
-    //     // pick x with a lower floor (e.g., 1e9 wei) but never exceed xMax.
-    //     uint256 lo = 1e9; // 1e-9 in t; safely above Q18 rounding noise
-    //     uint256 hi = locals.xMax;
-    //     if (hi < lo) {
-    //         lo = 1;
-    //     } // if xMax < floor, fall back to [1, xMax]
-    //     if (hi < lo) {
-    //         hi = lo;
-    //     } // clamp
-    //     locals.p.amountGivenScaled18 = bound(uint256(amtSeed), lo, hi);
+        // Ensure a *measurable* worsening so NOISE is chosen:
+        // pick x with a lower floor (e.g., 1e9 wei) but never exceed xMax.
+        uint256 lo = 1e9; // 1e-9 in t; safely above Q18 rounding noise
+        uint256 hi = locals.xMax;
+        if (hi < lo) {
+            lo = 1;
+        } // if xMax < floor, fall back to [1, xMax]
+        if (hi < lo) {
+            hi = lo;
+        } // clamp
 
-    //     HyperSurgeHookMock mock = new HyperSurgeHookMock(
-    //         IVault(vault),
-    //         _convertTo18Decimals(locals.arbMax9),
-    //         _convertTo18Decimals(locals.arbThr9),
-    //         _convertTo18Decimals(locals.arbCap9),
-    //         "logic-3"
-    //     );
-    //     (, locals.fee) = mock.ComputeSurgeFee(locals.comp, locals.p, STATIC_SWAP_FEE);
+        PoolSwapParams memory p = _createPoolSwapParams(
+            SwapKind.EXACT_IN,
+            balancesScaled18,
+            0,
+            1,
+            bound(uint256(amtSeed), lo, hi)
+        );
 
-    //     // Sanity: still inside after worsening
-    //     locals.price_after = (locals.price_before * 1e18) / (1e18 + locals.p.amountGivenScaled18);
-    //     uint256 deviationAfter = ((
-    //         locals.price_after > locals.E ? (locals.price_after - locals.E) : (locals.E - locals.price_after)
-    //     ) * 1e18) / locals.E;
-    //     assertLe(deviationAfter, locals.thr, "must remain inside threshold");
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(
+            IVault(vault),
+            _convertTo18Decimals(locals.arbMax9),
+            _convertTo18Decimals(locals.arbThr9),
+            _convertTo18Decimals(locals.arbCap9),
+            "logic-3"
+        );
+        (, locals.fee) = mock.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, weights, 0, locals.oraclePrice);
 
-    //     // Inside-after on NOISE → static
-    //     assertEq(locals.fee, STATIC_SWAP_FEE, "inside threshold after worsening must still return static (noise path)");
-    // }
+        // Sanity: still inside after worsening
+        locals.price_after = locals.price_before.divDown(FixedPoint.ONE + p.amountGivenScaled18);
+        uint256 deviationAfter = (
+            locals.price_after > locals.oraclePrice
+                ? (locals.price_after - locals.oraclePrice)
+                : (locals.oraclePrice - locals.price_after)
+        ).divDown(locals.oraclePrice);
+        assertLe(deviationAfter, locals.thr, "must remain inside threshold");
 
-    // struct NoiseCrossesPriceWorsensLocals {
-    //     uint256 E;
-    //     uint32 noiseThr9;
-    //     uint32 noiseCap9;
-    //     uint32 noiseMax9;
-    //     uint32 arbThr9;
-    //     uint32 arbCap9;
-    //     uint32 arbMax9;
-    //     uint256 thr;
-    //     uint256 cap;
-    //     uint256 deviationBefore;
-    //     uint256 price_before;
-    //     uint256 price_after;
-    //     uint256 tCross;
-    //     uint256 tWorse;
-    //     uint256 tMin;
-    //     uint256 x;
-    //     uint256 num; // numerator for tWorse calculation
-    //     uint256 den; // denominator for tWorse calculation
-    //     uint256 q; // intermediate value for tWorse calculation
-    //     uint256 epsT; // safety margin for tMin
-    //     uint256 span; // range for x selection
-    //     uint256 lo; // lower bound for x
-    //     uint256 hi; // upper bound for x
-    //     uint256 deviationAfter; // absolute deviation after
-    //     HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
-    //     PoolSwapParams p;
-    //     uint256 expected;
-    //     uint256 dyn;
-    // }
+        // Inside-after on NOISE → static
+        assertEq(locals.fee, STATIC_SWAP_FEE, "inside threshold after worsening must still return static (noise path)");
+    }
 
-    // function testFuzz_logic_noise_outside_crosses_and_worsens_dynamic_after(
-    //     uint256 eSeed,
-    //     uint32 noiseThrSeed,
-    //     uint32 noiseCapSeed,
-    //     uint32 noiseMaxSeed,
-    //     uint64 amtSeed
-    // ) public {
-    //     NoiseCrossesPriceWorsensLocals memory locals;
+    struct NoiseCrossesPriceWorsensLocals {
+        uint256 oraclePrice;
+        uint32 noiseThr9;
+        uint32 noiseCap9;
+        uint32 noiseMax9;
+        uint32 arbThr9;
+        uint32 arbCap9;
+        uint32 arbMax9;
+        uint256 thr;
+        uint256 cap;
+        uint256 deviationBefore;
+        uint256 price_before;
+        uint256 price_after;
+        uint256 tCross;
+        uint256 tWorse;
+        uint256 tMin;
+        uint256 x;
+        uint256 num; // numerator for tWorse calculation
+        uint256 den; // denominator for tWorse calculation
+        uint256 q; // intermediate value for tWorse calculation
+        uint256 epsT; // safety margin for tMin
+        uint256 span; // range for x selection
+        uint256 lo; // lower bound for x
+        uint256 hi; // upper bound for x
+        uint256 deviationAfter; // absolute deviation after
+        uint256 expected;
+        uint256 dyn;
+    }
 
-    //     // --- Fuzz + bounds ---
-    //     locals.E = bound(eSeed, 1e16, 1e24);
+    function testFuzz_logic_noise_outside_crosses_and_worsens_dynamic_after(
+        uint256 eSeed,
+        uint32 noiseThrSeed,
+        uint32 noiseCapSeed,
+        uint32 noiseMaxSeed,
+        uint64 amtSeed
+    ) public {
+        NoiseCrossesPriceWorsensLocals memory locals;
 
-    //     // Keep thr < 1 so denominators stay positive and bands are non-degenerate
-    //     locals.noiseThr9 = uint32(bound(noiseThrSeed, 1, 900_000_000 - 1)); // (0, 0.9)
-    //     locals.noiseCap9 = uint32(bound(noiseCapSeed, locals.noiseThr9 + 1, 1_000_000_000)); // (thr, 1]
-    //     locals.noiseMax9 = uint32(bound(noiseMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
+        // --- Fuzz + bounds ---
+        locals.oraclePrice = bound(eSeed, 1e16, 1e24);
 
-    //     // ARB lane different (unused in assertion)
-    //     locals.arbThr9 = 1_000_000;
-    //     locals.arbCap9 = 300_000_000;
-    //     locals.arbMax9 = 50_000_000;
+        // Keep thr < 1 so denominators stay positive and bands are non-degenerate
+        locals.noiseThr9 = uint32(bound(noiseThrSeed, 1, 900_000_000 - 1)); // (0, 0.9)
+        locals.noiseCap9 = uint32(bound(noiseCapSeed, locals.noiseThr9 + 1, 1_000_000_000)); // (thr, 1]
+        locals.noiseMax9 = uint32(bound(noiseMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
 
-    //     locals.thr = uint256(locals.noiseThr9) * 1e9;
-    //     locals.cap = uint256(locals.noiseCap9) * 1e9;
+        // ARB lane different (unused in assertion)
+        locals.arbThr9 = 1_000_000;
+        locals.arbCap9 = 300_000_000;
+        locals.arbMax9 = 50_000_000;
 
-    //     // Start ABOVE E with a deviation strictly outside the threshold:
-    //     locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 4;
-    //     locals.price_before = locals.E + (locals.E * locals.deviationBefore) / 1e18;
+        locals.thr = uint256(locals.noiseThr9) * 1e9;
+        locals.cap = uint256(locals.noiseCap9) * 1e9;
 
-    //     // Build compute locals
-    //     locals.comp.wIn = 1e18;
-    //     locals.comp.wOut = 1e18;
-    //     locals.comp.bIn = 1e18;
-    //     locals.comp.bOut = locals.price_before;
-    //     locals.comp.pxIn = 1e18;
-    //     locals.comp.pxOut = locals.E;
-    //     locals.comp.calcAmountScaled18 = 0;
-    //     locals.comp.poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
-    //     locals.comp.poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
-    //     locals.comp.poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
-    //     locals.comp.poolDetails.arbThresholdPercentage9 = locals.arbThr9;
-    //     locals.comp.poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
-    //     locals.comp.poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+        // Start ABOVE E with a deviation strictly outside the threshold:
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 4;
+        locals.price_before = locals.oraclePrice + (locals.oraclePrice * locals.deviationBefore) / 1e18;
 
-    //     locals.p.kind = SwapKind.EXACT_IN;
+        // Build compute locals
+        uint256[] memory weights = [uint256(50e16), uint256(50e16)].toMemoryArray();
+        uint256[] memory balancesScaled18 = [FixedPoint.ONE, locals.price_before].toMemoryArray();
 
-    //     // We need BOTH:
-    //     //  (1) Cross: price_after < E  means  t > Db                       (R = 1 + Db)
-    //     //  (2) Worsen: |after| > |before| when ending below:
-    //     //      1 - R/(1+t) > Db  means  (1 - Db)(1 + t) > 1 + Db  means  t > 2Db/(1 - Db)
-    //     locals.tCross = locals.deviationBefore;
-    //     // tWorse = ceil( (2*Db) / (1 - Db) ) in Q18
-    //     locals.num = (2 * locals.deviationBefore) * 1e18; // Q36
-    //     locals.den = 1e18 - locals.deviationBefore;
-    //     locals.q = (locals.num + locals.den - 1) / locals.den; // ceilDiv -> Q18
-    //     locals.tWorse = locals.q;
+        HyperSurgeHook.PoolDetails memory poolDetails;
+        poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
+        poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
+        poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+        poolDetails.arbThresholdPercentage9 = locals.arbThr9;
+        poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
+        poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+        poolDetails.numTokens = 2;
 
-    //     // Add a safety margin to overcome integer rounding in price_after and deviationAfter.
-    //     // Use 1e13 in Q18 (i.e., 1e-5) which is ample even for E as large as 1e24.
-    //     locals.epsT = 1e13;
-    //     locals.tMin = (locals.tWorse > locals.tCross ? locals.tWorse : locals.tCross) + locals.epsT;
+        // We need BOTH:
+        //  (1) Cross: price_after < E  means  t > Db                       (R = 1 + Db)
+        //  (2) Worsen: |after| > |before| when ending below:
+        //      1 - R/(1+t) > Db  means  (1 - Db)(1 + t) > 1 + Db  means  t > 2Db/(1 - Db)
+        locals.tCross = locals.deviationBefore;
+        // tWorse = ceil( (2*Db) / (1 - Db) ) in Q18
+        locals.num = (2 * locals.deviationBefore) * 1e18; // Q36
+        locals.den = 1e18 - locals.deviationBefore;
+        locals.q = (locals.num + locals.den - 1) / locals.den; // ceilDiv -> Q18
+        locals.tWorse = locals.q;
 
-    //     // Choose x = t*1e18 with t in [tMin, tMin + span]
-    //     locals.span = 5e17; // allow up to +0.5 in t
-    //     locals.lo = locals.tMin;
-    //     locals.hi = locals.tMin + locals.span;
-    //     if (locals.lo == 0) {
-    //         locals.lo = 1;
-    //     } // avoid x==0
+        // Add a safety margin to overcome integer rounding in price_after and deviationAfter.
+        // Use 1e13 in Q18 (i.e., 1e-5) which is ample even for E as large as 1e24.
+        locals.epsT = 1e13;
+        locals.tMin = (locals.tWorse > locals.tCross ? locals.tWorse : locals.tCross) + locals.epsT;
 
-    //     if (locals.hi < locals.lo) {
-    //         locals.hi = locals.lo;
-    //     } // clamp on overflow
+        // Choose x = t*1e18 with t in [tMin, tMin + span]
+        locals.span = 5e17; // allow up to +0.5 in t
+        locals.lo = locals.tMin;
+        locals.hi = locals.tMin + locals.span;
+        if (locals.lo == 0) {
+            locals.lo = 1;
+        } // avoid x==0
 
-    //     locals.x = bound(uint256(amtSeed), locals.lo, locals.hi);
-    //     locals.p.amountGivenScaled18 = locals.x;
+        if (locals.hi < locals.lo) {
+            locals.hi = locals.lo;
+        } // clamp on overflow
 
-    //     // Expected uses NOISE with AFTER deviation
-    //     locals.price_after = (locals.price_before * 1e18) / (1e18 + locals.x);
+        PoolSwapParams memory p = _createPoolSwapParams(
+            SwapKind.EXACT_IN,
+            balancesScaled18,
+            0,
+            1,
+            bound(uint256(amtSeed), locals.lo, locals.hi)
+        );
 
-    //     // Sanity: crossed and worsened absolute deviation
-    //     locals.deviationBefore = ((locals.price_before - locals.E) * 1e18) / locals.E;
-    //     locals.deviationAfter = ((locals.E - locals.price_after) * 1e18) / locals.E;
-    //     require(locals.price_after < locals.E, "must cross below E");
-    //     require(locals.deviationAfter > locals.deviationBefore, "must worsen absolute deviation after crossing");
+        // Expected uses NOISE with AFTER deviation
+        locals.price_after = locals.price_before.divDown(FixedPoint.ONE + p.amountGivenScaled18);
 
-    //     locals.expected = fee_expectedFeeWithParams(
-    //         locals.price_after,
-    //         locals.comp.pxIn,
-    //         locals.comp.pxOut,
-    //         STATIC_SWAP_FEE,
-    //         locals.noiseThr9,
-    //         locals.noiseCap9,
-    //         locals.noiseMax9
-    //     );
+        // Sanity: crossed and worsened absolute deviation
+        locals.deviationBefore = (locals.price_before - locals.oraclePrice).divDown(locals.oraclePrice);
+        locals.deviationAfter = (locals.oraclePrice - locals.price_after).divDown(locals.oraclePrice);
+        require(locals.price_after < locals.oraclePrice, "must cross below oraclePrice");
+        require(locals.deviationAfter > locals.deviationBefore, "must worsen absolute deviation after crossing");
 
-    //     HyperSurgeHookMock mock = new HyperSurgeHookMock(
-    //         IVault(vault),
-    //         _convertTo18Decimals(locals.arbMax9),
-    //         _convertTo18Decimals(locals.arbThr9),
-    //         _convertTo18Decimals(locals.arbCap9),
-    //         "logic-4"
-    //     );
-    //     (, locals.dyn) = mock.ComputeSurgeFee(locals.comp, locals.p, STATIC_SWAP_FEE);
+        locals.expected = fee_expectedFeeWithParams(
+            locals.price_after,
+            locals.oraclePrice,
+            STATIC_SWAP_FEE,
+            locals.noiseThr9,
+            locals.noiseCap9,
+            locals.noiseMax9
+        );
 
-    //     assertEq(
-    //         locals.dyn,
-    //         locals.expected,
-    //         "noise path must use AFTER deviation even when crossing the price (worsening)"
-    //     );
-    //     assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee >= static");
-    // }
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(
+            IVault(vault),
+            _convertTo18Decimals(locals.arbMax9),
+            _convertTo18Decimals(locals.arbThr9),
+            _convertTo18Decimals(locals.arbCap9),
+            "logic-4"
+        );
+        (, locals.dyn) = mock.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, weights, 0, locals.oraclePrice);
 
-    // struct OutsideToInsideDynamicBefore {
-    //     uint256 E;
-    //     uint32 arbThr9;
-    //     uint32 arbCap9;
-    //     uint32 arbMax9;
-    //     uint32 noiseThr9;
-    //     uint32 noiseCap9;
-    //     uint32 noiseMax9;
-    //     uint256 thr;
-    //     uint256 cap;
-    //     uint256 deviationBefore;
-    //     uint256 price_before;
-    //     uint256 price_after;
-    //     uint256 R1e18; // R in 1e18 scale: R = price_before / E
-    //     uint256 xLower; // min x to get price_after less than or equal to E*(1+thr)
-    //     uint256 xUpper; // max x to keep price_after greater than or equal to E*(1−thr)
-    //     uint256 x; // chosen amountGivenScaled18 inside [xLower, xUpper]
-    //     HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
-    //     PoolSwapParams p;
-    //     uint256 expected;
-    //     uint256 dyn;
-    // }
+        assertEq(
+            locals.dyn,
+            locals.expected,
+            "noise path must use AFTER deviation even when crossing the price (worsening)"
+        );
+        assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee >= static");
+    }
 
-    // /// 5) Arb: starts outside, ends inside → ARB lane still uses **BEFORE** deviation (dynamic, not base).
-    // function testFuzz_logic_arb_outside_to_inside_dynamic_before(
-    //     uint256 eSeed,
-    //     uint32 arbThrSeed,
-    //     uint32 arbCapSeed,
-    //     uint32 arbMaxSeed,
-    //     uint64 amtSeed
-    // ) public {
-    //     OutsideToInsideDynamicBefore memory locals;
+    struct OutsideToInsideDynamicBefore {
+        uint256 oraclePrice;
+        uint32 arbThr9;
+        uint32 arbCap9;
+        uint32 arbMax9;
+        uint32 noiseThr9;
+        uint32 noiseCap9;
+        uint32 noiseMax9;
+        uint256 thr;
+        uint256 cap;
+        uint256 deviationBefore;
+        uint256 price_before;
+        uint256 price_after;
+        uint256 R1e18; // R in 1e18 scale: R = price_before / E
+        uint256 xLower; // min x to get price_after less than or equal to E*(1+thr)
+        uint256 xUpper; // max x to keep price_after greater than or equal to E*(1−thr)
+        uint256 expected;
+        uint256 dyn;
+        uint256 denomPlus;
+        uint256 numPlus;
+        uint256 qPlus;
+        uint256 denomMinus;
+        uint256 numMinus;
+        uint256 qMinus;
+    }
 
-    //     // --- Fuzz + bounds ---
-    //     locals.E = bound(eSeed, 1e16, 1e24);
-    //     // Keep thr strictly < 1e9 so (1e18 - thr) > 0
-    //     locals.arbThr9 = uint32(bound(arbThrSeed, 1, 900_000_000 - 1));
-    //     locals.arbCap9 = uint32(bound(arbCapSeed, locals.arbThr9 + 1, 1_000_000_000));
-    //     locals.arbMax9 = uint32(bound(arbMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
-    //     // NOISE lane can be anything different; not used by this assertion
-    //     locals.noiseThr9 = 5_000_000;
-    //     locals.noiseCap9 = 400_000_000;
-    //     locals.noiseMax9 = 25_000_000;
+    /// 5) Arb: starts outside, ends inside → ARB lane still uses **BEFORE** deviation (dynamic, not base).
+    function testFuzz_logic_arb_outside_to_inside_dynamic_before(
+        uint256 eSeed,
+        uint32 arbThrSeed,
+        uint32 arbCapSeed,
+        uint32 arbMaxSeed,
+        uint64 amtSeed
+    ) public {
+        OutsideToInsideDynamicBefore memory locals;
 
-    //     locals.thr = uint256(locals.arbThr9) * 1e9;
-    //     locals.cap = uint256(locals.arbCap9) * 1e9;
+        // --- Fuzz + bounds ---
+        locals.oraclePrice = bound(eSeed, 1e16, 1e24);
+        // Keep thr strictly < 1e9 so (1e18 - thr) > 0
+        locals.arbThr9 = uint32(bound(arbThrSeed, 1, 900_000_000 - 1));
+        locals.arbCap9 = uint32(bound(arbCapSeed, locals.arbThr9 + 1, 1_000_000_000));
+        locals.arbMax9 = uint32(bound(arbMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
+        // NOISE lane can be anything different; not used by this assertion
+        locals.noiseThr9 = 5_000_000;
+        locals.noiseCap9 = 400_000_000;
+        locals.noiseMax9 = 25_000_000;
 
-    //     // Start ABOVE E with an outside deviation deviationBefore > thr
-    //     locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3; // strictly outside
-    //     locals.price_before = locals.E + (locals.E * locals.deviationBefore) / 1e18; // price_before = E * (1 + deviationBefore)
-    //     locals.R1e18 = (locals.price_before * 1e18) / locals.E; // R = 1e18 + deviationBefore
+        locals.thr = uint256(locals.arbThr9) * 1e9;
+        locals.cap = uint256(locals.arbCap9) * 1e9;
 
-    //     // Two-sided “inside” band: 1 − thr less than or equal to price_after/E less than or equal to 1 + thr,
-    //     // with price_after/E = R / (1 + t), t = x / 1e18.
+        // Start ABOVE E with an outside deviation deviationBefore > thr
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3; // strictly outside
+        locals.price_before = locals.oraclePrice + (locals.oraclePrice * locals.deviationBefore) / 1e18; // price_before = E * (1 + deviationBefore)
+        locals.R1e18 = (locals.price_before * 1e18) / locals.oraclePrice; // R = 1e18 + deviationBefore
 
-    //     // Lower bound on t (bring down to less than or equal to 1+thr):
-    //     //   t greater than or equal to R/(1+thr) − 1  means  xLower = ceil( (R1e18 * 1e18) / (1e18 + thr) ) − 1e18
-    //     uint256 denomPlus = 1e18 + locals.thr;
-    //     uint256 numPlus = locals.R1e18 * 1e18; // Q36
-    //     uint256 qPlus = (numPlus + denomPlus - 1) / denomPlus; // ceilDiv to Q18
-    //     locals.xLower = qPlus > 1e18 ? (qPlus - 1e18) : 0;
+        // Two-sided “inside” band: 1 − thr less than or equal to price_after/E less than or equal to 1 + thr,
+        // with price_after/E = R / (1 + t), t = x / 1e18.
 
-    //     // Upper bound on t (don’t overshoot below 1 − thr):
-    //     //   t less than or equal to R/(1−thr) − 1  means  xUpper = floor( (R1e18 * 1e18) / (1e18 − thr) ) − 1e18
-    //     uint256 denomMinus = 1e18 - locals.thr; // > 0 by bound
-    //     uint256 numMinus = locals.R1e18 * 1e18; // Q36
-    //     uint256 qMinus = numMinus / denomMinus; // floorDiv to Q18
-    //     locals.xUpper = qMinus > 1e18 ? (qMinus - 1e18) : 0;
+        // Lower bound on t (bring down to less than or equal to 1+thr):
+        //   t greater than or equal to R/(1+thr) − 1  means  xLower = ceil( (R1e18 * 1e18) / (1e18 + thr) ) − 1e18
+        locals.denomPlus = 1e18 + locals.thr;
+        locals.numPlus = locals.R1e18 * 1e18; // Q36
+        locals.qPlus = (locals.numPlus + locals.denomPlus - 1) / locals.denomPlus; // ceilDiv to Q18
+        locals.xLower = locals.qPlus > 1e18 ? (locals.qPlus - 1e18) : 0;
 
-    //     // Choose x inside [xLower, xUpper] using bound (no vm.assume). Collapse if inverted.
-    //     uint256 lo = locals.xLower;
-    //     uint256 hi = locals.xUpper;
-    //     if (hi < lo) {
-    //         hi = lo;
-    //     }
-    //     // avoid degenerate zero (x == 0 keeps price_after == price_before and won’t end inside)
-    //     if (lo == 0) lo = 1;
-    //     if (hi < lo) hi = lo;
+        // Upper bound on t (don’t overshoot below 1 − thr):
+        //   t less than or equal to R/(1−thr) − 1  means  xUpper = floor( (R1e18 * 1e18) / (1e18 − thr) ) − 1e18
+        locals.denomMinus = 1e18 - locals.thr; // > 0 by bound
+        locals.numMinus = locals.R1e18 * 1e18; // Q36
+        locals.qMinus = locals.numMinus / locals.denomMinus; // floorDiv to Q18
+        locals.xUpper = locals.qMinus > 1e18 ? (locals.qMinus - 1e18) : 0;
 
-    //     locals.x = bound(uint256(amtSeed), lo, hi);
+        // Choose x inside [xLower, xUpper] using bound (no vm.assume). Collapse if inverted.
+        uint256 lo = locals.xLower;
+        uint256 hi = locals.xUpper;
+        if (hi < lo) {
+            hi = lo;
+        }
+        // avoid degenerate zero (x == 0 keeps price_after == price_before and won’t end inside)
+        if (lo == 0) lo = 1;
+        if (hi < lo) hi = lo;
 
-    //     // Build compute locals
-    //     locals.comp.wIn = 1e18;
-    //     locals.comp.wOut = 1e18;
-    //     locals.comp.bIn = 1e18;
-    //     locals.comp.bOut = locals.price_before;
-    //     locals.comp.pxIn = 1e18;
-    //     locals.comp.pxOut = locals.E;
-    //     locals.comp.calcAmountScaled18 = 0;
-    //     locals.comp.poolDetails.arbThresholdPercentage9 = locals.arbThr9;
-    //     locals.comp.poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
-    //     locals.comp.poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
-    //     locals.comp.poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
-    //     locals.comp.poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
-    //     locals.comp.poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+        // Build compute locals
+        uint256[] memory weights = [uint256(50e16), uint256(50e16)].toMemoryArray();
+        uint256[] memory balancesScaled18 = [FixedPoint.ONE, locals.price_before].toMemoryArray();
 
-    //     locals.p.kind = SwapKind.EXACT_IN;
-    //     locals.p.amountGivenScaled18 = locals.x;
+        HyperSurgeHook.PoolDetails memory poolDetails;
+        poolDetails.arbThresholdPercentage9 = locals.arbThr9;
+        poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
+        poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+        poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
+        poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
+        poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+        poolDetails.numTokens = 2;
 
-    //     // Expected (ARB) uses BEFORE deviation even though end is inside
-    //     locals.expected = fee_expectedFeeWithParams(
-    //         locals.price_before,
-    //         locals.comp.pxIn,
-    //         locals.comp.pxOut,
-    //         STATIC_SWAP_FEE,
-    //         locals.arbThr9,
-    //         locals.arbCap9,
-    //         locals.arbMax9
-    //     );
+        PoolSwapParams memory p = _createPoolSwapParams(
+            SwapKind.EXACT_IN,
+            balancesScaled18,
+            0,
+            1,
+            bound(uint256(amtSeed), lo, hi)
+        );
 
-    //     HyperSurgeHookMock mock = new HyperSurgeHookMock(
-    //         IVault(vault),
-    //         _convertTo18Decimals(locals.arbMax9),
-    //         _convertTo18Decimals(locals.arbThr9),
-    //         _convertTo18Decimals(locals.arbCap9),
-    //         "logic-5"
-    //     );
-    //     (, locals.dyn) = mock.ComputeSurgeFee(locals.comp, locals.p, STATIC_SWAP_FEE);
+        // Expected (ARB) uses BEFORE deviation even though end is inside
+        locals.expected = fee_expectedFeeWithParams(
+            locals.price_before,
+            locals.oraclePrice,
+            STATIC_SWAP_FEE,
+            locals.arbThr9,
+            locals.arbCap9,
+            locals.arbMax9
+        );
 
-    //     // Sanity: end is inside (two-sided)
-    //     locals.price_after = (locals.price_before * 1e18) / (1e18 + locals.p.amountGivenScaled18);
-    //     uint256 deviationAfter = ((
-    //         locals.price_after > locals.E ? (locals.price_after - locals.E) : (locals.E - locals.price_after)
-    //     ) * 1e18) / locals.E;
-    //     assertLe(deviationAfter, locals.thr, "end should be inside threshold");
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(
+            IVault(vault),
+            _convertTo18Decimals(locals.arbMax9),
+            _convertTo18Decimals(locals.arbThr9),
+            _convertTo18Decimals(locals.arbCap9),
+            "logic-5"
+        );
+        (, locals.dyn) = mock.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, weights, 0, locals.oraclePrice);
 
-    //     assertEq(
-    //         locals.dyn,
-    //         locals.expected,
-    //         "arb path must use BEFORE deviation even if the end state is inside threshold"
-    //     );
-    //     assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee >= static");
-    // }
+        // Sanity: end is inside (two-sided)
+        locals.price_after = locals.price_before.divDown(FixedPoint.ONE + p.amountGivenScaled18);
+        uint256 deviationAfter = (
+            locals.price_after > locals.oraclePrice
+                ? (locals.price_after - locals.oraclePrice)
+                : (locals.oraclePrice - locals.price_after)
+        ).divDown(locals.oraclePrice);
+        assertLe(deviationAfter, locals.thr, "end should be inside threshold");
+
+        assertEq(
+            locals.dyn,
+            locals.expected,
+            "arb path must use BEFORE deviation even if the end state is inside threshold"
+        );
+        assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee >= static");
+    }
 
     // struct InsideToOutsideDynamicAfterLocals {
     //     uint256 E;

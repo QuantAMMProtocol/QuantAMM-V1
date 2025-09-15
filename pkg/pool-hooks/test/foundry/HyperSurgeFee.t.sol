@@ -1072,223 +1072,154 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
     }
 
-    // function testFuzz_view_readsLaneParams_reverts_onSafePath(uint8 nSeed) public {
-    //     uint8 n = uint8(bound(nSeed, 2, 8));
-    //     _registerBasePoolWithN(n);
+    function testFuzz_view_readsLaneParams_reverts_onSafePath(uint8 nSeed) public {
+        uint8 n = uint8(bound(nSeed, 2, 8));
+        _registerBasePoolWithN(n);
 
-    //     // Diverge NOISE and ARB lane params (authorized admin)
-    //     vm.startPrank(admin);
-    //     hook.setSurgeThresholdPercentage(address(pool), 5_000_000 * 1e9, IHyperSurgeHook.TradeType.NOISE); // 0.5%
-    //     hook.setCapDeviationPercentage(address(pool), 400_000_000 * 1e9, IHyperSurgeHook.TradeType.NOISE); // 40%
-    //     hook.setMaxSurgeFeePercentage(address(pool), 25_000_000 * 1e9, IHyperSurgeHook.TradeType.NOISE); // 2.5%
+        // Diverge NOISE and ARB lane params (authorized admin)
+        vm.startPrank(admin);
+        hook.setSurgeThresholdPercentage(address(pool), 5_000_000 * 1e9, IHyperSurgeHook.TradeType.NOISE); // 0.5%
+        hook.setCapDeviationPercentage(address(pool), 400_000_000 * 1e9, IHyperSurgeHook.TradeType.NOISE); // 40%
+        hook.setMaxSurgeFeePercentage(address(pool), 25_000_000 * 1e9, IHyperSurgeHook.TradeType.NOISE); // 2.5%
 
-    //     hook.setSurgeThresholdPercentage(address(pool), 1_000_000 * 1e9, IHyperSurgeHook.TradeType.ARBITRAGE); // 0.1%
-    //     hook.setCapDeviationPercentage(address(pool), 300_000_000 * 1e9, IHyperSurgeHook.TradeType.ARBITRAGE); // 30%
-    //     hook.setMaxSurgeFeePercentage(address(pool), 50_000_000 * 1e9, IHyperSurgeHook.TradeType.ARBITRAGE); // 5%
-    //     vm.stopPrank();
+        hook.setSurgeThresholdPercentage(address(pool), 1_000_000 * 1e9, IHyperSurgeHook.TradeType.ARBITRAGE); // 0.1%
+        hook.setCapDeviationPercentage(address(pool), 300_000_000 * 1e9, IHyperSurgeHook.TradeType.ARBITRAGE); // 30%
+        hook.setMaxSurgeFeePercentage(address(pool), 50_000_000 * 1e9, IHyperSurgeHook.TradeType.ARBITRAGE); // 5%
+        vm.stopPrank();
 
-    //     // Adapt to the pool’s true size to avoid OOB / shape mismatches
-    //     uint256[] memory weights = WeightedPool(address(pool)).getNormalizedWeights();
-    //     uint256 m = weights.length;
-    //     assertGe(m, 2, "pool must have at least 2 tokens");
+        // Adapt to the pool’s true size to avoid OOB / shape mismatches
+        uint256[] memory weights = WeightedPool(address(pool)).getNormalizedWeights();
+        uint256 m = weights.length;
+        assertGe(m, 2, "pool must have at least 2 tokens");
 
-    //     // Build non-zero balances of correct length m
-    //     uint256[] memory balances = new uint256[](m);
-    //     for (uint256 k = 0; k < m; ++k) {
-    //         balances[k] = 1e24 + k;
-    //     }
+        // Build non-zero balances of correct length m
+        uint256[] memory balances = new uint256[](m);
+        for (uint256 k = 0; k < m; ++k) {
+            balances[k] = 1e24 + k;
+        }
 
-    //     PoolSwapParams memory p;
-    //     p.amountGivenScaled18 = 1e18; // non-zero trade amount
-    //     p.balancesScaled18 = balances;
-    //     p.indexIn = 0;
-    //     p.indexOut = (m > 1) ? 1 : 0;
+        PoolSwapParams memory p = _createPoolSwapParams(SwapKind.EXACT_IN, balances, 0, 1, 1e18);
 
-    //     // EXACT_IN: either revert or static fee (but never a computed dynamic fee)
-    //     p.kind = SwapKind.EXACT_IN;
-    //     vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
-    //     hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
+        // EXACT_IN: either revert or static fee (but never a computed dynamic fee)
+        vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
+        hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
 
-    //     // EXACT_OUT: same invariant
-    //     p.kind = SwapKind.EXACT_OUT;
-    //     vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
-    //     hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
-    // }
+        // EXACT_OUT: same invariant
+        p.kind = SwapKind.EXACT_OUT;
+        vm.expectRevert(HyperSpotPricePrecompile.SpotPriceIsZero.selector);
+        hook.onComputeDynamicSwapFeePercentage(p, address(pool), STATIC_SWAP_FEE);
+    }
 
-    // struct DeviationEqualsThreshold {
-    //     uint256 staticFee;
-    //     uint256 maxFee;
-    //     uint32 thr9;
-    //     uint32 cap9;
-    //     uint32 max9;
-    //     uint256 E;
-    //     uint256 thr;
-    //     uint256 fee;
-    // }
+    /// 1) deviation == threshold => returns static fee (boundary counted as "inside")
+    function test_cfg_fee_static_at_threshold_usingMockWrapper() public view {
+        uint256 staticFee = 0.3e16; // 0.3%
+        uint256 maxFee = 1.2e16; // 1.2%
 
-    // /// 1) deviation == threshold => returns static fee (boundary counted as "inside")
-    // // function test_cfg_fee_static_at_threshold_usingMockWrapper() public view {
-    // //     DeviationEqualsThreshold memory locals;
+        // 9 lane params (contract upscales to 18dp)
+        uint32 thr9 = 100_000_000; // 10%
+        uint32 cap9 = 500_000_000; // 50%
+        uint32 max9 = uint32(maxFee / 1e9);
 
-    // //     locals.staticFee = 30e14; // 30 bps = 0.003 * 1e18
-    // //     locals.maxFee = 120e14; // 120 bps
+        // set both lanes the same (lane choice irrelevant for this edge)
+        HyperSurgeHook.PoolDetails memory poolDetails;
+        poolDetails.noiseThresholdPercentage9 = thr9;
+        poolDetails.noiseCapDeviationPercentage9 = cap9;
+        poolDetails.noiseMaxSurgeFee9 = max9;
+        poolDetails.arbThresholdPercentage9 = thr9;
+        poolDetails.arbCapDeviationPercentage9 = cap9;
+        poolDetails.arbMaxSurgeFee9 = max9;
+        poolDetails.numTokens = 2;
 
-    // //     // 9 lane params (contract upscales to 18dp)
-    // //     locals.thr9 = 100_000_000; // 10%
-    // //     locals.cap9 = 500_000_000; // 50%
-    // //     locals.max9 = uint32(locals.maxFee / 1e9);
+        PoolSwapParams memory p;
+        p.kind = SwapKind.EXACT_IN;
+        p.indexIn = 0;
+        p.indexOut = 1;
+        p.amountGivenScaled18 = 0;
 
-    // //     HyperSurgeHookMock.ComputeSurgeFeeLocals memory computeLocals;
-    // //     computeLocals.pxIn = 1e18;
-    // //     computeLocals.pxOut = 10e18; // external price E = 10
+        // External price (priceTokenOut / priceTokenIn).
+        uint256 E = 10e18;
 
-    // //     // set both lanes the same (lane choice irrelevant for this edge)
-    // //     computeLocals.poolDetails.noiseThresholdPercentage9 = locals.thr9;
-    // //     computeLocals.poolDetails.noiseCapDeviationPercentage9 = locals.cap9;
-    // //     computeLocals.poolDetails.noiseMaxSurgeFee9 = locals.max9;
-    // //     computeLocals.poolDetails.arbThresholdPercentage9 = locals.thr9;
-    // //     computeLocals.poolDetails.arbCapDeviationPercentage9 = locals.cap9;
-    // //     computeLocals.poolDetails.arbMaxSurgeFee9 = locals.max9;
+        uint256 fee = _feeAtDeviation(p, poolDetails, staticFee, E, _convertTo18Decimals(thr9));
+        assertEq(fee, staticFee, "fee must equal static when deviation == threshold");
+    }
 
-    // //     PoolSwapParams memory p;
-    // //     p.kind = SwapKind.EXACT_IN;
-    // //     p.amountGivenScaled18 = 0;
+    function test_cfg_fee_minimalRamp_just_above_threshold() public view {
+        uint256 staticFee = 0.3e16; // 0.3%
+        uint256 maxFee = 1.2e16; // 1.2%
 
-    // //     locals.E = 10e18;
-    // //     locals.thr = uint256(locals.thr9) * 1e9; // 18dp
+        uint32 thr9 = 100_000_000; // 10%
+        uint32 cap9 = 500_000_000; // 50%
+        uint32 max9 = uint32(maxFee / 1e9);
 
-    // //     locals.fee = _feeAtDeviation(computeLocals, p, locals.staticFee, locals.E, locals.thr);
-    // //     assertEq(locals.fee, locals.staticFee, "fee must equal static when deviation == threshold");
-    // // }
+        HyperSurgeHook.PoolDetails memory poolDetails;
+        poolDetails.noiseThresholdPercentage9 = thr9;
+        poolDetails.noiseCapDeviationPercentage9 = cap9;
+        poolDetails.noiseMaxSurgeFee9 = max9;
+        poolDetails.arbThresholdPercentage9 = thr9;
+        poolDetails.arbCapDeviationPercentage9 = cap9;
+        poolDetails.arbMaxSurgeFee9 = max9;
+        poolDetails.numTokens = 2;
 
-    // struct justAboveThreshold {
-    //     uint256 staticFee;
-    //     uint256 maxFee;
-    //     uint32 thr9;
-    //     uint32 cap9;
-    //     uint32 max9;
-    //     uint256 E;
-    //     uint256 thr;
-    //     uint256 cap;
-    //     uint256 dev;
-    //     uint256 span;
-    //     uint256 ramp;
-    //     uint256 expected;
-    // }
+        PoolSwapParams memory p;
+        p.kind = SwapKind.EXACT_IN;
+        p.amountGivenScaled18 = 0;
+        p.indexIn = 0;
+        p.indexOut = 1;
 
-    // // function test_cfg_fee_minimalRamp_just_above_threshold() public view {
-    // //     justAboveThreshold memory locals;
+        uint256 oraclePrice = 10e18;
+        uint256 deviation = _convertTo18Decimals(thr9 + 1); // smallest 9dp step above threshold
+        uint256 fee = _feeAtDeviation(p, poolDetails, staticFee, oraclePrice, deviation);
 
-    // //     locals.staticFee = 30e14; // 30 bps
-    // //     locals.maxFee = 120e14; // 120 bps
+        // Expected: static + (max - static) * (dev - thr) / (cap - thr)  (div-down)
+        uint256 span = _convertTo18Decimals(cap9 - thr9);
+        uint256 ramp = ((maxFee - staticFee) * (deviation - _convertTo18Decimals(thr9))) / span;
+        uint256 expected = staticFee + ramp;
 
-    // //     locals.thr9 = 100_000_000; // 10%
-    // //     locals.cap9 = 500_000_000; // 50%
-    // //     locals.max9 = uint32(locals.maxFee / 1e9);
+        assertEq(fee, expected, "minimal ramp just above threshold");
+        assertGt(fee, staticFee, "fee > static just above threshold");
+        assertLt(fee, maxFee, "fee < max when deviation < cap");
+    }
 
-    // //     HyperSurgeHookMock.ComputeSurgeFeeLocals memory computeLocals;
-    // //     computeLocals.pxIn = 1e18;
-    // //     computeLocals.pxOut = 10e18;
+    /// 3) degenerate: max == static => always static (even outside threshold)
+    function test_cfg_fee_degenerateRamp_max_equals_static() public view {
+        uint256 staticFee = 0.45e16; // 0.45%
+        uint256 maxFee = staticFee;
 
-    // //     computeLocals.poolDetails.noiseThresholdPercentage9 = locals.thr9;
-    // //     computeLocals.poolDetails.noiseCapDeviationPercentage9 = locals.cap9;
-    // //     computeLocals.poolDetails.noiseMaxSurgeFee9 = locals.max9;
-    // //     computeLocals.poolDetails.arbThresholdPercentage9 = locals.thr9;
-    // //     computeLocals.poolDetails.arbCapDeviationPercentage9 = locals.cap9;
-    // //     computeLocals.poolDetails.arbMaxSurgeFee9 = locals.max9;
+        uint32 thr9 = 50_000_000; // 5%
+        uint32 cap9 = 250_000_000; // 25%
+        uint32 max9 = uint32(maxFee / 1e9);
 
-    // //     PoolSwapParams memory p;
-    // //     p.kind = SwapKind.EXACT_IN;
-    // //     p.amountGivenScaled18 = 0;
+        HyperSurgeHook.PoolDetails memory poolDetails;
+        poolDetails.noiseThresholdPercentage9 = thr9;
+        poolDetails.noiseCapDeviationPercentage9 = cap9;
+        poolDetails.noiseMaxSurgeFee9 = max9;
+        poolDetails.arbThresholdPercentage9 = thr9;
+        poolDetails.arbCapDeviationPercentage9 = cap9;
+        poolDetails.arbMaxSurgeFee9 = max9;
 
-    // //     locals.E = 10e18;
-    // //     locals.thr = uint256(locals.thr9) * 1e9;
-    // //     locals.cap = uint256(locals.cap9) * 1e9;
-    // //     locals.dev = (uint256(locals.thr9) + 1) * 1e9; // smallest 18dp step above threshold
+        PoolSwapParams memory p;
+        p.kind = SwapKind.EXACT_IN;
+        p.amountGivenScaled18 = 0;
+        p.indexIn = 0;
+        p.indexOut = 1;
 
-    // //     uint256 fee = _feeAtDeviation(computeLocals, p, locals.staticFee, locals.E, locals.dev);
+        uint256 oraclePrice = 10e18;
+        uint256 thr = _convertTo18Decimals(thr9);
+        uint256 cap = _convertTo18Decimals(cap9);
 
-    // //     // Expected: static + (max - static) * (dev - thr) / (cap - thr)  (div-down)
-    // //     locals.span = locals.cap - locals.thr;
-    // //     locals.ramp = ((locals.maxFee - locals.staticFee) * (locals.dev - locals.thr)) / locals.span;
-    // //     locals.expected = locals.staticFee + locals.ramp;
-
-    // //     assertEq(fee, locals.expected, "minimal ramp just above threshold");
-    // //     assertGt(fee, locals.staticFee, "fee > static just above threshold");
-    // //     assertLt(fee, locals.maxFee, "fee < max when deviation < cap");
-    // // }
-
-    // struct MaxEqualsStatic {
-    //     uint256 staticFee;
-    //     uint256 maxFee;
-    //     uint32 thr9;
-    //     uint32 cap9;
-    //     uint32 max9;
-    //     uint256 E;
-    //     uint256 thr;
-    //     uint256 cap;
-    //     uint256 devAtThr;
-    //     uint256 devMid;
-    //     uint256 devAtCap;
-    //     uint256 devBeyond;
-    // }
-
-    // /// 3) degenerate: max == static => always static (even outside threshold)
-    // function test_cfg_fee_degenerateRamp_max_equals_static() public view {
-    //     MaxEqualsStatic memory locals;
-
-    //     locals.staticFee = 45e14; // 45 bps
-    //     locals.maxFee = locals.staticFee;
-
-    //     locals.thr9 = 50_000_000; // 5%
-    //     locals.cap9 = 250_000_000; // 25%
-    //     locals.max9 = uint32(locals.maxFee / 1e9);
-
-    //     HyperSurgeHookMock.ComputeSurgeFeeLocals memory computeLocals;
-    //     computeLocals.pxIn = 1e18;
-    //     computeLocals.pxOut = 10e18;
-
-    //     computeLocals.poolDetails.noiseThresholdPercentage9 = locals.thr9;
-    //     computeLocals.poolDetails.noiseCapDeviationPercentage9 = locals.cap9;
-    //     computeLocals.poolDetails.noiseMaxSurgeFee9 = locals.max9;
-    //     computeLocals.poolDetails.arbThresholdPercentage9 = locals.thr9;
-    //     computeLocals.poolDetails.arbCapDeviationPercentage9 = locals.cap9;
-    //     computeLocals.poolDetails.arbMaxSurgeFee9 = locals.max9;
-
-    //     PoolSwapParams memory p;
-    //     p.kind = SwapKind.EXACT_IN;
-    //     p.amountGivenScaled18 = 0;
-
-    //     locals.E = 10e18;
-    //     locals.thr = uint256(locals.thr9) * 1e9;
-    //     locals.cap = uint256(locals.cap9) * 1e9;
-
-    //     locals.devAtThr = locals.thr;
-    //     locals.devMid = locals.thr + (locals.cap - locals.thr) / 2;
-    //     locals.devAtCap = locals.cap;
-    //     locals.devBeyond = locals.cap + 12345;
-
-    //     assertEq(
-    //         _feeAtDeviation(computeLocals, p, locals.staticFee, locals.E, locals.devAtThr),
-    //         locals.staticFee,
-    //         "at thr => static"
-    //     );
-    //     assertEq(
-    //         _feeAtDeviation(computeLocals, p, locals.staticFee, locals.E, locals.devMid),
-    //         locals.staticFee,
-    //         "mid => static"
-    //     );
-    //     assertEq(
-    //         _feeAtDeviation(computeLocals, p, locals.staticFee, locals.E, locals.devAtCap),
-    //         locals.staticFee,
-    //         "at cap => static"
-    //     );
-    //     assertEq(
-    //         _feeAtDeviation(computeLocals, p, locals.staticFee, locals.E, locals.devBeyond),
-    //         locals.staticFee,
-    //         "beyond cap => static"
-    //     );
-    // }
+        assertEq(_feeAtDeviation(p, poolDetails, staticFee, oraclePrice, thr), staticFee, "at thr => static");
+        assertEq(
+            _feeAtDeviation(p, poolDetails, staticFee, oraclePrice, thr + (cap - thr) / 2),
+            staticFee,
+            "mid => static"
+        );
+        assertEq(_feeAtDeviation(p, poolDetails, staticFee, oraclePrice, cap), staticFee, "at cap => static");
+        assertEq(
+            _feeAtDeviation(p, poolDetails, staticFee, oraclePrice, cap + 12345),
+            staticFee,
+            "beyond cap => static"
+        );
+    }
 
     // struct MaxBelowStatic {
     //     uint256 staticFee;
@@ -2961,30 +2892,26 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         vm.store(HyperTokenInfoPrecompile.TOKEN_INFO_PRECOMPILE_ADDRESS, slot, bytes32(uint256(sz)));
     }
 
-    // function _feeAtDeviation(
-    //     HyperSurgeHookMock.ComputeSurgeFeeLocals memory computeLocals,
-    //     PoolSwapParams memory p,
-    //     uint256 staticFee,
-    //     uint256 extPxE18,
-    //     uint256 deviation18
-    // ) internal view returns (uint256) {
-    //     // pool price P = E * (1 + deviation)
-    //     uint256 P = extPxE18 + (extPxE18 * deviation18) / 1e18;
+    function _feeAtDeviation(
+        PoolSwapParams memory p,
+        HyperSurgeHook.PoolDetails memory poolDetails,
+        uint256 staticFee,
+        uint256 extPxE18,
+        uint256 deviation18
+    ) internal view returns (uint256) {
+        // pool price P = E * (1 + deviation)
+        uint256 P = extPxE18 + extPxE18.mulDown(deviation18);
 
-    //     // Make poolPx = P using simple weights/balances:
-    //     // poolPx = (bOut * wIn) / (bIn * wOut)
-    //     computeLocals.wIn = 1e18;
-    //     computeLocals.wOut = 1e18;
-    //     computeLocals.bIn = 1e18;
-    //     computeLocals.bOut = P;
+        // Make poolPx = P using simple weights/balances:
+        // poolPx = (bOut * wIn) / (bIn * wOut)
+        uint256[] memory weights = [uint256(50e16), uint256(50e16)].toMemoryArray();
+        p.balancesScaled18 = [uint256(1e18), uint256(P)].toMemoryArray();
 
-    //     // Keep deltas zero so poolPx == poolPxBefore (no lane flip due to swap)
-    //     computeLocals.calcAmountScaled18 = 0;
-
-    //     (bool ok, uint256 fee) = hook.ComputeSurgeFee(computeLocals, p, staticFee);
-    //     assertTrue(ok, "compute ok");
-    //     return fee;
-    // }
+        // Keep deltas zero so poolPx == poolPxBefore (no lane flip due to swap) => calculatedAmount = 0
+        (bool ok, uint256 fee) = hook.ComputeSurgeFee(p, poolDetails, staticFee, weights, 0, extPxE18);
+        assertTrue(ok, "compute ok");
+        return fee;
+    }
 
     function fee_mulDown(uint256 a, uint256 b) internal pure returns (uint256) {
         return (a * b) / FEE_ONE;

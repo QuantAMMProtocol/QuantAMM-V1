@@ -310,7 +310,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // bound amountIn to strictly inside the 30% guard
         params.MAX_RATIO = 30e16; // 30% in 1e18
-        params.maxIn = (balances[p.indexIn] * params.MAX_RATIO) / 1e18;
+        params.maxIn = balances[p.indexIn].mulDown(params.MAX_RATIO);
         if (params.maxIn > 0) params.maxIn -= 1;
         p.amountGivenScaled18 = bound(amtSeed, 1, params.maxIn == 0 ? 1 : params.maxIn);
 
@@ -400,7 +400,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // bound amountOut to strictly inside the 30% guard
         params.MAX_RATIO = 30e16; // 30%
-        params.maxIn = (balances[p.indexOut] * params.MAX_RATIO) / 1e18;
+        params.maxIn = balances[p.indexOut].mulDown(params.MAX_RATIO);
         if (params.maxIn > 0) {
             params.maxIn -= 1;
         }
@@ -519,7 +519,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         p.indexOut = locals.indexOut;
 
         locals.maxRatio = 30e16; // 30% in 1e18 basis
-        locals.maxIn = (locals.balances[p.indexIn] * locals.maxRatio) / 1e18;
+        locals.maxIn = locals.balances[p.indexIn].mulDown(locals.maxRatio);
         if (locals.maxIn > 0) {
             locals.maxIn -= 1;
         }
@@ -540,8 +540,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 P;
         uint256 capDev;
         uint256 D;
-        uint256 pxIn;
-        uint256 pxOut;
+        uint256 oraclePrice;
         uint256 feeA;
         uint256 expected;
         bool ok;
@@ -573,7 +572,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.capDev = _convertTo18Decimals(poolDetails.arbCapDeviationPercentage9);
         locals.D = uint256(keccak256(abi.encode(dSeed))) % (locals.capDev + locals.capDev / 2 + 1);
 
-        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, locals.D);
+        (locals.oraclePrice) = fee_computeOraclePriceForDeviation(locals.P, locals.D);
 
         HyperSurgeHookMock mock = new HyperSurgeHookMock(
             IVault(vault),
@@ -589,14 +588,13 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
             STATIC_SWAP_FEE,
             locals.w,
             0,
-            locals.pxOut.divDown(locals.pxIn)
+            locals.oraclePrice
         );
         assertTrue(locals.ok, "compute must succeed");
 
         locals.expected = fee_expectedFeeWithParams(
             locals.P,
-            locals.pxIn,
-            locals.pxOut,
+            locals.oraclePrice,
             STATIC_SWAP_FEE,
             poolDetails.arbThresholdPercentage9,
             poolDetails.arbCapDeviationPercentage9,
@@ -615,10 +613,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 capDev;
         uint256 D1;
         uint256 D2;
-        uint256 pxIn1;
-        uint256 pxOut1;
-        uint256 pxIn2;
-        uint256 pxOut2;
+        uint256 oraclePrice1;
+        uint256 oraclePrice2;
         uint256 fee1;
         uint256 fee2;
     }
@@ -653,8 +649,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.D2 = uint256(keccak256(abi.encode(d2))) % (locals.capDev + locals.capDev / 2 + 1);
         if (locals.D2 < locals.D1) (locals.D1, locals.D2) = (locals.D2, locals.D1);
 
-        (locals.pxIn1, locals.pxOut1) = fee_localsForDeviation(locals.P, locals.D1);
-        (locals.pxIn2, locals.pxOut2) = fee_localsForDeviation(locals.P, locals.D2);
+        (locals.oraclePrice1) = fee_computeOraclePriceForDeviation(locals.P, locals.D1);
+        (locals.oraclePrice2) = fee_computeOraclePriceForDeviation(locals.P, locals.D2);
 
         HyperSurgeHookMock mock = new HyperSurgeHookMock(
             IVault(vault),
@@ -664,22 +660,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
             "fee-mono"
         );
 
-        (, locals.fee1) = mock.ComputeSurgeFee(
-            p,
-            poolDetails,
-            STATIC_SWAP_FEE,
-            locals.w,
-            0,
-            locals.pxOut1.divDown(locals.pxIn1)
-        );
-        (, locals.fee2) = mock.ComputeSurgeFee(
-            p,
-            poolDetails,
-            STATIC_SWAP_FEE,
-            locals.w,
-            0,
-            locals.pxOut2.divDown(locals.pxIn2)
-        );
+        (, locals.fee1) = mock.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, locals.w, 0, locals.oraclePrice1);
+        (, locals.fee2) = mock.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, locals.w, 0, locals.oraclePrice2);
 
         assertLe(locals.fee1, locals.fee2, "fee must be non-decreasing in deviation");
     }
@@ -694,8 +676,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 capDev;
         uint256 scaleSeed;
         uint256 D;
-        uint256 pxIn;
-        uint256 pxOut;
+        uint256 oraclePrice;
         uint256 bMin;
         uint256 baseAmt;
         uint256 fee1;
@@ -732,7 +713,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         locals.D = uint256(keccak256(abi.encode(dSeed))) % (locals.capDev + locals.capDev / 2 + 1);
 
         // External price inputs that produce the desired deviation
-        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, locals.D);
+        (locals.oraclePrice) = fee_computeOraclePriceForDeviation(locals.P, locals.D);
 
         // Scale factor k and a base amount small relative to balances to avoid overflow
         locals.scaleSeed = 1 + (uint256(scaleSeed) % 1_000_000_000); // k in [1 .. 1e9]
@@ -770,23 +751,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
             locals.baseAmt * locals.scaleSeed
         );
 
-        (, locals.fee1) = mock.ComputeSurgeFee(
-            p1,
-            poolDetails,
-            STATIC_SWAP_FEE,
-            locals.w,
-            0,
-            locals.pxOut.divDown(locals.pxIn)
-        );
-
-        (, locals.fee2) = mock.ComputeSurgeFee(
-            p2,
-            poolDetails,
-            STATIC_SWAP_FEE,
-            locals.w,
-            0,
-            locals.pxOut.divDown(locals.pxIn)
-        );
+        (, locals.fee1) = mock.ComputeSurgeFee(p1, poolDetails, STATIC_SWAP_FEE, locals.w, 0, locals.oraclePrice);
+        (, locals.fee2) = mock.ComputeSurgeFee(p2, poolDetails, STATIC_SWAP_FEE, locals.w, 0, locals.oraclePrice);
 
         // --- Branch-aware assertion (inferred) ---
         uint256 strictTol = 100; // knife-edge rounding flips
@@ -823,8 +789,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint32 cap;
         uint32 maxp;
         uint256 D;
-        uint256 pxIn;
-        uint256 pxOut;
+        uint256 oraclePrice;
         uint256 feeA;
         uint256 feeB;
         uint256 feeC;
@@ -857,7 +822,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         // Below threshold
         locals.D = _convertTo18Decimals(locals.thr) - 1;
-        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, locals.D);
+        (locals.oraclePrice) = fee_computeOraclePriceForDeviation(locals.P, locals.D);
 
         HyperSurgeHook.PoolDetails memory poolDetails;
         poolDetails.numTokens = 2;
@@ -872,32 +837,17 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         poolDetails.noiseCapDeviationPercentage9 = locals.cap - 1;
         poolDetails.noiseMaxSurgeFee9 = locals.maxp + 1;
 
-        (, locals.feeA) = mock.ComputeSurgeFee(
-            p,
-            poolDetails,
-            STATIC_SWAP_FEE,
-            locals.w,
-            0,
-            locals.pxOut.divDown(locals.pxIn)
-        );
+        (, locals.feeA) = mock.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, locals.w, 0, locals.oraclePrice);
         assertEq(locals.feeA, STATIC_SWAP_FEE, "below threshold means static fee");
 
         locals.D = (_convertTo18Decimals(locals.thr) + _convertTo18Decimals(locals.cap)) / 2;
-        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, locals.D);
+        (locals.oraclePrice) = fee_computeOraclePriceForDeviation(locals.P, locals.D);
 
-        (, locals.feeB) = mock.ComputeSurgeFee(
-            p,
-            poolDetails,
-            STATIC_SWAP_FEE,
-            locals.w,
-            0,
-            locals.pxOut.divDown(locals.pxIn)
-        );
+        (, locals.feeB) = mock.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, locals.w, 0, locals.oraclePrice);
 
         uint256 expected = fee_expectedFeeWithParams(
             locals.P,
-            locals.pxIn,
-            locals.pxOut,
+            locals.oraclePrice,
             STATIC_SWAP_FEE,
             locals.thr,
             locals.cap,
@@ -908,29 +858,15 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         // At cap and above cap
 
         uint256 Dcap = _convertTo18Decimals(locals.cap);
-        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, Dcap);
+        (locals.oraclePrice) = fee_computeOraclePriceForDeviation(locals.P, Dcap);
 
-        (, locals.feeC) = mock.ComputeSurgeFee(
-            p,
-            poolDetails,
-            STATIC_SWAP_FEE,
-            locals.w,
-            0,
-            locals.pxOut.divDown(locals.pxIn)
-        );
+        (, locals.feeC) = mock.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, locals.w, 0, locals.oraclePrice);
         assertEq(locals.feeC, _convertTo18Decimals(locals.maxp), "at cap means max fee");
 
         uint256 Dbeyond = Dcap + 1;
-        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, Dbeyond);
+        (locals.oraclePrice) = fee_computeOraclePriceForDeviation(locals.P, Dbeyond);
 
-        (, locals.feeD) = mock.ComputeSurgeFee(
-            p,
-            poolDetails,
-            STATIC_SWAP_FEE,
-            locals.w,
-            0,
-            locals.pxOut.divDown(locals.pxIn)
-        );
+        (, locals.feeD) = mock.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, locals.w, 0, locals.oraclePrice);
         assertEq(locals.feeD, _convertTo18Decimals(locals.maxp), "above cap means clamped to max fee");
     }
 
@@ -946,8 +882,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         uint256 P;
         uint256 capDev;
         uint256 D;
-        uint256 pxIn;
-        uint256 pxOut;
+        uint256 oraclePrice;
         uint256 feeIn;
         uint256 feeOut;
     }
@@ -979,7 +914,7 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         locals.capDev = _convertTo18Decimals(locals.cap);
         locals.D = uint256(keccak256(abi.encode(dSeed))) % (locals.capDev + locals.capDev / 2 + 1);
-        (locals.pxIn, locals.pxOut) = fee_localsForDeviation(locals.P, locals.D);
+        (locals.oraclePrice) = fee_computeOraclePriceForDeviation(locals.P, locals.D);
 
         HyperSurgeHookMock mock = new HyperSurgeHookMock(
             IVault(vault),
@@ -1006,26 +941,12 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         poolDetails.arbCapDeviationPercentage9 = locals.cap - 1;
         poolDetails.arbMaxSurgeFee9 = locals.maxp + 1;
 
-        (, locals.feeIn) = mock.ComputeSurgeFee(
-            pIn,
-            poolDetails,
-            STATIC_SWAP_FEE,
-            locals.w,
-            0,
-            locals.pxOut.divDown(locals.pxIn)
-        );
+        (, locals.feeIn) = mock.ComputeSurgeFee(pIn, poolDetails, STATIC_SWAP_FEE, locals.w, 0, locals.oraclePrice);
 
         // EXACT_OUT
         PoolSwapParams memory pOut = _createPoolSwapParams(SwapKind.EXACT_OUT, locals.b, locals.i, locals.j, 0);
 
-        (, locals.feeOut) = mock.ComputeSurgeFee(
-            pOut,
-            poolDetails,
-            STATIC_SWAP_FEE,
-            locals.w,
-            0,
-            locals.pxOut.divDown(locals.pxIn)
-        );
+        (, locals.feeOut) = mock.ComputeSurgeFee(pOut, poolDetails, STATIC_SWAP_FEE, locals.w, 0, locals.oraclePrice);
 
         assertEq(locals.feeIn, locals.feeOut, "with equal lane params, kind should not change math result");
     }
@@ -1221,184 +1142,155 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
         );
     }
 
-    // struct MaxBelowStatic {
-    //     uint256 staticFee;
-    //     uint256 maxFee;
-    //     uint32 thr9;
-    //     uint32 cap9;
-    //     uint32 max9;
-    //     uint256 E;
-    //     uint256 thr;
-    //     uint256 cap;
-    //     uint256 devMid;
-    //     uint256 feeMid;
-    //     uint256 span;
-    //     uint256 ramp;
-    //     uint256 expected;
-    // }
+    function test_fee_misconfig_maxBelowStatic_usingMockWrapper() public {
+        // Misconfig: max < static
+        uint256 staticFee = 0.8e16; // 0.8%
+        uint256 maxFee = 0.2e16; // 0.2% -> lower than static
+        uint32 thr9 = 100_000_000; // 10%
+        uint32 cap9 = 300_000_000; // 30%
+        uint32 max9 = uint32(maxFee / 1e9);
 
-    // function test_fee_misconfig_maxBelowStatic_usingMockWrapper() public {
-    //     MaxBelowStatic memory locals;
+        // Local mock (don’t rely on global `hook`)
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(
+            IVault(vault),
+            _convertTo18Decimals(max9),
+            _convertTo18Decimals(thr9),
+            _convertTo18Decimals(cap9),
+            "misconfig-maxBelowStatic"
+        );
 
-    //     // Misconfig: max < static
-    //     locals.staticFee = 80e14; // 80 bps (1e18 scale)
-    //     locals.maxFee = 20e14; // 20 bps (1e18 scale) -> lower than static
-    //     locals.thr9 = 100_000_000; // 10% in 1e9
-    //     locals.cap9 = 300_000_000; // 30% in 1e9
-    //     locals.max9 = uint32(locals.maxFee / 1e9);
+        uint256 oraclePrice = 10e18;
 
-    //     // Local mock (don’t rely on global `hook`)
-    //     HyperSurgeHookMock mock = new HyperSurgeHookMock(
-    //         IVault(vault),
-    //         _convertTo18Decimals(locals.max9),
-    //         _convertTo18Decimals(locals.thr9),
-    //         _convertTo18Decimals(locals.cap9),
-    //         "misconfig-maxBelowStatic"
-    //     );
+        // Set BOTH lanes to the same (misconfigured) params so lane choice doesn't matter here.
+        HyperSurgeHook.PoolDetails memory poolDetails;
+        poolDetails.noiseThresholdPercentage9 = thr9;
+        poolDetails.noiseCapDeviationPercentage9 = cap9;
+        poolDetails.noiseMaxSurgeFee9 = max9;
+        poolDetails.arbThresholdPercentage9 = thr9;
+        poolDetails.arbCapDeviationPercentage9 = cap9;
+        poolDetails.arbMaxSurgeFee9 = max9;
+        poolDetails.numTokens = 2;
 
-    //     // Base inputs used for both sub-tests
-    //     locals.E = 10e18; // external price
-    //     locals.thr = uint256(locals.thr9) * 1e9; // 18dp threshold
-    //     locals.cap = uint256(locals.cap9) * 1e9; // 18dp cap
+        // ---------- (a) dev >= cap  -> revert (underflow in mock ramp) ----------
+        uint256 deviationAboveCap = _convertTo18Decimals(cap9) + 999; // strictly beyond cap
 
-    //     HyperSurgeHookMock.ComputeSurgeFeeLocals memory base;
-    //     base.pxIn = 1e18;
-    //     base.pxOut = locals.E;
+        // `amountGivenScaled18 = 0` to keep balances-based price exact
+        PoolSwapParams memory p = _createPoolSwapParams(
+            SwapKind.EXACT_IN,
+            [FixedPoint.ONE, oraclePrice.mulDown(FixedPoint.ONE + deviationAboveCap)].toMemoryArray(),
+            0,
+            1,
+            0
+        );
+        uint256[] memory weights = [uint256(50e16), uint256(50e16)].toMemoryArray();
 
-    //     // Set BOTH lanes to the same (misconfigured) params so lane choice doesn't matter here.
-    //     base.poolDetails.noiseThresholdPercentage9 = locals.thr9;
-    //     base.poolDetails.noiseCapDeviationPercentage9 = locals.cap9;
-    //     base.poolDetails.noiseMaxSurgeFee9 = locals.max9;
-    //     base.poolDetails.arbThresholdPercentage9 = locals.thr9;
-    //     base.poolDetails.arbCapDeviationPercentage9 = locals.cap9;
-    //     base.poolDetails.arbMaxSurgeFee9 = locals.max9;
+        vm.expectRevert(stdError.arithmeticError);
+        mock.ComputeSurgeFee(p, poolDetails, staticFee, weights, 0, oraclePrice);
 
-    //     PoolSwapParams memory p;
-    //     p.kind = SwapKind.EXACT_IN;
-    //     p.amountGivenScaled18 = 0; // keep balances-based price exact
-    //     p.balancesScaled18 = new uint256[](2);
-    //     p.balancesScaled18[0] = 1e18;
-    //     p.balancesScaled18[1] = locals.E;
+        // ---------- (b) thr < dev < cap  -> revert (underflow in mock ramp) ----------
+        uint256 deviationBetweenThrAndCap = _convertTo18Decimals(thr9 + (cap9 - thr9) / 3); // strictly between thr & cap
+        p = _createPoolSwapParams(
+            SwapKind.EXACT_IN,
+            [FixedPoint.ONE, oraclePrice.mulDown(FixedPoint.ONE + deviationBetweenThrAndCap)].toMemoryArray(),
+            0,
+            1,
+            0
+        );
 
-    //     // Reused working struct
-    //     HyperSurgeHookMock.ComputeSurgeFeeLocals memory T;
+        vm.expectRevert(stdError.arithmeticError);
+        mock.ComputeSurgeFee(p, poolDetails, staticFee, weights, 0, oraclePrice);
+    }
 
-    //     // ---------- (a) dev >= cap  -> revert (underflow in mock ramp) ----------
-    //     uint256 dev = locals.cap + 999; // strictly beyond cap
-    //     uint256 P = locals.E + (locals.E * dev) / 1e18; // P = E * (1 + dev)
-    //     T = base;
-    //     T.wIn = 1e18;
-    //     T.wOut = 1e18;
-    //     T.bIn = 1e18;
-    //     T.bOut = P;
-    //     T.calcAmountScaled18 = 0;
+    struct OutsideDynamicAfterLocals {
+        uint256 E;
+        uint32 noiseThr9;
+        uint32 noiseCap9;
+        uint32 noiseMax9;
+        uint32 arbThr9;
+        uint32 arbCap9;
+        uint32 arbMax9;
+        uint256 thr;
+        uint256 cap;
+        uint256 deviationBefore;
+        uint256 price_before;
+        uint256 price_after;
+        uint256 expected;
+        uint256 dyn;
+    }
 
-    //     vm.expectRevert(stdError.arithmeticError);
-    //     mock.ComputeSurgeFee(T, p, locals.staticFee);
+    /// 1) Noise: starts outside threshold, deviation worsens → NOISE lane, dynamic fee based on **after** deviation.
+    function testFuzz_logic_noise_worsens_outside_dynamic_after(
+        uint256 eSeed,
+        uint32 noiseThrSeed,
+        uint32 noiseCapSeed,
+        uint32 noiseMaxSeed,
+        uint64 amtSeed
+    ) public {
+        OutsideDynamicAfterLocals memory locals;
 
-    //     // ---------- (b) thr < dev < cap  -> revert (underflow in mock ramp) ----------
-    //     dev = locals.thr + (locals.cap - locals.thr) / 3; // strictly between thr & cap
-    //     P = locals.E + (locals.E * dev) / 1e18;
-    //     T = base;
-    //     T.wIn = 1e18;
-    //     T.wOut = 1e18;
-    //     T.bIn = 1e18;
-    //     T.bOut = P;
-    //     T.calcAmountScaled18 = 0;
+        // --- Fuzz + bounds ---
+        uint256 oraclePrice = bound(eSeed, 1e16, 1e24);
+        locals.noiseThr9 = uint32(bound(noiseThrSeed, 1, 900_000_000 - 1));
+        locals.noiseCap9 = uint32(bound(noiseCapSeed, locals.noiseThr9 + 1, 1_000_000_000));
+        locals.noiseMax9 = uint32(bound(noiseMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
+        // ARB lane (unused here, but keep distinct)
+        locals.arbThr9 = 1_000_000;
+        locals.arbCap9 = 300_000_000;
+        locals.arbMax9 = 50_000_000;
 
-    //     vm.expectRevert(stdError.arithmeticError);
-    //     mock.ComputeSurgeFee(T, p, locals.staticFee);
-    // }
+        locals.thr = _convertTo18Decimals(locals.noiseThr9);
+        locals.cap = _convertTo18Decimals(locals.noiseCap9);
+        locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3; // strictly outside
 
-    // struct OutsideDynamicAfterLocals {
-    //     uint256 E;
-    //     uint32 noiseThr9;
-    //     uint32 noiseCap9;
-    //     uint32 noiseMax9;
-    //     uint32 arbThr9;
-    //     uint32 arbCap9;
-    //     uint32 arbMax9;
-    //     uint256 thr;
-    //     uint256 cap;
-    //     uint256 deviationBefore;
-    //     uint256 price_before;
-    //     uint256 price_after;
-    //     HyperSurgeHookMock.ComputeSurgeFeeLocals comp;
-    //     PoolSwapParams p;
-    //     uint256 expected;
-    //     uint256 dyn;
-    // }
+        // Start BELOW E: price_before = E * (1 - deviationBefore)
+        locals.price_before = oraclePrice - (oraclePrice * locals.deviationBefore) / 1e18;
 
-    // /// 1) Noise: starts outside threshold, deviation worsens → NOISE lane, dynamic fee based on **after** deviation.
-    // function testFuzz_logic_noise_worsens_outside_dynamic_after(
-    //     uint256 eSeed,
-    //     uint32 noiseThrSeed,
-    //     uint32 noiseCapSeed,
-    //     uint32 noiseMaxSeed,
-    //     uint64 amtSeed
-    // ) public {
-    //     OutsideDynamicAfterLocals memory locals;
+        // Build compute locals + swap that worsens deviation (EXACT_IN; calc=0 → P decreases further)
+        uint256[] memory weights = [uint256(50e16), uint256(50e16)].toMemoryArray();
+        uint256[] memory balancesScaled18 = [FixedPoint.ONE, locals.price_before].toMemoryArray();
 
-    //     // --- Fuzz + bounds ---
-    //     locals.E = bound(eSeed, 1e16, 1e24); // pxOut
-    //     locals.noiseThr9 = uint32(bound(noiseThrSeed, 1, 900_000_000 - 1));
-    //     locals.noiseCap9 = uint32(bound(noiseCapSeed, locals.noiseThr9 + 1, 1_000_000_000));
-    //     locals.noiseMax9 = uint32(bound(noiseMaxSeed, uint32(STATIC_SWAP_FEE / 1e9), 1_000_000_000));
-    //     // ARB lane (unused here, but keep distinct)
-    //     locals.arbThr9 = 1_000_000;
-    //     locals.arbCap9 = 300_000_000;
-    //     locals.arbMax9 = 50_000_000;
+        HyperSurgeHook.PoolDetails memory poolDetails;
+        poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
+        poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
+        poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
+        poolDetails.arbThresholdPercentage9 = locals.arbThr9;
+        poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
+        poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+        poolDetails.numTokens = 2;
 
-    //     locals.thr = uint256(locals.noiseThr9) * 1e9;
-    //     locals.cap = uint256(locals.noiseCap9) * 1e9;
-    //     locals.deviationBefore = locals.thr + (locals.cap - locals.thr) / 3; // strictly outside
+        // ensure deviation increases *measurably* in Q18 (avoid 1-wei changes)
+        PoolSwapParams memory p = _createPoolSwapParams(
+            SwapKind.EXACT_IN,
+            balancesScaled18,
+            0,
+            1,
+            bound(uint256(amtSeed), 1e9, 5e17)
+        );
 
-    //     // Start BELOW E: price_before = E * (1 - deviationBefore)
-    //     locals.price_before = locals.E - (locals.E * locals.deviationBefore) / 1e18;
+        // Expected (NOISE) uses AFTER deviation: price_after = price_before / (1 + x)
+        locals.price_after = locals.price_before.divDown(FixedPoint.ONE + p.amountGivenScaled18);
+        locals.expected = fee_expectedFeeWithParams(
+            locals.price_after,
+            oraclePrice,
+            STATIC_SWAP_FEE,
+            locals.noiseThr9,
+            locals.noiseCap9,
+            locals.noiseMax9
+        );
 
-    //     // Build compute locals + swap that worsens deviation (EXACT_IN; calc=0 → P decreases further)
-    //     locals.comp.wIn = 1e18;
-    //     locals.comp.wOut = 1e18;
-    //     locals.comp.bIn = 1e18;
-    //     locals.comp.bOut = locals.price_before;
-    //     locals.comp.pxIn = 1e18;
-    //     locals.comp.pxOut = locals.E;
-    //     locals.comp.calcAmountScaled18 = 0;
-    //     locals.comp.poolDetails.noiseThresholdPercentage9 = locals.noiseThr9;
-    //     locals.comp.poolDetails.noiseCapDeviationPercentage9 = locals.noiseCap9;
-    //     locals.comp.poolDetails.noiseMaxSurgeFee9 = locals.noiseMax9;
-    //     locals.comp.poolDetails.arbThresholdPercentage9 = locals.arbThr9;
-    //     locals.comp.poolDetails.arbCapDeviationPercentage9 = locals.arbCap9;
-    //     locals.comp.poolDetails.arbMaxSurgeFee9 = locals.arbMax9;
+        HyperSurgeHookMock mock = new HyperSurgeHookMock(
+            IVault(vault),
+            _convertTo18Decimals(locals.arbMax9),
+            _convertTo18Decimals(locals.arbThr9),
+            _convertTo18Decimals(locals.arbCap9),
+            "logic-1"
+        );
 
-    //     locals.p.kind = SwapKind.EXACT_IN;
-    //     // ensure deviation increases *measurably* in Q18 (avoid 1-wei changes)
-    //     locals.p.amountGivenScaled18 = bound(uint256(amtSeed), 1e9, 5e17); // [1e9, 0.5e18]
+        (, locals.dyn) = mock.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, weights, 0, oraclePrice);
 
-    //     // Expected (NOISE) uses AFTER deviation: price_after = price_before / (1 + x)
-    //     locals.price_after = (locals.price_before * 1e18) / (1e18 + locals.p.amountGivenScaled18);
-    //     locals.expected = fee_expectedFeeWithParams(
-    //         locals.price_after,
-    //         locals.comp.pxIn,
-    //         locals.comp.pxOut,
-    //         STATIC_SWAP_FEE,
-    //         locals.noiseThr9,
-    //         locals.noiseCap9,
-    //         locals.noiseMax9
-    //     );
-
-    //     HyperSurgeHookMock mock = new HyperSurgeHookMock(
-    //         IVault(vault),
-    //         _convertTo18Decimals(locals.arbMax9),
-    //         _convertTo18Decimals(locals.arbThr9),
-    //         _convertTo18Decimals(locals.arbCap9),
-    //         "logic-1"
-    //     );
-    //     (, locals.dyn) = mock.ComputeSurgeFee(locals.comp, locals.p, STATIC_SWAP_FEE);
-
-    //     assertEq(locals.dyn, locals.expected, "noise path must use AFTER deviation for dynamic fee");
-    //     assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee >= static");
-    // }
+        assertEq(locals.dyn, locals.expected, "noise path must use AFTER deviation for dynamic fee");
+        assertGe(locals.dyn, STATIC_SWAP_FEE, "dynamic fee >= static");
+    }
 
     // struct BetterStillOutsideLocals {
     //     uint256 E;
@@ -2976,9 +2868,8 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
     }
 
     // Choose deviation D, then set external px so that extPx = P / (1 + D)
-    function fee_localsForDeviation(uint256 P, uint256 D) internal pure returns (uint256 pxIn, uint256 pxOut) {
-        pxIn = FEE_ONE;
-        pxOut = fee_divDown(P, FEE_ONE + D);
+    function fee_computeOraclePriceForDeviation(uint256 P, uint256 deviation) internal pure returns (uint256) {
+        return P.divDown(FixedPoint.ONE + deviation);
     }
 
     function _convertTo18Decimals(uint32 valueScaled9) internal pure returns (uint256) {
@@ -2988,15 +2879,13 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
     // Expected fee (exact same rounding & clamping as the hook)
     function fee_expectedFeeWithParams(
         uint256 poolPx,
-        uint256 pxIn,
-        uint256 pxOut,
+        uint256 oraclePrice,
         uint256 staticSwapFee,
         uint32 thresholdPPM9,
         uint32 capDevPPM9,
         uint32 maxFeePPM9
     ) internal pure returns (uint256) {
-        uint256 extPx = fee_divDown(pxOut, pxIn);
-        uint256 deviation = fee_relAbsDiff(poolPx, extPx);
+        uint256 deviation = fee_relAbsDiff(poolPx, oraclePrice);
 
         uint256 threshold = _convertTo18Decimals(thresholdPPM9);
         uint256 capDev = _convertTo18Decimals(capDevPPM9);

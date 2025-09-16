@@ -95,7 +95,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
                            Hooks   
      **************************************************/
 
-    ///@inheritdoc IHooks
+    /// @inheritdoc IHooks
     function getHookFlags() public pure override returns (HookFlags memory hookFlags) {
         hookFlags.shouldCallComputeDynamicSwapFee = true;
         hookFlags.shouldCallAfterAddLiquidity = true;
@@ -263,7 +263,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         emit TokenPriceConfiguredIndex(pool, tokenIndex, tempCfg.pairIndex, hlTokenIdx, tempCfg.sz);
     }
 
-    ///@inheritdoc IHyperSurgeHook
+    /// @inheritdoc IHyperSurgeHook
     function setMaxSurgeFeePercentage(
         address pool,
         uint256 newMaxSurgeFeePercentageScaled18,
@@ -286,7 +286,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         emit MaxSurgeFeePercentageChanged(msg.sender, pool, newMaxSurgeFeePercentageScaled18, tradeType);
     }
 
-    ///@inheritdoc IHyperSurgeHook
+    /// @inheritdoc IHyperSurgeHook
     function setSurgeThresholdPercentage(
         address pool,
         uint256 newThresholdPercentageScaled18,
@@ -367,7 +367,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
     }
 
-    ///@inheritdoc IHyperSurgeHook
+    /// @inheritdoc IHyperSurgeHook
     function getMaxSurgeFeePercentage(address pool, TradeType tradeType) external view override returns (uint256) {
         if (tradeType == TradeType.ARBITRAGE) {
             return _convertTo18Decimals(_poolCfg[pool].details.arbMaxSurgeFee9);
@@ -376,7 +376,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
     }
 
-    ///@inheritdoc IHyperSurgeHook
+    /// @inheritdoc IHyperSurgeHook
     function getCapDeviationPercentage(address pool, TradeType tradeType) external view override returns (uint256) {
         if (tradeType == TradeType.ARBITRAGE) {
             return _convertTo18Decimals(_poolCfg[pool].details.arbCapDeviationPercentage9);
@@ -385,7 +385,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
     }
 
-    ///@inheritdoc IHyperSurgeHook
+    /// @inheritdoc IHyperSurgeHook
     function getTokenPriceConfigIndex(
         address pool,
         uint8 tokenIndex
@@ -394,7 +394,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         return (cfg.pairIndex, _divisorFromSz(cfg.sz));
     }
 
-    ///@inheritdoc IHyperSurgeHook
+    /// @inheritdoc IHyperSurgeHook
     function getTokenPriceConfigs(
         address pool
     ) external view override returns (uint32[] memory pairIndexArr, uint32[] memory priceDivisorArr) {
@@ -410,22 +410,22 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
     }
 
-    ///@inheritdoc IHyperSurgeHook
+    /// @inheritdoc IHyperSurgeHook
     function getDefaultMaxSurgeFeePercentage() external view override returns (uint256) {
         return _defaultMaxSurgeFeePercentage18;
     }
 
-    ///@inheritdoc IHyperSurgeHook
+    /// @inheritdoc IHyperSurgeHook
     function getDefaultSurgeThresholdPercentage() external view override returns (uint256) {
         return _defaultThresholdPercentage18;
     }
 
-    ///@inheritdoc IHyperSurgeHook
+    /// @inheritdoc IHyperSurgeHook
     function getDefaultCapDeviationPercentage() external view override returns (uint256) {
         return _defaultCapDeviationPercentage18;
     }
 
-    ///@inheritdoc IHyperSurgeHook
+    /// @inheritdoc IHyperSurgeHook
     function getNumTokens(address pool) external view override returns (uint8) {
         return _poolCfg[pool].details.numTokens;
     }
@@ -707,12 +707,12 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         return (priceDeviationAfter > priceDeviationBefore) && (priceDeviationAfter > surgeThreshold);
     }
 
-    ///@notice Converts a 9 decimal places fixed point number to 18 decimal places.
+    /// @notice Converts a 9 decimal places fixed point number to 18 decimal places.
     function _convertTo18Decimals(uint32 valueScaled9) internal pure returns (uint256) {
         return uint256(valueScaled9) * 1e9;
     }
 
-    ///@notice Converts a 18 decimal places fixed point number to 9 decimal places.
+    /// @notice Converts a 18 decimal places fixed point number to 9 decimal places.
     function _safeConvertTo9Decimals(uint256 valueScaled18) internal pure returns (uint32) {
         return (valueScaled18 / 1e9).toUint32();
     }

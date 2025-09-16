@@ -208,11 +208,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         _setTokenPriceConfigIndex(pool, tokenIndex, hlPairIdx, hlTokenIdx, details);
     }
 
-    struct SetBatchConfigs {
-        TokenPriceCfg tempCfg;
-        uint256 i;
-    }
-
     /// @notice Batch version (indices).
     /// @param pool the pool address
     /// @param tokenIndices the indices of the token configs being changed
@@ -224,14 +219,13 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint32[] calldata hlTokenIdx
     ) external onlySwapFeeManagerOrGovernance(pool) {
         PoolDetails storage detail = _poolCfg[pool].details;
-        SetBatchConfigs memory cfg;
 
         if (tokenIndices.length != pairIdx.length) {
             revert InvalidArrayLengths();
         }
 
-        for (cfg.i = 0; cfg.i < tokenIndices.length; ++cfg.i) {
-            _setTokenPriceConfigIndex(pool, tokenIndices[cfg.i], pairIdx[cfg.i], hlTokenIdx[cfg.i], detail);
+        for (uint256 i = 0; i < tokenIndices.length; ++i) {
+            _setTokenPriceConfigIndex(pool, tokenIndices[i], pairIdx[i], hlTokenIdx[i], detail);
         }
     }
 

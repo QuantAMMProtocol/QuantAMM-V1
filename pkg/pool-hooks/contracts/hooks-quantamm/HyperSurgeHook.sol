@@ -193,11 +193,13 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
                            Setters   
      **************************************************/
 
-    /// @notice Configure a single token’s Hyperliquid mapping for a given pool by token index (0..7).
-    /// @param pool The pool address to configure.
-    /// @param tokenIndex The balancer index of the token to configure (0..7).
-    /// @param hlPairIdx the index of the pair being set
-    /// @param hlTokenIdx the index of the token being set
+    /**
+     * @notice Configure a single token’s Hyperliquid mapping for a given pool by token index (0..7).
+     * @param pool The pool address to configure.
+     * @param tokenIndex The balancer index of the token to configure (0..7).
+     * @param hlPairIdx the index of the pair being set
+     * @param hlTokenIdx the index of the token being set
+     */
     function setTokenPriceConfigIndex(
         address pool,
         uint8 tokenIndex,
@@ -208,10 +210,13 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         _setTokenPriceConfigIndex(pool, tokenIndex, hlPairIdx, hlTokenIdx, details);
     }
 
-    /// @notice Batch version (indices).
-    /// @param pool the pool address
-    /// @param tokenIndices the indices of the token configs being changed
-    /// @param pairIdx the index of the pair being changed
+    /**
+     * @notice Batch version (indices).
+     * @param pool the pool address
+     * @param tokenIndices the indices of the token configs being changed
+     * @param pairIdx the index of the pair being changed
+     * @param hlTokenIdx the index of the token being set
+     */
     function setTokenPriceConfigBatchIndex(
         address pool,
         uint8[] calldata tokenIndices,
@@ -264,7 +269,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         address pool,
         uint256 newMaxSurgeFeePercentageScaled18,
         TradeType tradeType
-    ) external override onlySwapFeeManagerOrGovernance(pool) {
+    ) external override onlySwapFeeManagerOrGovernance(pool) ensureValidPercentage(newMaxSurgeFeePercentageScaled18) {
         _setMaxSurgeFeePercentage(pool, newMaxSurgeFeePercentageScaled18, tradeType);
     }
 
@@ -272,7 +277,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         address pool,
         uint256 newMaxSurgeFeePercentageScaled18,
         TradeType tradeType
-    ) internal ensureValidPercentage(newMaxSurgeFeePercentageScaled18) {
+    ) internal {
         if (tradeType == TradeType.ARBITRAGE) {
             _poolCfg[pool].details.arbMaxSurgeFee9 = _safeConvertTo9Decimals(newMaxSurgeFeePercentageScaled18);
         } else {
@@ -287,7 +292,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         address pool,
         uint256 newThresholdPercentageScaled18,
         TradeType tradeType
-    ) external override onlySwapFeeManagerOrGovernance(pool) {
+    ) external override onlySwapFeeManagerOrGovernance(pool) ensureValidPercentage(newThresholdPercentageScaled18) {
         _setSurgeThresholdPercentage(pool, newThresholdPercentageScaled18, tradeType);
     }
 
@@ -295,7 +300,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         address pool,
         uint256 newThresholdPercentageScaled18,
         TradeType tradeType
-    ) internal ensureValidPercentage(newThresholdPercentageScaled18) {
+    ) internal {
         uint256 capDeviationPercentageScaled18;
         PoolDetails memory poolDetails = _poolCfg[pool].details;
         if (tradeType == TradeType.ARBITRAGE) {
@@ -321,7 +326,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         address pool,
         uint256 newCapDeviationPercentageScaled18,
         TradeType tradeType
-    ) external override onlySwapFeeManagerOrGovernance(pool) {
+    ) external override onlySwapFeeManagerOrGovernance(pool) ensureValidPercentage(newCapDeviationPercentageScaled18) {
         _setCapDeviationPercentage(pool, newCapDeviationPercentageScaled18, tradeType);
     }
 
@@ -329,7 +334,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         address pool,
         uint256 newCapDeviationPercentageScaled18,
         TradeType tradeType
-    ) internal ensureValidPercentage(newCapDeviationPercentageScaled18) {
+    ) internal {
         uint256 thresholdPercentageScaled18;
         PoolDetails memory poolDetails = _poolCfg[pool].details;
         if (tradeType == TradeType.ARBITRAGE) {
@@ -440,27 +445,27 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         }
 
         (
-            uint256 deviation18,
-            uint256 capDevPct18,
-            uint256 maxPct18,
-            uint256 threshold18
+            uint256 deviationScaled18,
+            uint256 capDeviationPercentageScaled18,
+            uint256 maxSurgeFeeScaled18,
+            uint256 thresholdScaled18
         ) = _computeDeviationAndSelectPoolDetails(params, weights, calculatedAmountScaled18, oraclePrice, poolDetails);
 
-        if (deviation18 <= threshold18) {
+        if (deviationScaled18 <= thresholdScaled18) {
             return (true, staticSwapFee);
         }
 
-        uint256 span = capDevPct18 - threshold18; // > 0 by fallback above
-        uint256 norm = (deviation18 - threshold18).divDown(span);
+        uint256 span = capDeviationPercentageScaled18 - thresholdScaled18; // > 0 by fallback above
+        uint256 norm = (deviationScaled18 - thresholdScaled18).divDown(span);
 
         if (norm > FixedPoint.ONE) {
             norm = FixedPoint.ONE;
         }
 
-        uint256 increment = (maxPct18 - staticSwapFee).mulDown(norm);
-        uint256 surgeFee18 = staticSwapFee + increment;
+        uint256 increment = (maxSurgeFeeScaled18 - staticSwapFee).mulDown(norm);
+        uint256 surgeFeeScaled18 = staticSwapFee + increment;
 
-        return (true, surgeFee18);
+        return (true, surgeFeeScaled18);
     }
 
     function _computeDeviationAndSelectPoolDetails(
@@ -473,13 +478,13 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         internal
         pure
         returns (
-            uint256 deviation18,
+            uint256 deviationScaled18,
             uint256 capDeviationScaled18,
             uint256 maxSurgeFeeScaled18,
             uint256 thresholdScaled18
         )
     {
-        uint256 deviationBefore18;
+        uint256 deviationBeforeScaled18;
         {
             uint256 poolPriceBefore = _pairSpotFromBalancesWeights(
                 params.balancesScaled18,
@@ -487,7 +492,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
                 params.indexIn,
                 params.indexOut
             );
-            deviationBefore18 = _relAbsDiff(poolPriceBefore, oraclePrice);
+            deviationBeforeScaled18 = _relAbsDiff(poolPriceBefore, oraclePrice);
         }
 
         uint256[] memory newBalancesScaled18 = new uint256[](params.balancesScaled18.length);
@@ -511,11 +516,11 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
                 params.indexIn,
                 params.indexOut
             );
-            deviation18 = _relAbsDiff(poolPriceAfter, oraclePrice); // |pool - ext| / ext
+            deviationScaled18 = _relAbsDiff(poolPriceAfter, oraclePrice); // |pool - ext| / ext
         }
 
         // Check if the swap is a noise (deviation is worsening) or an arbitrage (deviation is improving).
-        if (deviation18 > deviationBefore18) {
+        if (deviationScaled18 > deviationBeforeScaled18) {
             // Deviation is worsening, use noise details.
             capDeviationScaled18 = _convertTo18Decimals(poolDetails.noiseCapDeviationPercentage9);
             maxSurgeFeeScaled18 = _convertTo18Decimals(poolDetails.noiseMaxSurgeFee9);
@@ -531,7 +536,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             // decreases the closer you get to market price, another arb opportunity presents itself once the first arb
             // is taken. This means a large fee != a large no arb region and the pool stays close to market. For more
             // information, check the HyperSurgeHook-README.md file.
-            deviation18 = deviationBefore18;
+            deviationScaled18 = deviationBeforeScaled18;
         }
     }
 
@@ -609,9 +614,15 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256 priceDivisor;
     }
 
-    /// @dev Computes the pool-wide oracle deviation as the MAX pairwise deviation
-    ///      across all token pairs (i<j): |P_pool(i->j) - P_ext(i->j)| / P_ext(i->j).
-    ///      Uses the same spot & external price conventions as the swap-fee compute.
+    /**
+     * @dev Computes the pool-wide oracle deviation as the MAX pairwise deviation across all token pairs (i<j):
+     * |P_pool(i->j) - P_ext(i->j)| / P_ext(i->j). Uses the same spot & external price conventions as the swap-fee
+     * compute.
+     *
+     * @param pool The pool address
+     * @param balancesScaled18 The balances of the pool
+     * @param w The weights of the pool
+     */
     function _computeOracleDeviationPct(
         address pool,
         uint256[] memory balancesScaled18,

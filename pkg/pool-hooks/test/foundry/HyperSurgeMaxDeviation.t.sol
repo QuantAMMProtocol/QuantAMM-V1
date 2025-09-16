@@ -773,6 +773,7 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         locals.oraclePrice = fee_computeOraclePriceForDeviation(locals.P, locals.D);
 
         HyperSurgeHook.PoolDetails memory poolDetails = _getDefaultPoolDetails();
+        poolDetails.numTokens = locals.n;
 
         PoolSwapParams memory p;
         p.kind = SwapKind.EXACT_IN;
@@ -785,16 +786,11 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
 
         locals.k = 1 + (uint256(scaleSeed) % 1_000_000_000); // [1 .. 1e9]
 
-        p.balancesScaled18 = [locals.b[locals.i] * locals.k, locals.b[locals.j] * locals.k].toMemoryArray();
+        for (uint256 bl = 0; bl < locals.n; bl++) {
+            p.balancesScaled18[bl] = p.balancesScaled18[bl] * locals.k;
+        }
 
-        (, locals.fee2) = hook.ComputeSurgeFee(
-            p,
-            poolDetails,
-            STATIC_SWAP_FEE,
-            [locals.w[locals.i] * locals.k, locals.w[locals.j] * locals.k].toMemoryArray(),
-            0,
-            locals.oraclePrice
-        );
+        (, locals.fee2) = hook.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, locals.w, 0, locals.oraclePrice);
 
         assertApproxEqAbs(locals.fee1, locals.fee2, 1, "fee must be invariant to balance scaling");
     }

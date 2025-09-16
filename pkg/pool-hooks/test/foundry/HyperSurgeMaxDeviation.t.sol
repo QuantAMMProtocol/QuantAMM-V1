@@ -444,12 +444,13 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
             locals.oraclePrice
         );
         // Orientation B (j -> i)
-        p.balancesScaled18 = [p.balancesScaled18[1], p.balancesScaled18[0]].toMemoryArray();
+        p.indexIn = locals.j;
+        p.indexOut = locals.i;
         (locals.okB, locals.feeB) = hook.ComputeSurgeFee(
             p,
             poolDetails,
             STATIC_SWAP_FEE,
-            [locals.w[1], locals.w[0]].toMemoryArray(),
+            locals.w,
             0,
             FixedPoint.ONE.divDown(locals.oraclePrice)
         );
@@ -460,10 +461,10 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
 
         // Compute the swapped pool spot with the SAME rounding (don’t assume 1/P)
         uint256 P_ji = _pairSpotFromBalancesWeights(
-            p.balancesScaled18[1],
-            locals.w[1],
-            p.balancesScaled18[0],
-            locals.w[0]
+            p.balancesScaled18[locals.j],
+            locals.w[locals.j],
+            p.balancesScaled18[locals.i],
+            locals.w[locals.i]
         );
         locals.devB = _relAbsDiff(P_ji, FixedPoint.ONE.divDown(locals.oraclePrice));
 
@@ -589,15 +590,17 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         p.indexIn = locals.i;
         p.indexOut = locals.j;
         p.amountGivenScaled18 = 0;
+
         (locals.ok, locals.fee) = hook.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, w, 0, locals.oraclePrice);
 
         // Orientation B (j -> i) with inverted external prices
-        p.balancesScaled18 = [b[1], b[0]].toMemoryArray();
+        p.indexIn = locals.j;
+        p.indexOut = locals.i;
         (bool okB, uint256 feeB) = hook.ComputeSurgeFee(
             p,
             poolDetails,
             STATIC_SWAP_FEE,
-            [w[1], w[0]].toMemoryArray(),
+            w,
             0,
             FixedPoint.ONE.divDown(locals.oraclePrice)
         );
@@ -606,7 +609,7 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         // Measure deviations exactly like the hook does
         uint256 devA = _relAbsDiff(locals.price, locals.oraclePrice);
         uint256 devB = _relAbsDiff(
-            _pairSpotFromBalancesWeights(b[1], w[1], b[0], w[0]),
+            _pairSpotFromBalancesWeights(b[locals.j], w[locals.j], b[locals.i], w[locals.i]),
             FixedPoint.ONE.divDown(locals.oraclePrice)
         ); // equals 1/P vs 1/ext due to swap
 

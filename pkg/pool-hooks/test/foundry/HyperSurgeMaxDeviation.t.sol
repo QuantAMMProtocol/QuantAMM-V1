@@ -143,14 +143,20 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
     function testFuzz_feeBelowThreshold_min(uint8 nSeed, uint256 wSeed, uint256 bSeed, uint256 dSeed) public view {
         uint8 n = uint8(bound(nSeed, 2, 8));
         uint256[] memory w = _normWeights(n, wSeed);
-        uint256[] memory b = _balances(n, bSeed);
 
         // Pick a pair i!=j.
         uint8 i = uint8(bound(uint256(keccak256(abi.encode(dSeed, 1))), 0, n - 1));
         uint8 j = uint8(bound(uint256(keccak256(abi.encode(dSeed, 2))), 0, n - 1));
         if (j == i) j = (i + 1) % n;
 
-        uint256 P = _pairSpotFromBalancesWeights(b[i], w[i], b[j], w[j]);
+        PoolSwapParams memory p; // zero-initialized; p.kind defaults to 0 (= EXACT_IN)
+        p.kind = SwapKind.EXACT_IN; // keep before==after so we take the NOISE lane
+        p.balancesScaled18 = _balances(n, bSeed);
+        p.indexIn = i;
+        p.indexOut = j;
+        p.amountGivenScaled18 = 0;
+
+        uint256 P = _pairSpotFromBalancesWeights(p.balancesScaled18[i], w[i], p.balancesScaled18[j], w[j]);
 
         vm.assume(P > 0);
 
@@ -160,13 +166,6 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
 
         uint256 oraclePrice = fee_computeOraclePriceForDeviation(P, D);
         HyperSurgeHook.PoolDetails memory poolDetails = _getDefaultPoolDetails();
-
-        PoolSwapParams memory p; // zero-initialized; p.kind defaults to 0 (= EXACT_IN)
-        p.kind = SwapKind.EXACT_IN; // keep before==after so we take the NOISE lane
-        p.balancesScaled18 = b;
-        p.indexIn = i;
-        p.indexOut = j;
-        p.amountGivenScaled18 = 0;
 
         (bool ok, uint256 fee) = hook.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, w, 0, oraclePrice);
         assertTrue(ok, "compute must succeed");
@@ -335,54 +334,79 @@ contract HyperSurgeFindMaxFeeRampTest is BaseVaultTest {
         assertLe(locals.fee, fee2, "fee must be non-decreasing with deviation");
     }
 
-    function testFuzz_swapSymmetry_sameLaneParams(
-        uint8 nSeed,
-        uint256 wSeed,
-        uint256 bSeed,
-        uint256 dSeed
-    ) public view {
-        uint8 n = uint8(bound(nSeed, 2, 8));
-        uint256[] memory w = _normWeights(n, wSeed);
-        uint256[] memory b = _balances(n, bSeed);
+    struct SwapSymmetryLocals {
+        uint256[] w;
+        uint8 i;
+        uint8 j;
+        uint256 P;
+        uint256 oraclePrice;
+    }
 
-        uint8 i = uint8(bound(uint256(keccak256(abi.encode(dSeed, 1))), 0, n - 1));
-        uint8 j = (i + 1 + uint8(bound(uint256(keccak256(abi.encode(dSeed, 2))), 0, n - 2))) % n;
+    function testFuzz_swapSymmetry_sameLaneParams(uint8 n, uint256 wSeed, uint256 bSeed, uint256 dSeed) public view {
+        SwapSymmetryLocals memory locals;
+
+        n = uint8(bound(n, 2, 8));
+        locals.w = _normWeights(n, wSeed);
+
+        locals.i = uint8(bound(uint256(keccak256(abi.encode(dSeed, 1))), 0, n - 1));
+        locals.j = (locals.i + 1 + uint8(bound(uint256(keccak256(abi.encode(dSeed, 2))), 0, n - 2))) % n;
+
+        PoolSwapParams memory p;
+        p.kind = SwapKind.EXACT_IN;
+        p.balancesScaled18 = _balances(n, bSeed);
+        p.indexIn = locals.i;
+        p.indexOut = locals.j;
+        p.amountGivenScaled18 = 0;
 
         // Pool spot for (i -> j) using the same rounding/staging as the hook
-        uint256 P_ij = _pairSpotFromBalancesWeights(b[i], w[i], b[j], w[j]);
+        uint256 P_ij = _pairSpotFromBalancesWeights(
+            p.balancesScaled18[locals.i],
+            locals.w[locals.i],
+            p.balancesScaled18[locals.j],
+            locals.w[locals.j]
+        );
         vm.assume(P_ij > 0);
 
         // Pick some deviation (bounded safely below 1 to keep pxOut > 0 in _localsForDeviation)
         uint256 capDev = DEFAULT_CAP_DEV_PPM9;
         uint256 D = uint256(keccak256(abi.encode(dSeed))) % (capDev + capDev / 2 + 1);
 
-        uint256 oraclePrice = fee_computeOraclePriceForDeviation(P_ij, D);
+        locals.oraclePrice = fee_computeOraclePriceForDeviation(P_ij, D);
 
         HyperSurgeHook.PoolDetails memory poolDetails = _getDefaultPoolDetails();
 
-        PoolSwapParams memory p;
-        p.kind = SwapKind.EXACT_IN;
-
         // Orientation A (i -> j)
-        (bool okA, uint256 feeA) = hook.ComputeSurgeFee(p, poolDetails, STATIC_SWAP_FEE, w, 0, oraclePrice);
+        (bool okA, uint256 feeA) = hook.ComputeSurgeFee(
+            p,
+            poolDetails,
+            STATIC_SWAP_FEE,
+            locals.w,
+            0,
+            locals.oraclePrice
+        );
         // Orientation B (j -> i)
-        p.balancesScaled18 = [b[1], b[0]].toMemoryArray();
+        p.balancesScaled18 = [p.balancesScaled18[1], p.balancesScaled18[0]].toMemoryArray();
         (bool okB, uint256 feeB) = hook.ComputeSurgeFee(
             p,
             poolDetails,
             STATIC_SWAP_FEE,
-            [w[1], w[0]].toMemoryArray(),
+            [locals.w[1], locals.w[0]].toMemoryArray(),
             0,
-            FixedPoint.ONE.divDown(oraclePrice)
+            FixedPoint.ONE.divDown(locals.oraclePrice)
         );
         assertTrue(okA && okB, "compute must succeed");
 
         // Measure deviations exactly like the hook does in each orientation
-        uint256 devA = _relAbsDiff(P_ij, oraclePrice);
+        uint256 devA = _relAbsDiff(P_ij, locals.oraclePrice);
 
         // Compute the swapped pool spot with the SAME rounding (don’t assume 1/P)
-        uint256 P_ji = _pairSpotFromBalancesWeights(b[1], w[1], b[0], w[0]);
-        uint256 devB = _relAbsDiff(P_ji, FixedPoint.ONE.divDown(oraclePrice));
+        uint256 P_ji = _pairSpotFromBalancesWeights(
+            p.balancesScaled18[1],
+            locals.w[1],
+            p.balancesScaled18[0],
+            locals.w[0]
+        );
+        uint256 devB = _relAbsDiff(P_ji, FixedPoint.ONE.divDown(locals.oraclePrice));
 
         // Correct directional assertion:
         if (devA > devB) {

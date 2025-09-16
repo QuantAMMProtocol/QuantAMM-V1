@@ -30,7 +30,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     error InvalidArrayLengths();
     error TokenIndexOutOfRange();
-    error NumTokensOutOfRange();
     error InvalidPairIndex();
     error PoolNotInitialized();
     error InvalidDecimals();
@@ -109,10 +108,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         TokenConfig[] memory tokenCfgs,
         LiquidityManagement calldata
     ) public override onlyVault returns (bool) {
-        if (tokenCfgs.length < 2 || tokenCfgs.length > 8) {
-            revert NumTokensOutOfRange();
-        }
-
         PoolDetails memory details;
         details.numTokens = uint8(tokenCfgs.length);
         // Set the pool details, so we can use the setters and emit the proper events.

@@ -9,6 +9,7 @@ import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol"
 import "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 
 import { SingletonAuthentication } from "@balancer-labs/v3-vault/contracts/SingletonAuthentication.sol";
+import { InputHelpers } from "@balancer-labs/v3-solidity-utils/contracts/helpers/InputHelpers.sol";
 import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol";
 import { WeightedPool } from "@balancer-labs/v3-pool-weighted/contracts/WeightedPool.sol";
 import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Version.sol";
@@ -223,11 +224,9 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint32[] calldata pairIdx,
         uint32[] calldata hlTokenIdx
     ) external onlySwapFeeManagerOrGovernance(pool) {
-        PoolDetails storage detail = _poolCfg[pool].details;
+        InputHelpers.ensureInputLengthMatch(tokenIndices.length, pairIdx.length);
 
-        if (tokenIndices.length != pairIdx.length) {
-            revert InvalidArrayLengths();
-        }
+        PoolDetails storage detail = _poolCfg[pool].details;
 
         for (uint256 i = 0; i < tokenIndices.length; ++i) {
             _setTokenPriceConfigIndex(pool, tokenIndices[i], pairIdx[i], hlTokenIdx[i], detail);
@@ -689,6 +688,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
      * @notice Checks if the pool price deviation is worsening after a add/remove liquidity operation.
      * @dev The pool price deviation is worsening if the deviation between oracle and pool price increased and the
      * deviation is greater than the surge threshold.
+     *
      * @param pool The pool address
      * @param oldBalancesScaled18 The balances before the add/remove liquidity operation
      * @param newBalancesScaled18 The balances after the add/remove liquidity operation

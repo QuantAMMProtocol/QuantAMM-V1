@@ -651,21 +651,21 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     function _findMaxDeviation(
         ComputeOracleDeviationLocals memory locals,
         uint256[] memory balancesScaled18,
-        uint256[] memory w
+        uint256[] memory weights
     ) internal pure returns (uint256) {
         // Pairwise check (O(n^2), n<=8).
         for (locals.i = 0; locals.i < balancesScaled18.length; ++locals.i) {
             locals.bi = balancesScaled18[locals.i];
-            locals.wi = w[locals.i];
+            locals.wi = weights[locals.i];
             locals.pxi = locals.px[locals.i];
 
             for (locals.j = locals.i + 1; locals.j < balancesScaled18.length; ++locals.j) {
                 locals.bj = balancesScaled18[locals.j];
-                locals.wj = w[locals.j];
+                locals.wj = weights[locals.j];
                 locals.pxj = locals.px[locals.j];
 
                 // Pool-implied spot for j vs i: (Bj/wj) / (Bi/wi)
-                locals.poolPx = _pairSpotFromBalancesWeights(balancesScaled18, w, locals.i, locals.j);
+                locals.poolPx = _pairSpotFromBalancesWeights(balancesScaled18, weights, locals.i, locals.j);
 
                 if (locals.poolPx == 0) {
                     continue;
@@ -673,6 +673,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
                 // External ratio j/i
                 locals.extPx = locals.pxj.divDown(locals.pxi);
+
                 locals.dev = _relAbsDiff(locals.poolPx, locals.extPx);
 
                 if (locals.dev > locals.maxDev) {

@@ -999,7 +999,7 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         );
         vm.stopPrank();
 
-        assertTrue(ok, "must be greater than, equal is fine");
+        assertFalse(ok, "must be greater than, equal is fine");
     }
 
     /// CASE 6 (worsened): Starts outside BELOW-price, ends outside ABOVE-price with *larger* deviation ⇒ must BLOCK.

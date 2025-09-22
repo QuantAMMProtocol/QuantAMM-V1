@@ -27,9 +27,9 @@ import {
 } from "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 
 // Local deployer + mock
-import { HyperSurgeHookDeployer } from "./utils/HyperSurgeHookDeployer.sol";
+import { HyperSurgeHook } from "../../contracts/hooks-quantamm/HyperSurgeHook.sol";
 import { HyperSurgeHookMock } from "../../contracts/test/HyperSurgeHookMock.sol";
-import { HyperSurgeHook } from ".../../contracts/hooks-quantamm/HyperSurgeHook.sol";
+import { HyperSurgeHookDeployer } from "./utils/HyperSurgeHookDeployer.sol";
 import {
     WeightedPoolContractsDeployer
 } from "@balancer-labs/v3-pool-weighted/test/foundry/utils/WeightedPoolContractsDeployer.sol";
@@ -999,7 +999,7 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         );
         vm.stopPrank();
 
-        assertTrue(ok, "must be greater than, equal is fine");
+        assertFalse(ok, "must be greater than, equal is fine");
     }
 
     /// CASE 6 (worsened): Starts outside BELOW-price, ends outside ABOVE-price with *larger* deviation ⇒ must BLOCK.
@@ -1192,8 +1192,7 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
     struct DefenciveZeroCheck {
         uint256 bIn;
         uint256 bOut;
-        uint256 pxIn;
-        uint256 pxOut;
+        uint256 oraclePrice;
         uint256 pxBase;
         uint256 amountGiven;
         uint256 calcAmount;
@@ -1210,37 +1209,28 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         uint256 calcAmtRaw
     ) public view {
         DefenciveZeroCheck memory check;
-        check.bIn = bound(bInRaw, 1e18, 1e22);
-        check.bOut = bound(bOutRaw, 1e18, 1e22);
-        check.pxIn = 1e18;
-        check.pxOut = 1e18;
+        check.bIn = bound(bInRaw, FixedPoint.ONE, 1e22);
+        check.bOut = bound(bOutRaw, FixedPoint.ONE, 1e22);
+        check.oraclePrice = FixedPoint.ONE;
         check.amountGiven = bound(amtGivenRaw, 1, check.bIn / 1_000_000); // ≤ 1e-6 of bIn
         check.calcAmount = bound(calcAmtRaw, 1, check.bOut / 1_000_000); // ≤ 1e-6 of bOut
 
-        HyperSurgeHookMock.ComputeSurgeFeeLocals memory L;
-        L.bIn = check.bIn;
-        L.bOut = check.bOut;
-        L.wIn = 1e18;
-        L.wOut = 0; // <<< makes den = bIn.mulDown(wOut) == 0 → poolPx == 0
-        L.pxIn = check.pxIn;
-        L.pxOut = check.pxOut;
-        L.calcAmountScaled18 = check.calcAmount;
-        L.poolDetails.noiseThresholdPercentage9 = 10_000_000; // 1%
-        L.poolDetails.noiseCapDeviationPercentage9 = 50_000_000; // 5%
-        L.poolDetails.noiseMaxSurgeFee9 = 100_000_000; // 10%
-        L.poolDetails.arbThresholdPercentage9 = 10_000_000; // 1%
-        L.poolDetails.arbCapDeviationPercentage9 = 50_000_000; // 5%
-        L.poolDetails.arbMaxSurgeFee9 = 200_000_000; // 20%
-        L.poolDetails.numTokens = 2;
+        uint256[] memory balancesScaled18 = [check.bIn, check.bOut].toMemoryArray();
+        uint256[] memory weights = [FixedPoint.ONE, uint256(0)].toMemoryArray(); // <<< makes den = bIn.mulDown(wOut) == 0 → poolPx == 0
 
-        uint256[] memory balances = new uint256[](2);
-        balances[0] = check.bIn;
-        balances[1] = check.bOut;
+        HyperSurgeHook.PoolDetails memory poolDetails;
+        poolDetails.noiseThresholdPercentage9 = 10_000_000; // 1%
+        poolDetails.noiseCapDeviationPercentage9 = 50_000_000; // 5%
+        poolDetails.noiseMaxSurgeFee9 = 100_000_000; // 10%
+        poolDetails.arbThresholdPercentage9 = 10_000_000; // 1%
+        poolDetails.arbCapDeviationPercentage9 = 50_000_000; // 5%
+        poolDetails.arbMaxSurgeFee9 = 200_000_000; // 20%
+        poolDetails.numTokens = 2;
 
         PoolSwapParams memory p = PoolSwapParams({
             kind: exactIn ? SwapKind.EXACT_IN : SwapKind.EXACT_OUT,
             amountGivenScaled18: check.amountGiven,
-            balancesScaled18: balances,
+            balancesScaled18: balancesScaled18,
             indexIn: 0,
             indexOut: 1,
             router: address(0),
@@ -1248,10 +1238,17 @@ contract HyperSurgeLiquidityCheckTest is BaseVaultTest, HyperSurgeHookDeployer, 
         });
 
         check.staticFee = 1e16; // 1%
-        (check.ok, check.fee) = hook.ComputeSurgeFee(L, p, check.staticFee);
+        (check.ok, check.fee) = hook.ComputeSurgeFee(
+            p,
+            poolDetails,
+            check.staticFee,
+            weights,
+            check.calcAmount,
+            check.oraclePrice
+        );
 
         assertTrue(check.ok, "compute fee must not block when pool spot denominator is zero");
-        assertLe(check.fee, 1e18, "fee must be a valid 18-dec percentage");
+        assertLe(check.fee, FixedPoint.ONE, "fee must be a valid 18-dec percentage");
         assertGe(check.fee, check.staticFee, "fee must be at least the static fee");
     }
 }

@@ -62,6 +62,9 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     uint256 private constant MAX32 = uint256(type(uint32).max);
 
+    ///@notice Hyperliquid has an internal maximum of 8 decimal places.
+    uint256 private constant SZMAX = 8;
+
     mapping(address => PoolCfg) private _poolCfg;
 
     uint256 private immutable _defaultMaxSurgeFeePercentage18;
@@ -140,12 +143,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             return (true, amountsInRaw);
         }
 
-        uint256[] memory oldBalancesScaled18 = new uint256[](balancesScaled18.length);
-        for (uint256 i = 0; i < balancesScaled18.length; ++i) {
-            oldBalancesScaled18[i] = balancesScaled18[i] - amountsInScaled18[i];
-        }
-
-        bool isPriceDeviationWorsening = _isPriceDeviationWorsening(pool, oldBalancesScaled18, balancesScaled18);
+        bool isPriceDeviationWorsening = _isPriceDeviationWorsening(pool, amountsInScaled18, balancesScaled18, false);
 
         return (isPriceDeviationWorsening == false, amountsInRaw);
     }
@@ -166,13 +164,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             return (true, amountsOutRaw);
         }
 
-        // Reconstruct pre-remove balances = post + out; if addition overflows, allow.
-        uint256[] memory oldBalancesScaled18 = new uint256[](balancesScaled18.length);
-        for (uint256 i = 0; i < balancesScaled18.length; ++i) {
-            oldBalancesScaled18[i] = balancesScaled18[i] + amountsOutScaled18[i];
-        }
-
-        bool isPriceDeviationWorsening = _isPriceDeviationWorsening(pool, oldBalancesScaled18, balancesScaled18);
+        bool isPriceDeviationWorsening = _isPriceDeviationWorsening(pool, amountsOutScaled18, balancesScaled18, true);
 
         return (isPriceDeviationWorsening == false, amountsOutRaw);
     }
@@ -252,7 +244,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
         tempCfg.sz = HyperTokenInfoPrecompile.szDecimals(hlTokenIdx);
 
-        if (tempCfg.sz > 8) {
+        if (tempCfg.sz > SZMAX) {
             revert InvalidDecimals();
         }
 
@@ -494,18 +486,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             deviationBeforeScaled18 = _relAbsDiff(poolPriceBefore, oraclePrice);
         }
 
-        uint256[] memory newBalancesScaled18 = new uint256[](params.balancesScaled18.length);
-        for (uint256 i = 0; i < params.balancesScaled18.length; i++) {
-            newBalancesScaled18[i] = params.balancesScaled18[i];
-        }
-
-        if (params.kind == SwapKind.EXACT_IN) {
-            newBalancesScaled18[params.indexIn] += params.amountGivenScaled18;
-            newBalancesScaled18[params.indexOut] -= calculatedAmountScaled18;
-        } else {
-            newBalancesScaled18[params.indexIn] += calculatedAmountScaled18;
-            newBalancesScaled18[params.indexOut] -= params.amountGivenScaled18;
-        }
+        uint256[] memory newBalancesScaled18 = _simulateAfterSwapBalances(params, calculatedAmountScaled18);
 
         // P_pool = (B_out/w_out) / (B_in/w_in) = (B_out * w_in) / (B_in * w_out)
         {
@@ -536,6 +517,25 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             // is taken. This means a large fee != a large no arb region and the pool stays close to market. For more
             // information, check the HyperSurgeHook-README.md file.
             deviationScaled18 = deviationBeforeScaled18;
+        }
+    }
+
+    function _simulateAfterSwapBalances(
+        PoolSwapParams calldata params,
+        uint256 calculatedAmountScaled18
+    ) internal pure returns (uint256[] memory newBalances) {
+        newBalances = new uint256[](params.balancesScaled18.length);
+
+        for (uint256 i = 0; i < params.balancesScaled18.length; i++) {
+            newBalances[i] = params.balancesScaled18[i];
+        }
+
+        if (params.kind == SwapKind.EXACT_IN) {
+            newBalances[params.indexIn] += params.amountGivenScaled18;
+            newBalances[params.indexOut] -= calculatedAmountScaled18;
+        } else {
+            newBalances[params.indexIn] += calculatedAmountScaled18;
+            newBalances[params.indexOut] -= params.amountGivenScaled18;
         }
     }
 
@@ -690,18 +690,29 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
      * deviation is greater than the surge threshold.
      *
      * @param pool The pool address
-     * @param oldBalancesScaled18 The balances before the add/remove liquidity operation
-     * @param newBalancesScaled18 The balances after the add/remove liquidity operation
+     * @param amountsInScaled18 The amounts added/removed in the operation
+     * @param balancesScaled18 The balances after the add/remove liquidity operation
+     * @param addAmount True if the amounts are being added, false if removed
      * @return True if the pool price deviation is worsening, false otherwise
      */
     function _isPriceDeviationWorsening(
         address pool,
-        uint256[] memory oldBalancesScaled18,
-        uint256[] memory newBalancesScaled18
+        uint256[] memory amountsInScaled18,
+        uint256[] memory balancesScaled18,
+        bool addAmount
     ) internal view returns (bool) {
+        uint256[] memory oldBalancesScaled18 = new uint256[](balancesScaled18.length);
+        for (uint256 i = 0; i < balancesScaled18.length; ++i) {
+            if (addAmount) {
+                oldBalancesScaled18[i] = balancesScaled18[i] + amountsInScaled18[i];
+            } else {
+                oldBalancesScaled18[i] = balancesScaled18[i] - amountsInScaled18[i];
+            }
+        }
+
         uint256[] memory weights = WeightedPool(pool).getNormalizedWeights();
         uint256 priceDeviationBefore = _computeOracleDeviationPct(pool, oldBalancesScaled18, weights);
-        uint256 priceDeviationAfter = _computeOracleDeviationPct(pool, newBalancesScaled18, weights);
+        uint256 priceDeviationAfter = _computeOracleDeviationPct(pool, balancesScaled18, weights);
         uint256 surgeThreshold = getSurgeThresholdPercentage(pool, TradeType.NOISE);
 
         return (priceDeviationAfter > priceDeviationBefore) && (priceDeviationAfter > surgeThreshold);
@@ -718,7 +729,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     }
 
     function _ensureValidPercentage(uint256 percentageValue) internal pure {
-        if (percentageValue < 1e9 || percentageValue > 1e18 || percentageValue % 1e9 != 0) {
+        if (percentageValue < 1e9 || percentageValue > FixedPoint.ONE || percentageValue % 1e9 != 0) {
             revert InvalidPercentage();
         }
     }

@@ -2532,11 +2532,11 @@ contract HyperSurgeFeeTest is BaseVaultTest, HyperSurgeHookDeployer, WeightedPoo
 
         locals.num = (locals.thr - locals.Db) * FixedPoint.ONE;
         locals.den = FixedPoint.ONE - locals.thr;
-        locals.tEdge = locals.den == 0 ? 0 : (locals.num + locals.den - 1) / locals.den;
+        locals.tEdge = locals.den == 0 ? 0 : (locals.num / locals.den);
 
         locals.epsT = 1e6;
         locals.lo = (locals.tEdge > locals.epsT) ? (locals.tEdge - locals.epsT) : 1;
-        locals.hi = locals.tEdge == 0 ? 0 : (locals.tEdge - 1);
+        locals.hi = locals.tEdge;
         if (locals.hi < locals.lo) {
             locals.hi = locals.lo;
         }

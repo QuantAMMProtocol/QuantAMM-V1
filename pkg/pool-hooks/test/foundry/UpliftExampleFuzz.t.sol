@@ -59,9 +59,11 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
     uint64 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16;
     uint64 private constant _MAX_SWAP_FEE_PERCENTAGE = 10e16;
     uint64 private constant _MAX_UPLIFT_WITHDRAWAL_FEE = 20e16;
+    uint256 internal bptAmount = 2e3 * 1e18;
 
     uint256 internal constant DEFAULT_AMP_FACTOR = 200;
 
+    PoolFactoryMock internal factoryMock;
     MockUpdateWeightRunner internal updateWeightRunner;
 
     UpliftOnlyExample internal upliftOnlyRouter;

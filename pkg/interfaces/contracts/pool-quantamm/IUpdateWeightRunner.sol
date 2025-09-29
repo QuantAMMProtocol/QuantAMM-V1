@@ -7,9 +7,8 @@ import "./IQuantAMMWeightedPool.sol";
 import "./IUpdateRule.sol";
 import "./OracleWrapper.sol";
 
-import {
-    IWeightedPool
-} from "../pool-weighted/IWeightedPool.sol";
+import { IWeightedPool } from "../pool-weighted/IWeightedPool.sol";
+
 /*
 ARCHITECTURE DESIGN NOTES
 
@@ -44,11 +43,9 @@ updates and guard rails.
 
  */
 
-
 /// @title UpdateWeightRunner singleton contract that is responsible for running all weight updates
 
 interface IUpdateWeightRunner {
-    
     // Store the current execution context for callbacks
     struct ExecutionData {
         address pool;
@@ -77,33 +74,23 @@ interface IUpdateWeightRunner {
 
     /// @notice Get the happy path primary oracles for the constituents of a pool
     /// @param _poolAddress Address of the pool
-    function getOptimisedPoolOracle(
-        address _poolAddress
-    ) external view returns (address[] memory oracles);
-    
+    function getOptimisedPoolOracle(address _poolAddress) external view returns (address[] memory oracles);
+
     /// @notice Get the data for a pool from the oracles and return it in the same order as the assets in the pool
     /// @param _pool Pool to get data for
-    function getData(
-        address _pool
-    ) external view returns (int256[] memory outputData);
+    function getData(address _pool) external view returns (int256[] memory outputData);
 
     /// @notice Get the backup oracles for the constituents of a pool
     /// @param _poolAddress Address of the pool
-    function getPoolOracleAndBackups(
-        address _poolAddress
-    ) external view returns (address[][] memory oracles);
+    function getPoolOracleAndBackups(address _poolAddress) external view returns (address[][] memory oracles);
 
     /// @notice Get the rule settings for a pool
     /// @param _poolAddress Address of the pool
-    function getPoolRuleSettings(
-        address _poolAddress
-    ) external view returns (PoolRuleSettings memory oracles);
+    function getPoolRuleSettings(address _poolAddress) external view returns (PoolRuleSettings memory oracles);
 
     /// @notice Get the rule for a pool
     /// @param _poolAddress Address of the pool
-    function getPoolRule(
-        address _poolAddress
-    ) external view returns (IUpdateRule rule);
+    function getPoolRule(address _poolAddress) external view returns (IUpdateRule rule);
 
     /// @notice Add a new oracle to the available oracles
     /// @param _oracle Oracle to add
@@ -121,7 +108,7 @@ interface IUpdateWeightRunner {
     function performUpdate(address _pool) external;
 
     /// @notice Change the ETH/USD oracle
-    /// @param _ethUsdOracle The new oracle address to use for ETH/USD 
+    /// @param _ethUsdOracle The new oracle address to use for ETH/USD
     function setETHUSDOracle(address _ethUsdOracle) external;
 
     /// @notice Set the quantAMM swap fee % amount allocated to the protocol for running costs
@@ -139,17 +126,14 @@ interface IUpdateWeightRunner {
     function getQuantAMMUpliftFeeTake() external view returns (uint256);
 
     /// @notice get the confirmedquantAMMAdmin address
-    function getQuantAMMAdmin() external view returns (address); 
+    function getQuantAMMAdmin() external view returns (address);
 
     /// @notice Sets the timestamp of when an update was last run for a pool. Can by used as a breakgrass measure to retrigger an update.
     /// @param _poolAddress the target pool address
     /// @param _time the time to initialise the last update run to
-    function InitialisePoolLastRunTime(
-        address _poolAddress,
-        uint40 _time
-    ) external ;
+    function InitialisePoolLastRunTime(address _poolAddress, uint40 _time) external;
 
-/// @notice Breakglass function to allow the admin or the pool manager to set the quantammAdmins weights manually
+    /// @notice Breakglass function to allow the admin or the pool manager to set the quantammAdmins weights manually
     /// @param _weights the new weights
     /// @param _poolAddress the target pool
     /// @param _interpolationTime the time required to calcluate the multiplier
@@ -160,7 +144,7 @@ interface IUpdateWeightRunner {
         address _poolAddress,
         uint40 _interpolationTime,
         uint _numberOfAssets
-    ) external ;
+    ) external;
 
     /// @notice Breakglass function to allow the admin or the pool manager to set the quantammAdmins weights manually
     /// @param _weights the new weights
@@ -172,7 +156,7 @@ interface IUpdateWeightRunner {
         address _poolAddress,
         uint40 _lastInterpolationTimePossible,
         uint _numberOfAssets
-    ) external ;
+    ) external;
 
     /// @notice Breakglass function to allow the admin or the pool manager to set the intermediate values of the rule manually
     /// @param _poolAddress the target pool
@@ -184,5 +168,5 @@ interface IUpdateWeightRunner {
         int256[] memory _newMovingAverages,
         int256[] memory _newParameters,
         uint _numberOfAssets
-    ) external ;
+    ) external;
 }

@@ -17,6 +17,7 @@
     "!contracts/test/**/*.sol"
   ],
   "scripts": {
+    "docs": "npx ",
     "build": "yarn compile",
     "compile": "hardhat compile",
     "compile:watch": "nodemon --ext sol --exec yarn compile",

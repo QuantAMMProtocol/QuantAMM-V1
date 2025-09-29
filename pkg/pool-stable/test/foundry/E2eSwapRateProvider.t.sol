@@ -11,11 +11,10 @@ import "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 import { CastingHelpers } from "@balancer-labs/v3-solidity-utils/contracts/helpers/CastingHelpers.sol";
 import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol";
 
-import { PoolHooksMock } from "@balancer-labs/v3-vault/contracts/test/PoolHooksMock.sol";
-import { ProtocolFeeControllerMock } from "@balancer-labs/v3-vault/contracts/test/ProtocolFeeControllerMock.sol";
-import { RateProviderMock } from "@balancer-labs/v3-vault/contracts/test/RateProviderMock.sol";
-import { E2eSwapRateProviderTest } from "@balancer-labs/v3-vault/test/foundry/E2eSwapRateProvider.t.sol";
 import { VaultContractsDeployer } from "@balancer-labs/v3-vault/test/foundry/utils/VaultContractsDeployer.sol";
+import { E2eSwapRateProviderTest } from "@balancer-labs/v3-vault/test/foundry/E2eSwapRateProvider.t.sol";
+import { RateProviderMock } from "@balancer-labs/v3-vault/contracts/test/RateProviderMock.sol";
+import { PoolHooksMock } from "@balancer-labs/v3-vault/contracts/test/PoolHooksMock.sol";
 
 import { StablePoolFactory } from "../../contracts/StablePoolFactory.sol";
 import { StablePool } from "../../contracts/StablePool.sol";
@@ -27,6 +26,10 @@ contract E2eSwapRateProviderStableTest is VaultContractsDeployer, E2eSwapRatePro
 
     uint256 internal constant DEFAULT_SWAP_FEE = 1e16; // 1%
     uint256 internal constant DEFAULT_AMP_FACTOR = 200;
+
+    function createPoolFactory() internal override returns (address) {
+        return address(deployStablePoolFactory(IVault(address(vault)), 365 days, "Factory v1", "Pool v1"));
+    }
 
     function _createPool(
         address[] memory tokens,
@@ -42,13 +45,12 @@ contract E2eSwapRateProviderStableTest is VaultContractsDeployer, E2eSwapRatePro
         rateProviders[tokenAIdx] = IRateProvider(address(rateProviderTokenA));
         rateProviders[tokenBIdx] = IRateProvider(address(rateProviderTokenB));
 
-        StablePoolFactory factory = deployStablePoolFactory(IVault(address(vault)), 365 days, "Factory v1", "Pool v1");
         PoolRoleAccounts memory roleAccounts;
 
         // Allow pools created by `factory` to use poolHooksMock hooks.
-        PoolHooksMock(poolHooksContract).allowFactory(address(factory));
+        PoolHooksMock(poolHooksContract).allowFactory(poolFactory);
 
-        newPool = factory.create(
+        newPool = StablePoolFactory(poolFactory).create(
             "Stable Pool",
             "STABLE",
             vault.buildTokenConfig(tokens.asIERC20(), rateProviders),
@@ -64,9 +66,6 @@ contract E2eSwapRateProviderStableTest is VaultContractsDeployer, E2eSwapRatePro
 
         // Cannot set the pool creator directly on a standard Balancer stable pool factory.
         vault.manualSetPoolCreator(address(newPool), lp);
-
-        ProtocolFeeControllerMock feeController = ProtocolFeeControllerMock(address(vault.getProtocolFeeController()));
-        feeController.manualSetPoolCreator(address(newPool), lp);
 
         poolArgs = abi.encode(
             StablePool.NewPoolParams({

@@ -51,6 +51,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
     uint256 internal daiIdx;
     uint256 internal usdcIdx;
+    uint256 internal bptAmount = 2e3 * 1e18;
 
     address internal owner;
     address internal addr1;
@@ -62,6 +63,8 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     uint64 private constant _MAX_UPLIFT_WITHDRAWAL_FEE = 20e16; // 20%
 
     uint256 internal constant DEFAULT_AMP_FACTOR = 200;
+
+    PoolFactoryMock internal factoryMock;
 
     MockUpdateWeightRunner internal updateWeightRunner;
 
@@ -804,9 +807,66 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.prank(bob);
         upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
         vm.stopPrank();
+    }
 
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
+    function testSetHookPassGreaterThanMaxFail(uint64 poolHookAmount) public {
+        uint64 boundFeeAmount = uint64(
+            bound(poolHookAmount, uint64(_MAX_SWAP_FEE_PERCENTAGE) + 1, uint64(type(uint64).max))
+        );
+
+        vm.startPrank(owner);
+        vm.expectRevert("Above _MAX_SWAP_FEE_PERCENTAGE");
+        upliftOnlyRouter.setHookSwapFeePercentage(boundFeeAmount);
+        vm.stopPrank();
+    }
+
+    function testFeeSwapExactIn__Fuzz(uint256 swapAmount, uint64 hookFeePercentage) public {
+        // Swap between POOL_MINIMUM_TOTAL_SUPPLY and whole pool liquidity (pool math is linear)
+        swapAmount = bound(swapAmount, POOL_MINIMUM_TOTAL_SUPPLY, poolInitAmount);
+
+        // Fee between 0 and 100%
+        hookFeePercentage = uint64(bound(hookFeePercentage, _MIN_SWAP_FEE_PERCENTAGE, _MAX_SWAP_FEE_PERCENTAGE));
+
+        vm.expectEmit();
+        emit UpliftOnlyExample.HookSwapFeePercentageChanged(poolHooksContract, hookFeePercentage);
+
+        vm.prank(owner);
+        UpliftOnlyExample(payable(poolHooksContract)).setHookSwapFeePercentage(hookFeePercentage);
+        uint256 hookFee = swapAmount.mulUp(hookFeePercentage);
+
+        BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
+
+        vm.prank(bob);
+        vm.expectCall(
+            address(poolHooksContract),
+            abi.encodeCall(
+                IHooks.onAfterSwap,
+                AfterSwapParams({
+                    kind: SwapKind.EXACT_IN,
+                    tokenIn: dai,
+                    tokenOut: usdc,
+                    amountInScaled18: swapAmount,
+                    amountOutScaled18: swapAmount,
+                    tokenInBalanceScaled18: poolInitAmount + swapAmount,
+                    tokenOutBalanceScaled18: poolInitAmount - swapAmount,
+                    amountCalculatedScaled18: swapAmount,
+                    amountCalculatedRaw: swapAmount,
+                    router: address(router),
+                    pool: pool,
+                    userData: bytes("")
+                })
+            )
+        );
+
+        if (hookFee > 0) {
+            vm.expectEmit();
+            emit UpliftOnlyExample.SwapHookFeeCharged(poolHooksContract, IERC20(usdc), hookFee);
+        }
+
+        router.swapSingleTokenExactIn(address(pool), dai, usdc, swapAmount, 0, MAX_UINT256, false, bytes(""));
+
+        BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
+
         assertEq(
             upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
             block.timestamp,

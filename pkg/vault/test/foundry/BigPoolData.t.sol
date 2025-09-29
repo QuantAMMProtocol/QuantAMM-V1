@@ -17,7 +17,7 @@ import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/Fixe
 import { RateProviderMock } from "../../contracts/test/RateProviderMock.sol";
 import { PoolMock } from "../../contracts/test/PoolMock.sol";
 
-import { BaseVaultTest } from "./utils/BaseVaultTest.sol";
+import { PoolFactoryMock, BaseVaultTest } from "./utils/BaseVaultTest.sol";
 
 contract BigPoolDataTest is BaseVaultTest {
     using FixedPoint for uint256;
@@ -49,9 +49,9 @@ contract BigPoolDataTest is BaseVaultTest {
 
         newPool = address(deployPoolMock(IVault(address(vault)), name, symbol));
 
-        _approveForPool(IERC20(newPool));
+        _approveForNewPool(IERC20(newPool));
 
-        factoryMock.registerTestPool(
+        PoolFactoryMock(poolFactory).registerTestPool(
             newPool,
             vault.buildTokenConfig(bigPoolTokens, bigPoolRateProviders),
             poolHooksContract,
@@ -75,7 +75,7 @@ contract BigPoolDataTest is BaseVaultTest {
         vm.stopPrank();
     }
 
-    function _approveForSender() internal {
+    function _approveNewPoolForSender() internal {
         for (uint256 i = 0; i < bigPoolTokens.length; ++i) {
             bigPoolTokens[i].approve(address(permit2), type(uint256).max);
             permit2.approve(address(bigPoolTokens[i]), address(router), type(uint160).max, type(uint48).max);
@@ -83,11 +83,11 @@ contract BigPoolDataTest is BaseVaultTest {
         }
     }
 
-    function _approveForPool(IERC20 bpt) internal {
+    function _approveForNewPool(IERC20 bpt) internal {
         for (uint256 i = 0; i < users.length; ++i) {
             vm.startPrank(users[i]);
 
-            _approveForSender();
+            _approveNewPoolForSender();
 
             bpt.approve(address(router), type(uint256).max);
             bpt.approve(address(batchRouter), type(uint256).max);

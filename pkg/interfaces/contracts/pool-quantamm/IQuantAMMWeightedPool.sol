@@ -38,18 +38,18 @@ interface IQuantAMMWeightedPool {
         uint40 lastUpdateTime;
         uint40 lastInteropTime;
     }
-    
+
     /**
      * @notice Weighted Pool data that cannot change after deployment.
-        * @param tokens Pool tokens, sorted in pool registration order
-        * @param oracleStalenessThreshold The acceptable number of blocks behind the current that an oracle value can be
-        * @param poolRegistry The address of the pool registry
-        * @param ruleParameters The parameters for the rule, validated in each rule separately during set rule
-        * @param lambda Decay parameter for exponentially-weighted moving average (0 < λ < 1)
-        * @param epsilonMax Maximum allowed delta for a weight update, stored as SD59x18 number
-        * @param absoluteWeightGuardRail Minimum absolute weight allowed. CODEHAWKS INFO /s/611
-        * @param maxTradeSizeRatio maximum trade size allowed as a fraction of the pool
-        * @param updateInterval Minimum amount of seconds between two updates
+     * @param tokens Pool tokens, sorted in pool registration order
+     * @param oracleStalenessThreshold The acceptable number of blocks behind the current that an oracle value can be
+     * @param poolRegistry The address of the pool registry
+     * @param ruleParameters The parameters for the rule, validated in each rule separately during set rule
+     * @param lambda Decay parameter for exponentially-weighted moving average (0 < λ < 1)
+     * @param epsilonMax Maximum allowed delta for a weight update, stored as SD59x18 number
+     * @param absoluteWeightGuardRail Minimum absolute weight allowed. CODEHAWKS INFO /s/611
+     * @param maxTradeSizeRatio maximum trade size allowed as a fraction of the pool
+     * @param updateInterval Minimum amount of seconds between two updates
      */
     struct QuantAMMWeightedPoolImmutableData {
         IERC20[] tokens;
@@ -116,20 +116,24 @@ interface IQuantAMMWeightedPool {
         address _poolAddress,
         uint40 _lastInterpolationTimePossible
     ) external;
-    
+
     /// @notice get pool details such as strategy name and description
     /// @param category the category of detail
     /// @param name the name of the detail to be retrieved
-    function getPoolDetail(string memory category, string memory name) external view returns (string memory, string memory);
+    function getPoolDetail(
+        string memory category,
+        string memory name
+    ) external view returns (string memory, string memory);
 
     /// @notice the acceptable number of blocks behind the current that an oracle value can be
     function getOracleStalenessThreshold() external view returns (uint);
 
     ///@notice returns the normalized weights of the pool for the current block
     function getNormalizedWeights() external view returns (uint256[] memory);
-    
+
     ///@notice returns the fix window for the pool
     function getWithinFixWindow() external view returns (bool);
+
     /**
      * @notice Get dynamic pool data relevant to swap/add/remove calculations.
      * @return data A struct containing all dynamic QuantAMM weighted pool parameters
@@ -140,7 +144,10 @@ interface IQuantAMMWeightedPool {
      * @notice Get immutable pool data relevant to swap/add/remove calculations.
      * @return data A struct containing all immutable weighted pool parameters
      */
-    function getQuantAMMWeightedPoolImmutableData() external view returns (QuantAMMWeightedPoolImmutableData memory data);
+    function getQuantAMMWeightedPoolImmutableData()
+        external
+        view
+        returns (QuantAMMWeightedPoolImmutableData memory data);
 
     /// @notice this is to update the runner for the pool. This is for hotfixes and is timelock protected.
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) external;

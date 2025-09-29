@@ -298,7 +298,7 @@ contract WeightedPoolLimitsTest is BaseVaultTest, WeightedPoolContractsDeployer 
 
     function _testSwap() public {
         // Set swap fee to zero for this test.
-        vault.manuallySetSwapFee(pool, 0);
+        vault.manualUnsafeSetStaticSwapFeePercentage(pool, 0);
         startingBalances[daiIdx] = dai.balanceOf(bob);
         startingBalances[usdcIdx] = usdc.balanceOf(bob);
 
@@ -332,7 +332,7 @@ contract WeightedPoolLimitsTest is BaseVaultTest, WeightedPoolContractsDeployer 
     }
 
     function _testAddLiquidityUnbalanced(uint256 swapFeePercentage) public {
-        uint256[] memory maxAmountsIn = [defaultBalance, defaultBalance].toMemoryArray();
+        uint256[] memory maxAmountsIn = [defaultAccountBalance(), defaultAccountBalance()].toMemoryArray();
         // Enlarge the pool so that adding liquidity unbalanced does not hit the invariant ratio limit.
         uint256 currentBPTSupply = IERC20(weightedPool).totalSupply();
         vm.prank(alice);

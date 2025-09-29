@@ -12,6 +12,7 @@ import { IWETH } from "@balancer-labs/v3-interfaces/contracts/solidity-utils/mis
 import { StorageSlotExtension } from "@balancer-labs/v3-solidity-utils/contracts/openzeppelin/StorageSlotExtension.sol";
 
 import { RouterCommon } from "../../contracts/RouterCommon.sol";
+import { SenderGuard } from "../../contracts/SenderGuard.sol";
 
 contract RouterCommonMock is RouterCommon {
     event CurrentSenderMock(address sender);
@@ -30,7 +31,7 @@ contract RouterCommonMock is RouterCommon {
 
     function emitSender() external {
         (bool success, bytes memory result) = address(this).call(
-            abi.encodeWithSelector(RouterCommon.getSender.selector)
+            abi.encodeWithSelector(SenderGuard.getSender.selector)
         );
         require(success, "RouterCommonMock: failed getSender call");
 
@@ -39,14 +40,6 @@ contract RouterCommonMock is RouterCommon {
 
     function getVault() external view returns (IVault) {
         return _vault;
-    }
-
-    function getWeth() external view returns (IWETH) {
-        return _weth;
-    }
-
-    function getPermit2() external view returns (IPermit2 permit2) {
-        return _permit2;
     }
 
     function manualGetSenderSlot() external view returns (StorageSlotExtension.AddressSlotType) {

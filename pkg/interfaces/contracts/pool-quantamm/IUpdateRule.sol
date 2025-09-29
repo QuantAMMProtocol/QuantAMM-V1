@@ -12,7 +12,7 @@ interface IUpdateRule {
     /// @param _absoluteWeightGuardRail the minimum weight possible for the pool CODEHAWKS INFO /s/611
     function CalculateNewWeights(
         int256[] calldata _prevWeights,
-        int256[]  memory _data,
+        int256[] memory _data,
         address _pool,
         int256[][] calldata _parameters,
         uint64[] calldata _lambdaStore,

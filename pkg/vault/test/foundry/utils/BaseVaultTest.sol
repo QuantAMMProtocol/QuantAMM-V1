@@ -74,8 +74,25 @@ abstract contract BaseVaultTest is VaultContractsDeployer, VaultStorage, BaseTes
     uint256 internal constant BUFFER_MINIMUM_TOTAL_SUPPLY = 1e4;
     uint256 internal constant PRODUCTION_MIN_WRAP_AMOUNT = 1e3;
 
-    bytes32 internal constant ZERO_BYTES32 = 0x0000000000000000000000000000000000000000000000000000000000000000;
-    bytes32 internal constant ONE_BYTES32 = 0x0000000000000000000000000000000000000000000000000000000000000001;
+    // Applies to Weighted Pools.
+    uint256 internal constant BASE_MIN_SWAP_FEE = 1e12; // 0.00001%
+    uint256 internal constant BASE_MAX_SWAP_FEE = 10e16; // 10%
+
+    // Default amount to use in tests for user operations.
+    uint256 internal constant DEFAULT_AMOUNT = 1e3 * 1e18;
+    // Default amount round down.
+    uint256 internal constant DEFAULT_AMOUNT_ROUND_DOWN = DEFAULT_AMOUNT - 2;
+    // Default amount of BPT to use in tests for user operations.
+    uint256 internal constant DEFAULT_BPT_AMOUNT = 2e3 * 1e18;
+    // Default amount of BPT round down.
+    uint256 internal constant DEFAULT_BPT_AMOUNT_ROUND_DOWN = DEFAULT_BPT_AMOUNT - 2;
+    // Default rate for the rate provider mock.
+    uint256 internal constant DEFAULT_MOCK_RATE = 2e18;
+
+    // Default swap fee percentage.
+    uint256 internal constant DEFAULT_SWAP_FEE_PERCENTAGE = 1e16; // 1%
+    // Default protocol swap fee percentage.
+    uint64 internal constant DEFAULT_PROTOCOL_SWAP_FEE_PERCENTAGE = 50e16; // 50%
 
     // Main contract mocks.
     IVaultMock internal vault;
@@ -84,7 +101,6 @@ abstract contract BaseVaultTest is VaultContractsDeployer, VaultStorage, BaseTes
     RouterMock internal router;
     BatchRouterMock internal batchRouter;
     BufferRouterMock internal bufferRouter;
-    PoolFactoryMock internal factoryMock;
     RateProviderMock internal rateProvider;
     CompositeLiquidityRouterMock internal compositeLiquidityRouter;
     BasicAuthorizerMock internal authorizer;
@@ -97,25 +113,11 @@ abstract contract BaseVaultTest is VaultContractsDeployer, VaultStorage, BaseTes
     bytes internal poolArguments;
     // Pool Hooks.
     address internal poolHooksContract;
+    // Pool factory.
+    address internal poolFactory;
 
-    // Default amount to use in tests for user operations.
-    uint256 internal defaultAmount = 1e3 * 1e18;
-    // Default amount round up.
-    uint256 internal defaultAmountRoundUp = defaultAmount + 1;
-    // Default amount round down.
-    uint256 internal defaultAmountRoundDown = defaultAmount - 2;
-    // Default amount of BPT to use in tests for user operations.
-    uint256 internal bptAmount = 2e3 * 1e18;
-    // Default amount of BPT round down.
-    uint256 internal bptAmountRoundDown = bptAmount - 2;
     // Amount to use to init the mock pool.
     uint256 internal poolInitAmount = 1e3 * 1e18;
-    // Default rate for the rate provider mock.
-    uint256 internal mockRate = 2e18;
-    // Default swap fee percentage.
-    uint256 internal swapFeePercentage = 1e16; // 1%
-    // Default protocol swap fee percentage.
-    uint64 internal protocolSwapFeePercentage = 50e16; // 50%
 
     // VaultMock can override min trade amount; tests shall use 0 by default to simplify fuzz tests.
     // Min trade amount is meant to be an extra protection against unknown rounding errors; the Vault should still work
@@ -129,19 +131,40 @@ abstract contract BaseVaultTest is VaultContractsDeployer, VaultStorage, BaseTes
     // Change this value before calling `setUp` to test under real conditions.
     uint256 vaultMockMinWrapAmount = 1;
 
-    // Applies to Weighted Pools.
-    uint256 internal constant BASE_MIN_SWAP_FEE = 1e12; // 0.00001%
-    uint256 internal constant BASE_MAX_SWAP_FEE = 10e16; // 10%
+    // These are passed into the Protocol Fee Controller (keep zero for now to avoid breaking tests).
+    uint256 vaultMockInitialProtocolSwapFeePercentage = 0;
+    uint256 vaultMockInitialProtocolYieldFeePercentage = 0;
 
+    // ------------------------------ Hooks ------------------------------
+    function onAfterDeployMainContracts() internal virtual {}
+
+    // ------------------------------ Initialization ------------------------------
     function setUp() public virtual override {
         BaseTest.setUp();
-        _setUpBaseVaultTest();
+
+        _deployMainContracts();
+        onAfterDeployMainContracts();
+        _approveForAllUsers();
+
+        poolFactory = createPoolFactory();
+        poolHooksContract = createHook();
+        (pool, poolArguments) = createPool();
+
+        if (pool != address(0)) {
+            approveForPool(IERC20(pool));
+        }
+
         // Add initial liquidity
         initPool();
     }
 
-    function _setUpBaseVaultTest() internal {
-        vault = deployVaultMock(vaultMockMinTradeAmount, vaultMockMinWrapAmount);
+    function _deployMainContracts() private {
+        vault = deployVaultMock(
+            vaultMockMinTradeAmount,
+            vaultMockMinWrapAmount,
+            vaultMockInitialProtocolSwapFeePercentage,
+            vaultMockInitialProtocolYieldFeePercentage
+        );
 
         vm.label(address(vault), "vault");
         vaultExtension = IVaultExtension(vault.getVaultExtension());
@@ -150,8 +173,6 @@ abstract contract BaseVaultTest is VaultContractsDeployer, VaultStorage, BaseTes
         vm.label(address(vaultAdmin), "vaultAdmin");
         authorizer = BasicAuthorizerMock(address(vault.getAuthorizer()));
         vm.label(address(authorizer), "authorizer");
-        factoryMock = PoolFactoryMock(address(vault.getPoolFactoryMock()));
-        vm.label(address(factoryMock), "factory");
         router = deployRouterMock(IVault(address(vault)), weth, permit2);
         vm.label(address(router), "router");
         batchRouter = deployBatchRouterMock(IVault(address(vault)), weth, permit2);
@@ -162,19 +183,14 @@ abstract contract BaseVaultTest is VaultContractsDeployer, VaultStorage, BaseTes
         vm.label(address(bufferRouter), "buffer router");
         feeController = vault.getProtocolFeeController();
         vm.label(address(feeController), "fee controller");
+    }
 
-        poolHooksContract = createHook();
-        (pool, poolArguments) = createPool();
-
-        // Approve vault allowances.
+    function _approveForAllUsers() private {
         for (uint256 i = 0; i < users.length; ++i) {
             address user = users[i];
             vm.startPrank(user);
             approveForSender();
             vm.stopPrank();
-        }
-        if (pool != address(0)) {
-            approveForPool(IERC20(pool));
         }
     }
 
@@ -185,6 +201,19 @@ abstract contract BaseVaultTest is VaultContractsDeployer, VaultStorage, BaseTes
             permit2.approve(address(tokens[i]), address(bufferRouter), type(uint160).max, type(uint48).max);
             permit2.approve(address(tokens[i]), address(batchRouter), type(uint160).max, type(uint48).max);
             permit2.approve(address(tokens[i]), address(compositeLiquidityRouter), type(uint160).max, type(uint48).max);
+        }
+
+        for (uint256 i = 0; i < oddDecimalTokens.length; ++i) {
+            oddDecimalTokens[i].approve(address(permit2), type(uint256).max);
+            permit2.approve(address(oddDecimalTokens[i]), address(router), type(uint160).max, type(uint48).max);
+            permit2.approve(address(oddDecimalTokens[i]), address(bufferRouter), type(uint160).max, type(uint48).max);
+            permit2.approve(address(oddDecimalTokens[i]), address(batchRouter), type(uint160).max, type(uint48).max);
+            permit2.approve(
+                address(oddDecimalTokens[i]),
+                address(compositeLiquidityRouter),
+                type(uint160).max,
+                type(uint48).max
+            );
         }
 
         for (uint256 i = 0; i < erc4626Tokens.length; ++i) {
@@ -240,6 +269,13 @@ abstract contract BaseVaultTest is VaultContractsDeployer, VaultStorage, BaseTes
         return router.initialize(poolToInit, tokens, amountsIn, minBptOut, false, bytes(""));
     }
 
+    function createPoolFactory() internal virtual returns (address) {
+        PoolFactoryMock factoryMock = PoolFactoryMock(address(vault.getPoolFactoryMock()));
+        vm.label(address(factoryMock), "factory");
+
+        return address(factoryMock);
+    }
+
     function createPool() internal virtual returns (address, bytes memory) {
         return _createPool([address(dai), address(usdc)].toMemoryArray(), "pool");
     }
@@ -251,10 +287,15 @@ abstract contract BaseVaultTest is VaultContractsDeployer, VaultStorage, BaseTes
         string memory name = "ERC20 Pool";
         string memory symbol = "ERC20POOL";
 
-        newPool = factoryMock.createPool(name, symbol);
+        newPool = PoolFactoryMock(poolFactory).createPool(name, symbol);
         vm.label(newPool, label);
 
-        factoryMock.registerTestPool(newPool, vault.buildTokenConfig(tokens.asIERC20()), poolHooksContract, lp);
+        PoolFactoryMock(poolFactory).registerTestPool(
+            newPool,
+            vault.buildTokenConfig(tokens.asIERC20()),
+            poolHooksContract,
+            lp
+        );
 
         poolArgs = abi.encode(vault, name, symbol);
     }
@@ -268,19 +309,20 @@ abstract contract BaseVaultTest is VaultContractsDeployer, VaultStorage, BaseTes
     function _createHook(HookFlags memory hookFlags) internal virtual returns (address) {
         PoolHooksMock newHook = deployPoolHooksMock(IVault(address(vault)));
         // Allow pools built with factoryMock to use the poolHooksMock.
-        newHook.allowFactory(address(factoryMock));
+        newHook.allowFactory(poolFactory);
         // Configure pool hook flags.
         newHook.setHookFlags(hookFlags);
         vm.label(address(newHook), "pool hooks");
         return address(newHook);
     }
 
+    // ------------------------------ Helpers ------------------------------
     function setSwapFeePercentage(uint256 percentage) internal {
         _setSwapFeePercentage(pool, percentage);
     }
 
     function _setSwapFeePercentage(address setPool, uint256 percentage) internal {
-        vault.manuallySetSwapFee(setPool, percentage);
+        vault.manualUnsafeSetStaticSwapFeePercentage(setPool, percentage);
     }
 
     function getBalances(address user) internal view returns (Balances memory balances) {

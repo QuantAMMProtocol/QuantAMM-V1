@@ -50,7 +50,7 @@ contract PoolFactoryMock is IBasePoolFactory, SingletonAuthentication, FactoryWi
         );
     }
 
-    function registerTestPool(address pool, TokenConfig[] memory tokenConfig, address poolHooksContract) external {
+    function registerPoolWithHook(address pool, TokenConfig[] memory tokenConfig, address poolHooksContract) external {
         PoolRoleAccounts memory roleAccounts;
 
         _vault.registerPool(
@@ -166,6 +166,10 @@ contract PoolFactoryMock is IBasePoolFactory, SingletonAuthentication, FactoryWi
             poolHooksContract,
             liquidityManagement
         );
+    }
+
+    function manualSetPoolFromFactory(address pool) external {
+        _isPoolFromFactory[pool] = true;
     }
 
     function _getDefaultLiquidityManagement() private pure returns (LiquidityManagement memory) {

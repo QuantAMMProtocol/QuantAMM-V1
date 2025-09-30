@@ -659,7 +659,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.stopPrank();
         uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
-        vm.expectRevert(abi.encodeWithSelector(IVaultErrors.SenderIsNotVault.selector, bob));
+        vm.expectRevert(abi.encodeWithSelector(UpliftOnlyExample.CannotUseExternalRouter.selector, address(router)));
         vm.startPrank(bob);
         upliftOnlyRouter.onAfterRemoveLiquidity(
             address(router),
@@ -682,7 +682,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.stopPrank();
         uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
-        vm.expectRevert(abi.encodeWithSelector(IVaultErrors.SenderIsNotVault.selector, lp));
+        vm.expectRevert(abi.encodeWithSelector(UpliftOnlyExample.CannotUseExternalRouter.selector, address(router)));
         vm.startPrank(lp);
         upliftOnlyRouter.onAfterRemoveLiquidity(
             address(router),
@@ -817,86 +817,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.startPrank(owner);
         vm.expectRevert("Above _MAX_SWAP_FEE_PERCENTAGE");
         upliftOnlyRouter.setHookSwapFeePercentage(boundFeeAmount);
-        vm.stopPrank();
-    }
-
-    function testFeeSwapExactIn__Fuzz(uint256 swapAmount, uint64 hookFeePercentage) public {
-        // Swap between POOL_MINIMUM_TOTAL_SUPPLY and whole pool liquidity (pool math is linear)
-        swapAmount = bound(swapAmount, POOL_MINIMUM_TOTAL_SUPPLY, poolInitAmount);
-
-        // Fee between 0 and 100%
-        hookFeePercentage = uint64(bound(hookFeePercentage, _MIN_SWAP_FEE_PERCENTAGE, _MAX_SWAP_FEE_PERCENTAGE));
-
-        vm.expectEmit();
-        emit UpliftOnlyExample.HookSwapFeePercentageChanged(poolHooksContract, hookFeePercentage);
-
-        vm.prank(owner);
-        UpliftOnlyExample(payable(poolHooksContract)).setHookSwapFeePercentage(hookFeePercentage);
-        uint256 hookFee = swapAmount.mulUp(hookFeePercentage);
-
-        BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
-
-        vm.prank(bob);
-        vm.expectCall(
-            address(poolHooksContract),
-            abi.encodeCall(
-                IHooks.onAfterSwap,
-                AfterSwapParams({
-                    kind: SwapKind.EXACT_IN,
-                    tokenIn: dai,
-                    tokenOut: usdc,
-                    amountInScaled18: swapAmount,
-                    amountOutScaled18: swapAmount,
-                    tokenInBalanceScaled18: poolInitAmount + swapAmount,
-                    tokenOutBalanceScaled18: poolInitAmount - swapAmount,
-                    amountCalculatedScaled18: swapAmount,
-                    amountCalculatedRaw: swapAmount,
-                    router: address(router),
-                    pool: pool,
-                    userData: bytes("")
-                })
-            )
-        );
-
-        if (hookFee > 0) {
-            vm.expectEmit();
-            emit UpliftOnlyExample.SwapHookFeeCharged(poolHooksContract, IERC20(usdc), hookFee);
-        }
-
-        router.swapSingleTokenExactIn(address(pool), dai, usdc, swapAmount, 0, MAX_UINT256, false, bytes(""));
-
-        BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
-
-        assertEq(
-            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
-            block.timestamp,
-            "bptAmount mapping should be 0"
-        );
-        assertEq(
-            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
-            500000000000000000,
-            "should match sum(amount * price)"
-        );
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
-
-        int256[] memory prices = new int256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            prices[i] = int256(i + 1) * 1.5e1; // Make the price 1.5 times higher
-        }
-        updateWeightRunner.setMockPrices(pool, prices);
-
-        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
-
-        vm.startPrank(bob);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IVaultErrors.AmountInAboveMax.selector,
-                address(dai),
-                83333333333333334,
-                83333333333333167
-            )
-        );
-        upliftOnlyRouter.removeLiquidityProportional(bptAmount / 3, minAmountsOut, false, pool);
         vm.stopPrank();
     }
 

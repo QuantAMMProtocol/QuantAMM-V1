@@ -863,7 +863,9 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         vm.stopPrank();
 
         p.prices = new int256[](tokens.length);
-        for (uint256 i; i < tokens.length; ++i) p.prices[i] = int256(i) * int256(p.priceMulE18);
+        for (uint256 i; i < tokens.length; ++i){
+            p.prices[i] = int256(i) * int256(p.priceMulE18);
+        }
         updateWeightRunner.setMockPrices(pool, p.prices);
 
         p.minsOut = [uint256(0), uint256(0)].toMemoryArray();

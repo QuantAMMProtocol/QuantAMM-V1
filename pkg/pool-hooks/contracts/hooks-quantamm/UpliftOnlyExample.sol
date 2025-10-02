@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity >=0.8.24;
+pragma solidity >=0.8.27;
 
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -94,6 +94,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
     uint64 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16; // 0.001%
     uint64 private constant _MAX_SWAP_FEE_PERCENTAGE = 10e16; // 10%
     uint64 public immutable _MAX_UPLIFT_FEE_PERCENTAGE = 10e16; // 10%
+
     /**
      * @notice A new `UpliftOnlyExampleRegistered` contract has been registered successfully for a given pool.
      * @dev If the registration fails the call will revert, so there will be no event.
@@ -236,10 +237,10 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
      * @param wethIsEth A boolean indicating whether WETH should be treated as ETH.
      * @param userData Additional data provided by the user for the liquidity addition.
      * @return amountsIn The actual amounts of tokens deposited into the pool.
-     * @custom:requirements 
+     * @custom:requirements
      * - The pool must be registered with the QuantAMM update weight runner.
      * - The pool must be approved with oracles that provide the prices.
-     * @custom:errors 
+     * @custom:errors
      * - `TooManyDeposits`: Thrown if the user has exceeded the maximum allowed deposits for the pool.
      * - `TooFastDeposits`: Thrown if deposits are made too frequently within the same block.
      */
@@ -298,6 +299,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
 
         nftPool[tokenID] = pool;
     }
+
     /**
      * @notice Removes liquidity from the pool proportionally based on the provided BPT amount.
      * @dev This function ensures that only the owner of the deposit can withdraw liquidity.
@@ -317,15 +319,23 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         bool wethIsEth,
         address pool
     ) external payable saveSender(msg.sender) returns (uint256[] memory amountsOut) {
-        uint depositLength = poolsFeeData[pool][msg.sender].length;
+        address quantAMMAdmin = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin();
+        address sender = address(this);
+        if (msg.sender != quantAMMAdmin) {
+            uint depositLength = poolsFeeData[pool][msg.sender].length;
 
-        if (depositLength == 0) {
-            revert WithdrawalByNonOwner(msg.sender, pool, bptAmountIn);
+            if (depositLength == 0) {
+                revert WithdrawalByNonOwner(msg.sender, pool, bptAmountIn);
+            }
         }
+        else{
+            sender = quantAMMAdmin;
+        }
+
         // Do removeLiquidity operation - tokens sent to msg.sender.
         amountsOut = _removeLiquidityProportional(
             pool,
-            address(this),
+            sender,
             msg.sender,
             bptAmountIn,
             minAmountsOut,
@@ -409,7 +419,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         if (liquidityManagement.enableDonation == false) {
             revert PoolDoesNotSupportDonation();
         }
-        if (liquidityManagement.disableUnbalancedLiquidity == false) {
+        if (liquidityManagement.disableUnbalancedLiquidity == true) {
             revert PoolSupportsUnbalancedLiquidity();
         }
 
@@ -424,7 +434,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         // `enableHookAdjustedAmounts` must be true for all contracts that modify the `amountCalculated`
         // in after hooks. Otherwise, the Vault will ignore any "hookAdjusted" amounts, and the transaction
         // might not settle. (It should be false if the after hooks do something else.)
-        hookFlags.enableHookAdjustedAmounts = true;
+        hookFlags.enableHookAdjustedAmounts = false;
         hookFlags.shouldCallBeforeAddLiquidity = true;
         hookFlags.shouldCallAfterRemoveLiquidity = true;
         hookFlags.shouldCallAfterSwap = true;
@@ -458,6 +468,8 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
     //needed to avoid stack too deep error
     struct AfterRemoveLiquidityData {
         address pool;
+        address userAddress;
+        address quantammAdminAddress;
         uint256 bptAmountIn;
         uint256[] amountsOutRaw;
         uint256[] minAmountsOut;
@@ -487,16 +499,16 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
      * @param userData Additional data provided by the user for the liquidity removal operation.
      * @return success A boolean indicating whether the operation was successful.
      * @return hookAdjustedAmountsOutRaw The adjusted amounts of tokens withdrawn after fees are applied.
-     * 
-     * @notice Fees are calculated based on the uplift in pool value since the deposit and are capped by 
+     *
+     * @notice Fees are calculated based on the uplift in pool value since the deposit and are capped by
      *         `_MAX_UPLIFT_FEE_PERCENTAGE`. A minimum withdrawal fee (`minWithdrawalFeeBps`) is always applied.
      * @notice Admin fees are redistributed to the admin's address, while other accrued fees are donated back to the pool.
      * @notice This function ensures that fees do not exceed the amounts being withdrawn and reverts if this condition is violated.
-     * 
+     *
      * @dev The function interacts with the Vault to add liquidity back to the pool for fee redistribution.
      * @dev The function assumes that liquidity removal is only performed via the Router/Hook itself to ensure proper fee application.
      * @dev Emits an `ExitFeeCharged` event when admin fees are charged.
-     * 
+     *
      * @custom:security Only callable by the Vault and self-router to ensure controlled execution.
      */
     function onAfterRemoveLiquidity(
@@ -509,139 +521,148 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         uint256[] memory,
         bytes memory userData
     ) public override onlySelfRouter(router) returns (bool, uint256[] memory hookAdjustedAmountsOutRaw) {
-        address userAddress = address(bytes20(userData));
         AfterRemoveLiquidityData memory localData = AfterRemoveLiquidityData({
-            pool: pool,
-            bptAmountIn: bptAmountIn,
-            amountsOutRaw: amountsOutRaw,
-            minAmountsOut: new uint256[](amountsOutRaw.length),
-            accruedFees: new uint256[](amountsOutRaw.length),
-            accruedQuantAMMFees: new uint256[](amountsOutRaw.length),
-            currentFee: minWithdrawalFeeBps,
-            feeAmount: 0,
-            prices: IUpdateWeightRunner(_updateWeightRunner).getData(pool),
-            lpTokenDepositValueNow: 0,
-            lpTokenDepositValueChange: 0,
-            lpTokenDepositValue: 0,
-            tokens: new IERC20[](amountsOutRaw.length),
-            feeDataArrayLength: 0,
-            amountLeft: 0,
-            feePercentage: 0,
-            adminFeePercent: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake()
-        });
+                pool: pool,
+                bptAmountIn: bptAmountIn,
+                amountsOutRaw: amountsOutRaw,
+                minAmountsOut: new uint256[](amountsOutRaw.length),
+                accruedFees: new uint256[](amountsOutRaw.length),
+                accruedQuantAMMFees: new uint256[](amountsOutRaw.length),
+                currentFee: minWithdrawalFeeBps,
+                feeAmount: 0,
+                prices: IUpdateWeightRunner(_updateWeightRunner).getData(pool),
+                lpTokenDepositValueNow: 0,
+                lpTokenDepositValueChange: 0,
+                lpTokenDepositValue: 0,
+                tokens: new IERC20[](amountsOutRaw.length),
+                feeDataArrayLength: 0,
+                amountLeft: 0,
+                feePercentage: 0,
+                adminFeePercent: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake(),
+                userAddress: address(bytes20(userData)),
+                quantammAdminAddress:IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin()
+            });
 
-        // We only allow removeLiquidity via the Router/Hook itself so that fee is applied correctly.
-        hookAdjustedAmountsOutRaw = amountsOutRaw;
+        if (localData.userAddress == localData.quantammAdminAddress) {
+            return (true, amountsOutRaw);
+        } else {
+            
+            // We only allow removeLiquidity via the Router/Hook itself so that fee is applied correctly.
+            hookAdjustedAmountsOutRaw = amountsOutRaw;
 
-        // Calculate the current value of the pool in USD, rounding down to favor LPs.
-        localData.lpTokenDepositValueNow = getPoolLPTokenValue(localData.prices, pool, MULDIRECTION.MULDOWN);
+            // Calculate the current value of the pool in USD, rounding down to favor LPs.
+            localData.lpTokenDepositValueNow = getPoolLPTokenValue(localData.prices, pool, MULDIRECTION.MULDOWN);
 
-        FeeData[] storage feeDataArray = poolsFeeData[pool][userAddress];
-        localData.feeDataArrayLength = feeDataArray.length;
-        localData.amountLeft = bptAmountIn;
+            FeeData[] storage feeDataArray = poolsFeeData[pool][localData.userAddress];
+            localData.feeDataArrayLength = feeDataArray.length;
+            localData.amountLeft = bptAmountIn;
 
-        for (uint256 i = localData.feeDataArrayLength - 1; i >= 0; --i) {
-            localData.lpTokenDepositValue = feeDataArray[i].lpTokenDepositValue;
-            localData.lpTokenDepositValueChange =
-                ((int256(localData.lpTokenDepositValueNow) - int256(localData.lpTokenDepositValue)) * 1e18) /
-                int256(localData.lpTokenDepositValueNow);
+            for (uint256 i = localData.feeDataArrayLength - 1; i >= 0; --i) {
+                localData.lpTokenDepositValue = feeDataArray[i].lpTokenDepositValue;
+                localData.lpTokenDepositValueChange =
+                    ((int256(localData.lpTokenDepositValueNow) - int256(localData.lpTokenDepositValue)) * 1e18) /
+                    int256(localData.lpTokenDepositValueNow);
 
-            uint256 feePerLP;
+                uint256 feePerLP;
 
-            // Calculate fee based on uplift in pool value since deposit, ensuring minimum withdrawal fee is applied.
-            if (localData.lpTokenDepositValueChange > 0) {
-                feePerLP = (uint256(localData.lpTokenDepositValueChange).mulUp(uint256(feeDataArray[i].upliftFeeBps)));
-            }
+                // Calculate fee based on uplift in pool value since deposit, ensuring minimum withdrawal fee is applied.
+                if (localData.lpTokenDepositValueChange > 0) {
+                    feePerLP = (
+                        uint256(localData.lpTokenDepositValueChange).mulUp(uint256(feeDataArray[i].upliftFeeBps))
+                    );
+                }
 
-            if (feePerLP < uint256(minWithdrawalFeeBps)) {
-                feePerLP = uint256(minWithdrawalFeeBps);
-            }
+                if (feePerLP < uint256(minWithdrawalFeeBps)) {
+                    feePerLP = uint256(minWithdrawalFeeBps);
+                }
 
-            if (feePerLP > uint256(_MAX_UPLIFT_FEE_PERCENTAGE)) {
-                feePerLP = uint256(_MAX_UPLIFT_FEE_PERCENTAGE);
-            }
+                if (feePerLP > uint256(_MAX_UPLIFT_FEE_PERCENTAGE)) {
+                    feePerLP = uint256(_MAX_UPLIFT_FEE_PERCENTAGE);
+                }
 
-            // Burn deposits sequentially (FILO) until the requested amount is fully withdrawn.
-            if (feeDataArray[i].amount <= localData.amountLeft) {
-                uint256 withdrawAmount = feeDataArray[i].amount;
+                // Burn deposits sequentially (FILO) until the requested amount is fully withdrawn.
+                if (feeDataArray[i].amount <= localData.amountLeft) {
+                    uint256 withdrawAmount = feeDataArray[i].amount;
 
-                localData.feeAmount += withdrawAmount.mulDown(feePerLP);
-                localData.amountLeft -= feeDataArray[i].amount;
+                    localData.feeAmount += withdrawAmount.mulDown(feePerLP);
+                    localData.amountLeft -= feeDataArray[i].amount;
 
-                lpNFT.burn(feeDataArray[i].tokenID);
+                    lpNFT.burn(feeDataArray[i].tokenID);
 
-                delete feeDataArray[i];
-                feeDataArray.pop();
+                    delete feeDataArray[i];
+                    feeDataArray.pop();
 
-                if (localData.amountLeft == 0) {
+                    if (localData.amountLeft == 0) {
+                        break;
+                    }
+                } else {
+                    feeDataArray[i].amount -= localData.amountLeft;
+                    localData.feeAmount += localData.amountLeft.mulDown(feePerLP);
                     break;
                 }
-            } else {
-                feeDataArray[i].amount -= localData.amountLeft;
-                localData.feeAmount += localData.amountLeft.mulDown(feePerLP);
-                break;
             }
-        }
 
-        localData.feePercentage = localData.feeAmount.divDown(bptAmountIn);
-        hookAdjustedAmountsOutRaw = localData.amountsOutRaw;
-        localData.tokens = _vault.getPoolTokens(localData.pool);
+            localData.feePercentage = localData.feeAmount.divDown(bptAmountIn);
+            hookAdjustedAmountsOutRaw = localData.amountsOutRaw;
+            localData.tokens = _vault.getPoolTokens(localData.pool);
 
-        localData.adminFeePercent = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
+            localData.adminFeePercent = IUpdateWeightRunner(_updateWeightRunner).getQuantAMMUpliftFeeTake();
 
-        // Charge fees proportional to the `amountOut` of each token.
-        for (uint256 i = 0; i < localData.amountsOutRaw.length; i++) {
-            uint256 exitFee = localData.amountsOutRaw[i].mulUp(localData.feePercentage);
+            // Charge fees proportional to the `amountOut` of each token.
+            for (uint256 i = 0; i < localData.amountsOutRaw.length; i++) {
+                uint256 exitFee = localData.amountsOutRaw[i].mulUp(localData.feePercentage);
+
+                if (localData.adminFeePercent > 0) {
+                    localData.accruedQuantAMMFees[i] = exitFee.mulUp(localData.adminFeePercent);
+                }
+
+                localData.accruedFees[i] = exitFee - localData.accruedQuantAMMFees[i];
+                if (localData.accruedFees[i] + localData.accruedQuantAMMFees[i] > localData.amountsOutRaw[i]) {
+                    // Ensure fees do not exceed the amounts being withdrawn.
+                    revert("Accrued fees exceed amounts out");
+                }
+                hookAdjustedAmountsOutRaw[i] = localData.amountsOutRaw[i] - exitFee;
+
+                // Fees don't need to be transferred to the hook, because donation will redeposit them in the Vault.
+            }
 
             if (localData.adminFeePercent > 0) {
-                localData.accruedQuantAMMFees[i] = exitFee.mulUp(localData.adminFeePercent);
+                // Redistribute admin fees back to the QuantAMM admin.
+                _vault.addLiquidity(
+                    AddLiquidityParams({
+                        pool: localData.pool,
+                        to: localData.quantammAdminAddress,
+                        maxAmountsIn: localData.accruedQuantAMMFees,
+                        minBptAmountOut: localData.feeAmount.mulUp(localData.adminFeePercent),
+                        kind: AddLiquidityKind.UNBALANCED,
+                        userData: userData
+                    })
+                );
+
+                emit ExitFeeCharged(
+                    localData.userAddress,
+                    localData.pool,
+                    IERC20(localData.pool),
+                    localData.feeAmount.mulDown(localData.adminFeePercent)
+                );
             }
 
-            localData.accruedFees[i] = exitFee - localData.accruedQuantAMMFees[i];
-            if (localData.accruedFees[i] + localData.accruedQuantAMMFees[i] > localData.amountsOutRaw[i]) {
-                // Ensure fees do not exceed the amounts being withdrawn.
-                revert("Accrued fees exceed amounts out");
+            if (localData.adminFeePercent != 1e18) {
+                // Donate accrued fees back to LPs.
+                _vault.addLiquidity(
+                    AddLiquidityParams({
+                        pool: localData.pool,
+                        to: localData.userAddress, // It would mint BPTs to router, but it's a donation so no BPT is minted
+                        maxAmountsIn: localData.accruedFees, // Donate all accrued fees back to the pool (i.e. to the LPs)
+                        minBptAmountOut: 0, // Donation does not return BPTs, any number above 0 will revert
+                        kind: AddLiquidityKind.DONATION,
+                        userData: bytes("") // User data is not used by donation, so we can set it to an empty string
+                    })
+                );
             }
-            hookAdjustedAmountsOutRaw[i] = localData.amountsOutRaw[i] - exitFee;
 
-            // Fees don't need to be transferred to the hook, because donation will redeposit them in the Vault.
+            return (true, hookAdjustedAmountsOutRaw);
         }
-
-        if (localData.adminFeePercent > 0) {
-            // Redistribute admin fees back to the QuantAMM admin.
-            _vault.addLiquidity(
-                AddLiquidityParams({
-                    pool: localData.pool,
-                    to: IUpdateWeightRunner(_updateWeightRunner).getQuantAMMAdmin(),
-                    maxAmountsIn: localData.accruedQuantAMMFees,
-                    minBptAmountOut: localData.feeAmount.mulUp(localData.adminFeePercent),
-                    kind: AddLiquidityKind.PROPORTIONAL,
-                    userData: userData
-                })
-            );
-            emit ExitFeeCharged(
-                userAddress,
-                localData.pool,
-                IERC20(localData.pool),
-                localData.feeAmount.mulDown(localData.adminFeePercent)
-            );
-        }
-
-        if (localData.adminFeePercent != 1e18) {
-            // Donate accrued fees back to LPs.
-            _vault.addLiquidity(
-                AddLiquidityParams({
-                    pool: localData.pool,
-                    to: userAddress, // It would mint BPTs to router, but it's a donation so no BPT is minted
-                    maxAmountsIn: localData.accruedFees, // Donate all accrued fees back to the pool (i.e. to the LPs)
-                    minBptAmountOut: 0, // Donation does not return BPTs, any number above 0 will revert
-                    kind: AddLiquidityKind.DONATION,
-                    userData: bytes("") // User data is not used by donation, so we can set it to an empty string
-                })
-            );
-        }
-
-        return (true, hookAdjustedAmountsOutRaw);
     }
 
     /// @param _from the owner to transfer from

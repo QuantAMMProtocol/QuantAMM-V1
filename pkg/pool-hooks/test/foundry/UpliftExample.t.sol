@@ -182,7 +182,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         roleAccounts.poolCreator = lp;
 
         LiquidityManagement memory liquidityManagement;
-        liquidityManagement.disableUnbalancedLiquidity = true;
+        liquidityManagement.disableUnbalancedLiquidity = false;
         liquidityManagement.enableDonation = true;
 
         factoryMock.registerPool(
@@ -1153,4 +1153,335 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         );
         assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
     }
+
+    //https://codehawks.cyfrin.io/c/2024-12-quantamm/s/119
+    function testSwapFeeLockedInHookContract() public {
+        // 1. Set hook fee percentage
+        uint64 hookFeePercentage = 1e16; // 1%
+        vm.prank(owner);
+        upliftOnlyRouter.setHookSwapFeePercentage(hookFeePercentage);
+
+        // 2. Log initial balances
+        console.log("--- Initial Balances ---");
+        console.log("Hook Contract USDC Balance:", usdc.balanceOf(address(upliftOnlyRouter)));
+        console.log("Owner USDC Balance:", usdc.balanceOf(owner));
+
+        // 3. Perform swap to generate fees
+        uint256 swapAmount = 100e18;
+        vm.prank(bob);
+        router.swapSingleTokenExactIn(address(pool), dai, usdc, swapAmount, 0, MAX_UINT256, false, bytes(""));
+
+        // 4. Log final balances to show fees are stuck in hook
+        console.log("\n--- After Swap Balances ---");
+        console.log("Hook Contract USDC Balance:", usdc.balanceOf(address(upliftOnlyRouter)));
+        console.log("Owner USDC Balance:", usdc.balanceOf(owner));
+
+        console.log("\n--- Fees are locked in hook contract ---");
+    }
+
+    function testUpliftOnlyAdminWithdraw_NoBptBalance() public {
+        vm.prank(address(vaultAdmin));
+        updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
+        vm.stopPrank();
+
+        // Add liquidity so bob has BPT to remove liquidity.
+        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+
+        vm.prank(bob);
+        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        vm.stopPrank();
+
+        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+
+        vm.startPrank(bob);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        vm.stopPrank();
+
+        //trying to remove liquidity added to QuantAMMAdmin with the value added from bob removing liquidity the remove attempt will revert with `WithdrawalByNonOwner` error
+        vm.prank(updateWeightRunner.getQuantAMMAdmin());
+        vm.expectRevert();
+        upliftOnlyRouter.removeLiquidityProportional(500000000000000000, minAmountsOut, false, pool);
+        vm.stopPrank();
+    }
+
+    function testUpliftOnlyAdmin_Succeeds_WithPositiveUplift() public {
+        // Configure the uplift fee take so that when there IS uplift, the admin receives BPT
+        vm.prank(address(vaultAdmin));
+        updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18); // 50% of uplift fee goes to admin as BPT
+        vm.stopPrank();
+
+        // (Optional) keep ownership consistent with other tests that transfer hook ownership
+        vm.prank(owner);
+        UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
+        vm.stopPrank();
+
+        // -------------------------
+        // 1) Bob adds liquidity
+        // -------------------------
+        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+
+        vm.prank(bob);
+        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        vm.stopPrank();
+
+        // Sanity: a deposit position (NFT/array) should be recorded for Bob
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "expected one position for Bob");
+
+        // ------------------------------------------------------
+        // 2) Create POSITIVE uplift: double the oracle prices
+        // ------------------------------------------------------
+        // Using the same price-setting pattern as other tests:
+        // prices[i] = int256(i) * 2e18  (for two tokens: [0, 2e18])
+        int256[] memory prices = new int256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; ++i) {
+            prices[i] = int256(i) * 2e18;
+        }
+        updateWeightRunner.setMockPrices(pool, prices);
+
+        // --------------------------------------------
+        // 3) Bob removes liquidity — this should mint
+        //    BPT to the QuantAMM admin due to uplift
+        // --------------------------------------------
+        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+
+        address admin = updateWeightRunner.getQuantAMMAdmin();
+
+        // Snapshot admin balances before
+        uint256 adminBptBefore = IERC20(pool).balanceOf(admin);
+        uint256 adminDaiBefore = dai.balanceOf(admin);
+        uint256 adminUsdcBefore = usdc.balanceOf(admin);
+
+        vm.startPrank(bob);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        vm.stopPrank();
+
+        // Verify uplift actually resulted in admin BPT being minted
+        uint256 adminBptAfterMint = IERC20(pool).balanceOf(admin);
+        assertGt(adminBptAfterMint, adminBptBefore, "expected admin BPT minted due to positive uplift");
+
+        // ----------------------------------------------------
+        // 4) Admin withdraws their fee BPT via normal router
+        //    path (admin fast-path) — should succeed
+        // ----------------------------------------------------
+        // Approve router to pull admin’s BPT
+        vm.prank(admin);
+        IERC20(pool).approve(address(upliftOnlyRouter), type(uint256).max);
+        vm.stopPrank();
+
+        // Withdraw ALL admin BPT; router will clamp if needed
+        vm.prank(admin);
+        upliftOnlyRouter.removeLiquidityProportional(adminBptAfterMint, minAmountsOut, false, pool);
+        vm.stopPrank();
+
+        // ----------------------------------------
+        // 5) Assertions: BPT down, tokens up
+        // ----------------------------------------
+        uint256 adminBptFinal = IERC20(pool).balanceOf(admin);
+        uint256 adminDaiFinal = dai.balanceOf(admin);
+        uint256 adminUsdcFinal = usdc.balanceOf(admin);
+
+        assertEq(adminBptFinal, 0, "admin has withdrawn all BPTs");
+
+        // Underlyings received
+        assertGt(adminDaiFinal, adminDaiBefore, "admin DAI should increase after withdraw");
+        assertGt(adminUsdcFinal, adminUsdcBefore, "admin USDC should increase after withdraw");
+
+        // Router should not retain BPT
+        assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), 0, "router should not hold BPT");
+    }
+
+    function testUpliftOnlyAdmin_PartialWithdraw_Succeeds() public {
+    // 50% uplift fee take
+    vm.prank(address(vaultAdmin));
+    updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
+    vm.stopPrank();
+
+    // (Optional) match ownership pattern used in other tests
+    vm.prank(owner);
+    UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
+    vm.stopPrank();
+
+    // Bob adds liquidity
+    uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+
+    vm.prank(bob);
+    upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+    vm.stopPrank();
+
+    // Bob has a recorded position
+    assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "expected one position for Bob");
+
+    // Create POSITIVE uplift (double prices like the working test)
+    int256[] memory prices = new int256[](tokens.length);
+    for (uint256 i = 0; i < tokens.length; ++i) {
+        prices[i] = int256(i) * 2e18;
+    }
+    updateWeightRunner.setMockPrices(pool, prices);
+
+    // Bob removes → admin gets fee BPT
+    uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+    address admin = updateWeightRunner.getQuantAMMAdmin();
+
+    vm.startPrank(bob);
+    upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+    vm.stopPrank();
+
+    uint256 adminBpt = IERC20(pool).balanceOf(admin);
+    assertGt(adminBpt, 0, "admin should have received BPT from uplift");
+
+    // Approve router and withdraw HALF
+    uint256 half = adminBpt / 2;
+    vm.prank(admin);
+    IERC20(pool).approve(address(upliftOnlyRouter), type(uint256).max);
+    vm.stopPrank();
+
+    uint256 adminDaiBefore = dai.balanceOf(admin);
+    uint256 adminUsdcBefore = usdc.balanceOf(admin);
+
+    vm.prank(admin);
+    upliftOnlyRouter.removeLiquidityProportional(half, minAmountsOut, false, pool);
+    vm.stopPrank();
+
+    // Half should remain
+    uint256 adminBptAfter = IERC20(pool).balanceOf(admin);
+    assertEq(adminBptAfter, adminBpt - half, "expected half of admin BPT to remain after partial withdraw");
+
+    // Underlyings increased
+    assertGt(dai.balanceOf(admin), adminDaiBefore, "admin DAI should increase");
+    assertGt(usdc.balanceOf(admin), adminUsdcBefore, "admin USDC should increase");
+
+    // Admin should not have any user-position metadata
+    assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, admin).length, 0, "admin should not accrue user fee data");
+}
+
+function testUpliftOnlyAdmin_OverWithdraw_Reverts() public {
+    // 50% uplift fee take
+    vm.prank(address(vaultAdmin));
+    updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
+    vm.stopPrank();
+
+    vm.prank(owner);
+    UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
+    vm.stopPrank();
+
+    // Bob adds liquidity
+    uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+    vm.prank(bob);
+    upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+    vm.stopPrank();
+
+    // Positive uplift
+    int256[] memory prices = new int256[](tokens.length);
+    for (uint256 i = 0; i < tokens.length; ++i) {
+        prices[i] = int256(i) * 2e18;
+    }
+    updateWeightRunner.setMockPrices(pool, prices);
+
+    // Bob exits → admin earns BPT
+    uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+    address admin = updateWeightRunner.getQuantAMMAdmin();
+
+    vm.startPrank(bob);
+    upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+    vm.stopPrank();
+
+    uint256 adminBpt = IERC20(pool).balanceOf(admin);
+    assertGt(adminBpt, 0, "admin should have BPT");
+
+    // Approve router then attempt to withdraw MORE than balance
+    vm.prank(admin);
+    IERC20(pool).approve(address(upliftOnlyRouter), type(uint256).max);
+    vm.stopPrank();
+
+    vm.prank(admin);
+    vm.expectRevert(); // Vault will enforce ERC20InsufficientBalance(admin, …)
+    upliftOnlyRouter.removeLiquidityProportional(adminBpt + 1, minAmountsOut, false, pool);
+    vm.stopPrank();
+
+    // Balance unchanged
+    assertEq(IERC20(pool).balanceOf(admin), adminBpt, "admin BPT should remain unchanged after failed over-withdraw");
+}
+
+function testUpliftOnlyAdmin_MultiAccruals_ThenWithdrawAll() public {
+    // 50% uplift fee take
+    vm.prank(address(vaultAdmin));
+    updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
+    vm.stopPrank();
+
+    vm.prank(owner);
+    UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
+    vm.stopPrank();
+
+    address admin = updateWeightRunner.getQuantAMMAdmin();
+    uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+
+    // -------- Cycle 1: add → uplift → remove --------
+    {
+        uint256[] memory maxIn1 = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+
+        vm.prank(bob);
+        upliftOnlyRouter.addLiquidityProportional(pool, maxIn1, bptAmount, false, bytes(""));
+        vm.stopPrank();
+
+        // Positive uplift (2x scale)
+        int256[] memory prices1 = new int256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; ++i) {
+            prices1[i] = int256(i) * 2e18;
+        }
+        updateWeightRunner.setMockPrices(pool, prices1);
+
+        vm.prank(bob);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        vm.stopPrank();
+    }
+
+    uint256 adminBptAfter1 = IERC20(pool).balanceOf(admin);
+    assertGt(adminBptAfter1, 0, "admin should have BPT after cycle 1");
+
+    // -------- Cycle 2: add → stronger uplift → remove --------
+    {
+        uint256[] memory maxIn2 = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+
+        vm.prank(bob);
+        upliftOnlyRouter.addLiquidityProportional(pool, maxIn2, bptAmount, false, bytes(""));
+        vm.stopPrank();
+
+        // Stronger uplift (e.g., 4x scale)
+        int256[] memory prices2 = new int256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; ++i) {
+            prices2[i] = int256(i) * 4e18;
+        }
+        updateWeightRunner.setMockPrices(pool, prices2);
+
+        vm.prank(bob);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        vm.stopPrank();
+    }
+
+    uint256 adminBptAfter2 = IERC20(pool).balanceOf(admin);
+    assertGt(adminBptAfter2, adminBptAfter1, "admin BPT should have increased after cycle 2");
+
+    // Approve and withdraw ALL fee BPT in one go
+    vm.prank(admin);
+    IERC20(pool).approve(address(upliftOnlyRouter), type(uint256).max);
+    vm.stopPrank();
+
+    uint256 adminDaiBefore = dai.balanceOf(admin);
+    uint256 adminUsdcBefore = usdc.balanceOf(admin);
+
+    vm.prank(admin);
+    upliftOnlyRouter.removeLiquidityProportional(adminBptAfter2, minAmountsOut, false, pool);
+    vm.stopPrank();
+
+    // All burned
+    assertEq(IERC20(pool).balanceOf(admin), 0, "admin should have withdrawn all fee BPT");
+
+    // Underlyings received
+    assertGt(dai.balanceOf(admin), adminDaiBefore, "admin DAI should increase");
+    assertGt(usdc.balanceOf(admin), adminUsdcBefore, "admin USDC should increase");
+
+    // Admin never accumulates user fee positions
+    assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, admin).length, 0, "admin should not have user fee data recorded");
+}
+
 }

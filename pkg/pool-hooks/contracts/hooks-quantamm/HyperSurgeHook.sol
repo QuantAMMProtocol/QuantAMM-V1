@@ -21,6 +21,7 @@ import {
 } from "@balancer-labs/v3-standalone-utils/contracts/utils/HyperTokenInfoPrecompile.sol";
 import { VaultGuard } from "@balancer-labs/v3-vault/contracts/VaultGuard.sol";
 import { BaseHooks } from "@balancer-labs/v3-vault/contracts/BaseHooks.sol";
+import { OracleWrapper } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
 
 /// -----------------------------------------------------------------------
 /// Multitoken Hyper Surge Hook — struct-per-index configuration
@@ -38,12 +39,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     error InvalidThresholdDeviation();
     error InvalidCapDeviationPercentage();
     error InvalidPercentage();
-
-    struct TokenPriceCfg {
-        uint32 pairIndex;
-        uint32 tokenIndex;
-        uint8 sz;
-    }
+    error InvalidStaleness();
 
     struct PoolDetails {
         uint32 arbMaxSurgeFee9;
@@ -57,7 +53,7 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
 
     struct PoolCfg {
         PoolDetails details;
-        TokenPriceCfg[8] tokenCfg;
+        OracleWrapper[8] tokenOracles;
     }
 
     uint256 private constant MAX32 = uint256(type(uint32).max);
@@ -69,6 +65,8 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     uint256 private immutable _defaultThresholdPercentage18;
 
     uint256 private immutable _defaultCapDeviationPercentage18;
+
+    uint256 public oracleStalenessThreshold = 15 minutes;
 
     modifier ensureValidPercentage(uint256 percentageValue) {
         _ensureValidPercentage(percentageValue);
@@ -194,73 +192,51 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
                            Setters   
      **************************************************/
 
+    function setOracleStalenessThreshold(
+        uint256 newThreshold,
+        address pool
+    ) external onlySwapFeeManagerOrGovernance(pool) {
+        // No staleness check if set to 0.
+        if (newThreshold == 0) {
+            revert InvalidStaleness();
+        }
+
+        uint256 oldThreshold = oracleStalenessThreshold;
+        oracleStalenessThreshold = newThreshold;
+        emit OracleStalenessThresholdChanged(msg.sender, oldThreshold, newThreshold);
+    }
+
     /**
-     * @notice Configure a single token’s Hyperliquid mapping for a given pool by token index (0..7).
+     * @notice Configure a single token’s oracle wrapper for a given pool by token index (0..7).
      * @param pool The pool address to configure.
      * @param tokenIndex The balancer index of the token to configure (0..7).
-     * @param hlPairIdx the index of the pair being set
-     * @param hlTokenIdx the index of the token being set
+     * @param oracle The oracle wrapper for this token.
      */
-    function setTokenPriceConfigIndex(
+    function setTokenOracle(
         address pool,
         uint8 tokenIndex,
-        uint32 hlPairIdx,
-        uint32 hlTokenIdx
+        OracleWrapper oracle
     ) external onlySwapFeeManagerOrGovernance(pool) {
         PoolDetails storage details = _poolCfg[pool].details;
-        _setTokenPriceConfigIndex(pool, tokenIndex, hlPairIdx, hlTokenIdx, details);
+        if (tokenIndex >= details.numTokens) revert TokenIndexOutOfRange();
+
+        _poolCfg[pool].tokenOracles[tokenIndex] = oracle;
     }
 
-    /**
-     * @notice Batch version (indices).
-     * @param pool the pool address
-     * @param tokenIndices the indices of the token configs being changed
-     * @param pairIdx the index of the pair being changed
-     * @param hlTokenIdx the index of the token being set
-     */
-    function setTokenPriceConfigBatchIndex(
+    /// @inheritdoc IHyperSurgeHook
+    function setTokenOraclesBatch(
         address pool,
         uint8[] calldata tokenIndices,
-        uint32[] calldata pairIdx,
-        uint32[] calldata hlTokenIdx
-    ) external onlySwapFeeManagerOrGovernance(pool) {
-        InputHelpers.ensureInputLengthMatch(tokenIndices.length, pairIdx.length);
+        OracleWrapper[] calldata oracles
+    ) external override onlySwapFeeManagerOrGovernance(pool) {
+        InputHelpers.ensureInputLengthMatch(tokenIndices.length, oracles.length);
 
-        PoolDetails storage detail = _poolCfg[pool].details;
+        PoolDetails storage details = _poolCfg[pool].details;
 
         for (uint256 i = 0; i < tokenIndices.length; ++i) {
-            _setTokenPriceConfigIndex(pool, tokenIndices[i], pairIdx[i], hlTokenIdx[i], detail);
+            if (tokenIndices[i] >= details.numTokens) revert TokenIndexOutOfRange();
+            _poolCfg[pool].tokenOracles[tokenIndices[i]] = oracles[i];
         }
-    }
-
-    function _setTokenPriceConfigIndex(
-        address pool,
-        uint8 tokenIndex,
-        uint32 hlPairIdx,
-        uint32 hlTokenIdx,
-        PoolDetails storage details
-    ) internal {
-        TokenPriceCfg memory tempCfg;
-
-        if (hlPairIdx == 0) {
-            revert InvalidPairIndex();
-        }
-
-        if (tokenIndex >= details.numTokens) {
-            revert TokenIndexOutOfRange();
-        }
-
-        tempCfg.sz = HyperTokenInfoPrecompile.szDecimals(hlTokenIdx);
-
-        if (tempCfg.sz > 8) {
-            revert InvalidDecimals();
-        }
-
-        tempCfg.pairIndex = hlPairIdx;
-
-        _poolCfg[pool].tokenCfg[tokenIndex] = tempCfg;
-
-        emit TokenPriceConfiguredIndex(pool, tokenIndex, tempCfg.pairIndex, hlTokenIdx, tempCfg.sz);
     }
 
     /// @inheritdoc IHyperSurgeHook
@@ -386,27 +362,19 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     }
 
     /// @inheritdoc IHyperSurgeHook
-    function getTokenPriceConfigIndex(
-        address pool,
-        uint8 tokenIndex
-    ) external view override returns (uint32 pairIndex, uint32 priceDivisor) {
-        TokenPriceCfg memory cfg = _poolCfg[pool].tokenCfg[tokenIndex];
-        return (cfg.pairIndex, _divisorFromSz(cfg.sz));
+    function getTokenOracle(address pool, uint8 tokenIndex) external view override returns (OracleWrapper oracle) {
+        if (tokenIndex >= _poolCfg[pool].details.numTokens) {
+            revert TokenIndexOutOfRange();
+        }
+        return _poolCfg[pool].tokenOracles[tokenIndex];
     }
 
     /// @inheritdoc IHyperSurgeHook
-    function getTokenPriceConfigs(
-        address pool
-    ) external view override returns (uint32[] memory pairIndexArr, uint32[] memory priceDivisorArr) {
-        PoolDetails memory details = _poolCfg[pool].details;
-
-        pairIndexArr = new uint32[](details.numTokens);
-        priceDivisorArr = new uint32[](details.numTokens);
-
-        for (uint8 i = 0; i < details.numTokens; ++i) {
-            TokenPriceCfg memory cfg = _poolCfg[pool].tokenCfg[i];
-            pairIndexArr[i] = cfg.pairIndex;
-            priceDivisorArr[i] = _divisorFromSz(cfg.sz);
+    function getTokenOracles(address pool) external view override returns (OracleWrapper[] memory oracles) {
+        uint8 n = _poolCfg[pool].details.numTokens;
+        oracles = new OracleWrapper[](n);
+        for (uint8 i = 0; i < n; ++i) {
+            oracles[i] = _poolCfg[pool].tokenOracles[i];
         }
     }
 
@@ -544,14 +512,25 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
         uint256 indexTokenIn,
         uint256 indexTokenOut
     ) internal view returns (uint256) {
-        TokenPriceCfg memory pInCfg = pc.tokenCfg[indexTokenIn];
-        TokenPriceCfg memory pOutCfg = pc.tokenCfg[indexTokenOut];
+        OracleWrapper oracleIn = pc.tokenOracles[indexTokenIn];
+        OracleWrapper oracleOut = pc.tokenOracles[indexTokenOut];
 
-        uint256 rawPriceTokenIn = HyperSpotPricePrecompile.spotPrice(pInCfg.pairIndex);
-        uint256 rawPriceTokenOut = HyperSpotPricePrecompile.spotPrice(pOutCfg.pairIndex);
-        uint256 priceTokenInScaled18 = rawPriceTokenIn.divDown(_divisorFromSz(pInCfg.sz));
-        uint256 priceTokenOutScaled18 = rawPriceTokenOut.divDown(_divisorFromSz(pOutCfg.sz));
-        return priceTokenOutScaled18.divDown(priceTokenInScaled18);
+        (int216 dataIn, uint40 timestampIn) = oracleIn.getData();
+        (int216 dataOut, uint40 timestampOut) = oracleOut.getData();
+
+        uint256 nowTs = block.timestamp;
+        uint256 localOracleStalenessThreshold = oracleStalenessThreshold;
+        if (
+            nowTs < uint256(timestampIn) ||
+            nowTs < uint256(timestampOut) ||
+            nowTs - uint256(timestampIn) > localOracleStalenessThreshold ||
+            nowTs - uint256(timestampOut) > localOracleStalenessThreshold
+        ) {
+            //this will revert to base fee downstream
+            return 0;
+        }
+
+        return uint256(int256(dataIn)).divDown(uint256(int256(dataOut)));
     }
 
     function _pairSpotFromBalancesWeights(
@@ -578,21 +557,6 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
             return (a - b).divDown(b);
         }
         return (b - a).divDown(b);
-    }
-
-    function _divisorFromSz(uint32 s) internal pure returns (uint32) {
-        // s in [0..8], divisor = 10**(8 - s)
-        // LUT avoids EXP cost both at config and (especially) runtime.
-        if (s == 0) return 100_000_000;
-        if (s == 1) return 10_000_000;
-        if (s == 2) return 1_000_000;
-        if (s == 3) return 100_000;
-        if (s == 4) return 10_000;
-        if (s == 5) return 1_000;
-        if (s == 6) return 100;
-        if (s == 7) return 10;
-        // s == 8
-        return 1;
     }
 
     struct ComputeOracleDeviationLocals {
@@ -629,18 +593,15 @@ contract HyperSurgeHook is BaseHooks, VaultGuard, SingletonAuthentication, Versi
     ) internal view returns (uint256 maxDev) {
         ComputeOracleDeviationLocals memory locals;
         PoolCfg memory pc = _poolCfg[pool];
-
-        // Build external prices per token (1e18). Missing/zero -> mark as 0 (skipped).
+        uint256 localOracleStalenessThreshold = oracleStalenessThreshold;
+        // Build external prices per token (1e18) from configured token oracles.
         for (locals.i = 0; locals.i < balancesScaled18.length; ++locals.i) {
-            TokenPriceCfg memory cfg = pc.tokenCfg[locals.i];
-            if (cfg.pairIndex != 0) {
-                locals.raw = HyperSpotPricePrecompile.spotPrice(cfg.pairIndex); // reverts if precompile fails
-                if (locals.raw != 0) {
-                    locals.priceDivisor = _divisorFromSz(cfg.sz);
-                    if (locals.priceDivisor != 0) {
-                        locals.px[locals.i] = uint256(locals.raw).divDown(uint256(locals.priceDivisor));
-                    }
-                }
+            (int216 dataIn, uint40 timestampIn) = pc.tokenOracles[locals.i].getData();
+            uint256 nowTs = block.timestamp;
+
+            if (nowTs < uint256(timestampIn) || nowTs - uint256(timestampIn) > localOracleStalenessThreshold) {
+                //this will revert to base fee downstream withdraw path
+                return 0;
             }
         }
 

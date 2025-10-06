@@ -46,10 +46,6 @@ contract HyperSurgeHookMock is HyperSurgeHook {
         return _relAbsDiff(a, b);
     }
 
-    function DivisorFromSz(uint8 s) external pure returns (uint32) {
-        return _divisorFromSz(s);
-    }
-
     function EnsureValidPct(uint256 pct) external pure {
         _ensureValidPercentage(pct);
     }

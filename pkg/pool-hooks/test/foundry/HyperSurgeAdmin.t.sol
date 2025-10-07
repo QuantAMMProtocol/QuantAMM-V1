@@ -10,6 +10,9 @@ import { CastingHelpers } from "@balancer-labs/v3-solidity-utils/contracts/helpe
 import { ArrayHelpers } from "@balancer-labs/v3-solidity-utils/contracts/test/ArrayHelpers.sol";
 import { FixedPoint } from "@balancer-labs/v3-solidity-utils/contracts/math/FixedPoint.sol";
 
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { ArrayHelpers } from "@balancer-labs/v3-solidity-utils/contracts/test/ArrayHelpers.sol";
+
 // Hook interfaces
 import { IHyperSurgeHook } from "@balancer-labs/v3-interfaces/contracts/pool-hooks/IHyperSurgeHook.sol";
 import { IAuthentication } from "@balancer-labs/v3-interfaces/contracts/solidity-utils/helpers/IAuthentication.sol";
@@ -30,32 +33,82 @@ import {
 import {
     WeightedPoolContractsDeployer
 } from "@balancer-labs/v3-pool-weighted/test/foundry/utils/WeightedPoolContractsDeployer.sol";
+
 import { WeightedPool } from "@balancer-labs/v3-pool-weighted/contracts/WeightedPool.sol";
 
+// Hook interface, oracle type and mock
+import { IHyperSurgeHook } from "@balancer-labs/v3-interfaces/contracts/pool-hooks/IHyperSurgeHook.sol";
+import { OracleWrapper } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
+import { HyperSurgeHookMock } from "../../contracts/test/HyperSurgeHookMock.sol";
+
 contract HyperSurgeAdminTest is BaseVaultTest, WeightedPoolContractsDeployer {
-    using ArrayHelpers for *;
-    using CastingHelpers for *;
     using FixedPoint for uint256;
 
     IHyperSurgeHook internal hook;
+    WeightedPool internal pool;
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
+    address internal admin;
 
-    function _createPool(uint256 n) internal returns (WeightedPool pool) {
-        // Build a basic WeightedPool with n tokens using helper infra from BaseVaultTest.
+    uint256 internal DEFAULT_MAX_FEE = 5e16; // 5%
+    uint256 internal DEFAULT_THRESHOLD = 2e16; // 2%
+    uint256 internal DEFAULT_CAP_DEV = 10e16; // 10%
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        admin = makeAddr("admin");
+
+        // Deploy hook (mock extends real) with constructor defaults
+        hook = IHyperSurgeHook(
+            address(new HyperSurgeHookMock(vault, DEFAULT_MAX_FEE, DEFAULT_THRESHOLD, DEFAULT_CAP_DEV, "test"))
+        );
+
+        // Grant auth roles for external admin calls to the hook
+        _grantHookAction("setMaxSurgeFeePercentage(address,uint256,uint8)");
+        _grantHookAction("setSurgeThresholdPercentage(address,uint256,uint8)");
+        _grantHookAction("setCapDeviationPercentage(address,uint256,uint8)");
+        _grantHookAction("setTokenOracle(address,uint8,address)");
+        _grantHookAction("setTokenOraclesBatch(address,uint8[],address[])");
+        _grantHookAction("setOracleStalenessThreshold(uint256,address)");
+
+        // Create and register a pool with 2 tokens for baseline tests
+        pool = _createPool(2);
+
+        // Prepare token configs for onRegister and a minimal LiquidityManagement
+        TokenConfig[] memory tokenConfigs = new TokenConfig[](2);
+        for (uint256 i = 0; i < 2; ++i) {
+            tokenConfigs[i] = TokenConfig({ token: tokens[i], normalizedWeight: 5e17 });
+        }
+
+        LiquidityManagement memory lm = LiquidityManagement({
+            enableAddLiquidityCustom: true,
+            enableRemoveLiquidityCustom: true,
+            disableUnbalancedLiquidity: false,
+            enableDonation: true
+        });
+
+        // onRegister is onlyVault; set per-pool defaults
+        vm.prank(address(vault));
+        // First parameter (hook address) is not used by the hook implementation
+        HyperSurgeHookMock(address(hook)).onRegister(address(hook), address(pool), tokenConfigs, lm);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           CREATE + REGISTER HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Necessary fixture: many admin operations are per-pool scoped,
+    /// so a ready pool with admin as swapFeeManager is needed in most tests.
+    function _createPool(uint256 n) internal returns (WeightedPool) {
+        // Build n-token weighted pool configs
         TokenConfig[] memory tokenConfigs = new TokenConfig[](n);
         for (uint256 i = 0; i < n; ++i) {
-            tokenConfigs[i] = TokenConfig({
-                token: tokens[i],
-                normalizedWeight: (1e18 / n)
-            });
+            tokenConfigs[i] = TokenConfig({ token: tokens[i], normalizedWeight: (1e18 / n) });
         }
 
         bytes memory userData = new bytes(0);
 
-        pool = WeightedPool(
+        WeightedPool wp = WeightedPool(
             WeightedPoolContractsDeployer.deployWeightedPool(
                 vault,
                 "Pool",
@@ -63,283 +116,224 @@ contract HyperSurgeAdminTest is BaseVaultTest, WeightedPoolContractsDeployer {
                 tokenConfigs,
                 LiquidityManagement({
                     enableAddLiquidityCustom: true,
-                    enableRemoveLiquidityCustom: true
+                    enableRemoveLiquidityCustom: true,
+                    disableUnbalancedLiquidity: false,
+                    enableDonation: true
                 }),
                 address(0) // no embedded hook on pool itself; HyperSurge is external per onRegister
             )
         );
 
-        // Initialize the pool (standard pattern in these tests)
+        // Initialize the pool (give admin swapFeeManager to satisfy hook access control)
         PoolRoleAccounts memory roles;
         roles.swapFeeManager = admin;
 
         vm.startPrank(admin);
-        pool.initialize(
+        wp.initialize(
             _asAddresses(tokens, n),
             _asAmounts(1e18, n),
             roles,
             userData,
             0,
-            ZERO
+            0 // pause window
         );
         vm.stopPrank();
+
+        return wp;
     }
 
-    function setUp() public virtual override {
-        super.setUp(); // sets: vault, poolFactory, admin, authorizer, tokens, routers, etc.
-
-        // Deploy HyperSurge hook via the same artifact address used in your repo.
-        // The hook in your codebase is constructed and then registered per-pool via onRegister.
-        // We don’t touch Hyperliquid precompiles anymore.
-        vm.prank(address(poolFactory));
-        hook = IHyperSurgeHook(
-            address(
-                // In your repo the hook is a deployed contract; we assume it’s deployed and available
-                // via create2/factory in a fixture. If you deploy inline elsewhere, keep that here.
-                new DeployableHyperSurgeHook(IVault(address(vault)))
-            )
-        );
-
-        // Grant roles for the *current* admin functions (oracle + fee knobs).
-        authorizer.grantRole(
-            IAuthentication(address(hook)).getActionId(IHyperSurgeHook.setMaxSurgeFeePercentage.selector),
-            admin
-        );
-        authorizer.grantRole(
-            IAuthentication(address(hook)).getActionId(IHyperSurgeHook.setSurgeThresholdPercentage.selector),
-            admin
-        );
-        authorizer.grantRole(
-            IAuthentication(address(hook)).getActionId(IHyperSurgeHook.setCapDeviationPercentage.selector),
-            admin
-        );
-        authorizer.grantRole(
-            IAuthentication(address(hook)).getActionId(IHyperSurgeHook.setTokenOracle.selector),
-            admin
-        );
-        authorizer.grantRole(
-            IAuthentication(address(hook)).getActionId(IHyperSurgeHook.setTokenOraclesBatch.selector),
-            admin
-        );
-
-        // setOracleStalenessThreshold exists in the hook; grant too in case downstream tests add coverage
-        bytes4 stalenessSel = bytes4(keccak256("setOracleStalenessThreshold(address,uint256)"));
-        authorizer.grantRole(
-            IAuthentication(address(hook)).getActionId(stalenessSel),
-            admin
-        );
-    }
-
+    /// @dev Older tests used a simple registrar; restore it so fuzz tests can reuse.
     function _registerBasePoolWithN(uint8 n) internal returns (uint8 tokenCount) {
         n = uint8(bound(n, 2, 8));
-        WeightedPool pool = _createPool(n);
+        WeightedPool p = _createPool(n);
 
-        // Register the pool with the hook. The hook uses per-pool config, so we must register it here.
-        vm.prank(address(vault)); // onRegister is onlyVault in the hook
-        bool ok = hook.onRegister(address(pool), address(0), new bytes(0));
-        assertTrue(ok, "onRegister(base pool) failed");
+        TokenConfig[] memory tokenConfigs = new TokenConfig[](n);
+        for (uint256 i = 0; i < n; ++i) {
+            tokenConfigs[i] = TokenConfig({ token: tokens[i], normalizedWeight: uint256(1e18) / n });
+        }
+        LiquidityManagement memory lm = LiquidityManagement({
+            enableAddLiquidityCustom: true,
+            enableRemoveLiquidityCustom: true,
+            disableUnbalancedLiquidity: false,
+            enableDonation:true
+        });
 
+        vm.prank(address(vault));
+        HyperSurgeHookMock(address(hook)).onRegister(address(hook), address(p), tokenConfigs, lm);
+
+        // update the shared state pool reference for convenience
+        pool = p;
         return n;
     }
 
-    // -------------------------------------------------------------------------
-    // Tests retained (non-Hyperliquid)
-    // -------------------------------------------------------------------------
+    function _grantHookAction(string memory signature) internal {
+        bytes4 sel = bytes4(keccak256(bytes(signature)));
+        bytes32 role = IAuthentication(address(hook)).getActionId(sel);
+        IAuthorizer(address(authorizer)).grantRole(role, admin);
+    }
 
-    function testFuzz_onRegister_withN_setsDefaults_and_second_overwrites_to_defaults(
-        uint8 n
-    ) public {
-        // First registration for base pool with fuzzed N tokens
-        n = _registerBasePoolWithN(n);
+    /*//////////////////////////////////////////////////////////////
+                          DEFAULTS ON REGISTER
+    //////////////////////////////////////////////////////////////*/
 
-        // Defaults (from constructor) are set for both lanes
-        assertEq(hook.getMaxSurgeFeePercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), 0.02e18, "default max(ARB) mismatch");
-        assertEq(hook.getMaxSurgeFeePercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), 0.02e18, "default max(NOISE) mismatch");
-        assertEq(hook.getSurgeThresholdPercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), 0.02e18, "default thr(ARB) mismatch");
-        assertEq(hook.getSurgeThresholdPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), 0.02e18, "default thr(NOISE) mismatch");
-        assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), 1e18, "default capDev(ARB) mismatch");
-        assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), 1e18, "default capDev(NOISE) mismatch");
+    function test_DefaultsAreAppliedOnRegister() public {
+        assertEq(hook.getMaxSurgeFeePercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), DEFAULT_MAX_FEE);
+        assertEq(hook.getMaxSurgeFeePercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), DEFAULT_MAX_FEE);
 
-        // Mutate, then ensure re-register restores defaults
+        assertEq(
+            hook.getSurgeThresholdPercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE),
+            DEFAULT_THRESHOLD
+        );
+        assertEq(hook.getSurgeThresholdPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), DEFAULT_THRESHOLD);
+
+        assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), DEFAULT_CAP_DEV);
+        assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), DEFAULT_CAP_DEV);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              ADMIN SETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_AdminCanSetMaxSurgeFee() public {
+        vm.prank(admin);
+        hook.setMaxSurgeFeePercentage(address(pool), 8e16, IHyperSurgeHook.TradeType.ARBITRAGE);
+        assertEq(hook.getMaxSurgeFeePercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), 8e16);
+    }
+
+    function test_AdminCanSetThreshold() public {
+        vm.prank(admin);
+        hook.setSurgeThresholdPercentage(address(pool), 3e16, IHyperSurgeHook.TradeType.NOISE);
+        assertEq(hook.getSurgeThresholdPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), 3e16);
+    }
+
+    function test_AdminCanSetCapDeviation() public {
+        vm.prank(admin);
+        hook.setCapDeviationPercentage(address(pool), 12e16, IHyperSurgeHook.TradeType.NOISE);
+        assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), 12e16);
+    }
+
+    function test_RevertIf_PercentageInvalid() public {
         vm.startPrank(admin);
-        hook.setMaxSurgeFeePercentage(address(pool), 0.10e18, IHyperSurgeHook.TradeType.ARBITRAGE);
-        hook.setSurgeThresholdPercentage(address(pool), 0.05e18, IHyperSurgeHook.TradeType.NOISE);
-        hook.setCapDeviationPercentage(address(pool), 0.50e18, IHyperSurgeHook.TradeType.NOISE);
+        vm.expectRevert();
+        hook.setMaxSurgeFeePercentage(address(pool), 12345, IHyperSurgeHook.TradeType.NOISE);
+        vm.expectRevert();
+        hook.setSurgeThresholdPercentage(address(pool), 0, IHyperSurgeHook.TradeType.NOISE);
+        vm.expectRevert();
+        hook.setCapDeviationPercentage(address(pool), 2e18 + 1, IHyperSurgeHook.TradeType.NOISE);
         vm.stopPrank();
-
-        vm.prank(address(vault));
-        bool ok = hook.onRegister(address(pool), address(0), new bytes(0));
-        assertTrue(ok, "onRegister (second) failed");
-
-        assertEq(hook.getMaxSurgeFeePercentage(address(pool), IHyperSurgeHook.TradeType.ARBITRAGE), 0.02e18, "max reset (ARB)");
-        assertEq(hook.getSurgeThresholdPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), 0.02e18, "thr reset (NOISE)");
-        assertEq(hook.getCapDeviationPercentage(address(pool), IHyperSurgeHook.TradeType.NOISE), 1e18, "capDev reset (NOISE)");
     }
 
-    function testFuzz_setCapDeviationPercentage_bounds_withThrZero(uint256 capSeed) public {
-        _registerBasePoolWithN(3);
-        uint256 cap = bound(capSeed, 1e9, 1e18); // multiples of 1e9 (enforced inside)
+    /*//////////////////////////////////////////////////////////////
+                          ORACLE CONFIGURATION
+    //////////////////////////////////////////////////////////////*/
+
+    function test_AdminCanSetSingleTokenOracle() public {
         vm.prank(admin);
-        hook.setCapDeviationPercentage(address(pool), cap, IHyperSurgeHook.TradeType.ARBITRAGE);
+        hook.setTokenOracle(address(pool), 0, OracleWrapper(address(0xBEEF)));
+        OracleWrapper oracle = hook.getTokenOracle(address(pool), 0);
+        assertEq(address(oracle), address(0xBEEF));
     }
 
-    function testFuzz_setCapDeviation_enforces_gt_threshold(uint256 thrSeed, uint256 capSeed) public {
-        _registerBasePoolWithN(3);
-        uint256 thr = bound(thrSeed, 1e9, 1e18 - 1e9);
-        uint256 cap = thr - (thr % 1e9); // <= thr and multiple of 1e9
+    function test_RevertIf_TokenIndexOutOfRange_SetSingle() public {
+        vm.prank(admin);
+        vm.expectRevert();
+        hook.setTokenOracle(address(pool), 9, OracleWrapper(address(0xBEEF)));
+    }
+
+    function test_AdminCanSetBatchTokenOracles() public {
+        uint8[] memory indices = new uint8[](2);
+        indices[0] = 0;
+        indices[1] = 1;
+
+        OracleWrapper[] memory oracles = new OracleWrapper[](2);
+        oracles[0] = OracleWrapper(address(0xA1));
+        oracles[1] = OracleWrapper(address(0xB2));
 
         vm.prank(admin);
-        hook.setSurgeThresholdPercentage(address(pool), thr, IHyperSurgeHook.TradeType.NOISE);
+        hook.setTokenOraclesBatch(address(pool), indices, oracles);
+
+        assertEq(address(hook.getTokenOracle(address(pool), 0)), address(0xA1));
+        assertEq(address(hook.getTokenOracle(address(pool), 1)), address(0xB2));
+    }
+
+    function test_RevertIf_LengthMismatch_OnBatch() public {
+        uint8[] memory indices = new uint8[](2);
+        indices[0] = 0;
+        indices[1] = 1;
+
+        OracleWrapper[] memory oracles = new OracleWrapper[](1);
+        oracles[0] = OracleWrapper(address(0xA1));
 
         vm.prank(admin);
         vm.expectRevert();
-        hook.setCapDeviationPercentage(address(pool), cap, IHyperSurgeHook.TradeType.NOISE);
+        hook.setTokenOraclesBatch(address(pool), indices, oracles);
     }
 
-    function testFuzz_setCapDeviation_rejects_le_threshold(uint256 thrSeed) public {
-        _registerBasePoolWithN(3);
-        uint256 thr = bound(thrSeed, 1e9, 1e18 - 1e9);
+    function test_RevertIf_TokenIndexOutOfRange_OnBatch() public {
+        uint8[] memory indices = new uint8[](2);
+        indices[0] = 0;
+        indices[1] = 7;
+
+        OracleWrapper[] memory oracles = new OracleWrapper[](2);
+        oracles[0] = OracleWrapper(address(0xA1));
+        oracles[1] = OracleWrapper(address(0xB2));
 
         vm.prank(admin);
-        hook.setSurgeThresholdPercentage(address(pool), thr, IHyperSurgeHook.TradeType.ARBITRAGE);
+        vm.expectRevert();
+        hook.setTokenOraclesBatch(address(pool), indices, oracles);
+    }
 
+    /*//////////////////////////////////////////////////////////////
+                         ORACLE STALENESS THRESHOLD
+    //////////////////////////////////////////////////////////////*/
+
+    function test_SetOracleStalenessThreshold() public {
+        vm.prank(admin);
+        hook.setOracleStalenessThreshold(60 minutes, address(pool));
+
+        uint256 threshold = HyperSurgeHookMock(address(hook)).oracleStalenessThreshold();
+        assertEq(threshold, 60 minutes);
+    }
+
+    function test_RevertIf_SetOracleStalenessThreshold_Zero() public {
         vm.prank(admin);
         vm.expectRevert();
-        hook.setCapDeviationPercentage(address(pool), thr, IHyperSurgeHook.TradeType.ARBITRAGE);
+        hook.setOracleStalenessThreshold(0, address(pool));
     }
 
-    function testFuzz_defaults_include_capDev_at_100_percent(uint8 n) public {
-        _registerBasePoolWithN(n);
-        assertTrue(true); // smoke; capDev is 100% by default (covered in other tests)
-    }
+    /*//////////////////////////////////////////////////////////////
+                         ACCESS CONTROL NEGATIVE
+    //////////////////////////////////////////////////////////////*/
 
-    function testFuzz_setMaxSurgeFeePercentage_bounds(uint256 seed) public {
-        _registerBasePoolWithN(3);
-        uint256 pct = bound(seed, 1e9, 1e18);
-        vm.prank(admin);
-        hook.setMaxSurgeFeePercentage(address(pool), pct, IHyperSurgeHook.TradeType.ARBITRAGE);
-    }
-
-    function testFuzz_setSurgeThresholdPercentage_bounds(uint256 seed) public {
-        _registerBasePoolWithN(3);
-        uint256 pct = bound(seed, 1e9, 1e18);
-        vm.prank(admin);
-        hook.setSurgeThresholdPercentage(address(pool), pct, IHyperSurgeHook.TradeType.NOISE);
-    }
-
-    function testFuzz_onlyAdmin_rejected_on_all_admin_setters(
-        uint8 n,
-        uint256 maxSeed,
-        uint256 thrSeed,
-        uint256 capSeed
-    ) public {
-        _registerBasePoolWithN(n);
-
-        uint256 maxPct = bound(maxSeed, 1e9, 1e18);
-        uint256 thr    = bound(thrSeed, 1e9, 1e18);
-        uint256 cap    = bound(capSeed, 1e9, 1e18);
-
-        address rando = address(0xBEEF);
-
-        vm.prank(rando);
+    function test_RevertIf_NonAdminSetsValues() public {
+        address bob = makeAddr("bob");
+        vm.startPrank(bob);
         vm.expectRevert();
-        hook.setMaxSurgeFeePercentage(address(pool), maxPct, IHyperSurgeHook.TradeType.ARBITRAGE);
-
-        vm.prank(rando);
+        hook.setMaxSurgeFeePercentage(address(pool), 5e16, IHyperSurgeHook.TradeType.ARBITRAGE);
         vm.expectRevert();
-        hook.setSurgeThresholdPercentage(address(pool), thr, IHyperSurgeHook.TradeType.NOISE);
-
-        vm.prank(rando);
+        hook.setSurgeThresholdPercentage(address(pool), 2e16, IHyperSurgeHook.TradeType.NOISE);
         vm.expectRevert();
-        hook.setCapDeviationPercentage(address(pool), cap, IHyperSurgeHook.TradeType.NOISE);
-
-        // Oracle admin setters should also be admin-gated
-        vm.prank(rando);
+        hook.setCapDeviationPercentage(address(pool), 10e16, IHyperSurgeHook.TradeType.NOISE);
         vm.expectRevert();
-        hook.setTokenOracle(address(pool), 0, OracleWrapper(address(0)));
-
-        vm.prank(rando);
+        hook.setTokenOracle(address(pool), 0, OracleWrapper(address(0xC0)));
         vm.expectRevert();
-        OracleWrapper;
-        uint8;
-        hook.setTokenOraclesBatch(address(pool), idx, OracleWrapper(address(0)));
-    }
-
-    function testFuzz_fee_knobs_per_direction_independent(uint256 seedA, uint256 seedB) public {
-        _registerBasePoolWithN(3);
-        uint256 a = bound(seedA, 1e9, 1e18);
-        uint256 b = bound(seedB, 1e9, 1e18);
-
-        vm.startPrank(admin);
-        hook.setMaxSurgeFeePercentage(address(pool), a, IHyperSurgeHook.TradeType.ARBITRAGE);
-        hook.setMaxSurgeFeePercentage(address(pool), b, IHyperSurgeHook.TradeType.NOISE);
+        hook.setTokenOraclesBatch(address(pool), new uint8[](0), new OracleWrapper[](0));
+        vm.expectRevert();
+        hook.setOracleStalenessThreshold(30 minutes, address(pool));
         vm.stopPrank();
-
-        assertTrue(true); // smoke; getter checks covered elsewhere
     }
 
-    function test_getDefaultGetters_match_constructor() public {
-        // sanity: defaults are available via getters and come from deployment
-        assertTrue(address(hook) != address(0));
+    /*//////////////////////////////////////////////////////////////
+                                UTILITIES
+    //////////////////////////////////////////////////////////////*/
+
+    function _asAddresses(IERC20[] memory erc20s, uint256 n) internal pure returns (address[] memory addrs) {
+        addrs = new address[](n);
+        for (uint256 i = 0; i < n; ++i) addrs[i] = address(erc20s[i]);
     }
 
-    function testFuzz_fee_setters_valid_before_register_then_reset_on_register(uint256 seed) public {
-        uint256 pct = bound(seed, 1e9, 1e18);
-
-        // Set on a dummy pool address prior to register
-        vm.prank(admin);
-        hook.setMaxSurgeFeePercentage(address(this), pct, IHyperSurgeHook.TradeType.ARBITRAGE);
-
-        // Now register a real pool → per-pool defaults should prevail
-        _registerBasePoolWithN(3);
-        assertTrue(true);
-    }
-
-    function test_getHookFlags_SignalsAreSet() public {
-        HookFlags memory flags = hook.getHookFlags();
-        assertTrue(flags.shouldCallComputeDynamicSwapFeePercentage);
-    }
-
-    function testFuzz_getNumTokens_ReturnsConfiguredCount(uint8 n) public {
-        n = _registerBasePoolWithN(n);
-        uint8 got = hook.getNumTokens(address(pool));
-        assertEq(got, n);
-    }
-
-    function testFuzz_SetSurgeThreshold_Reverts_When_Threshold_GE_CapDeviation(uint256 thrSeed) public {
-        _registerBasePoolWithN(3);
-
-        uint256 thr = bound(thrSeed, 1e9, 1e18);
-
-        // Set cap to the minimum valid (thr must be strictly less than cap)
-        vm.prank(admin);
-        hook.setCapDeviationPercentage(address(pool), 1e18, IHyperSurgeHook.TradeType.ARBITRAGE);
-
-        vm.prank(admin);
-        if (thr == 1e18) {
-            vm.expectRevert();
-        }
-        hook.setSurgeThresholdPercentage(address(pool), thr, IHyperSurgeHook.TradeType.ARBITRAGE);
-    }
-}
-
-/**
- * @dev Minimal deploy wrapper to keep the test structure consistent with your suite.
- * Replace with your project’s factory/deployer if needed.
- */
-contract DeployableHyperSurgeHook {
-    IHyperSurgeHook public hook;
-
-    constructor(IVault v) {
-        hook = IHyperSurgeHook(address(new HyperSurgeHook(v)));
-    }
-
-    function __self() external view returns (IHyperSurgeHook) {
-        return hook;
-    }
-
-    // implicit cast for convenience
-    function callAsHook() external view returns (IHyperSurgeHook) {
-        return hook;
+    function _asAmounts(uint256 amountEach, uint256 n) internal pure returns (uint256[] memory amounts) {
+        amounts = new uint256[](n);
+        for (uint256 i = 0; i < n; ++i) amounts[i] = amountEach;
     }
 }

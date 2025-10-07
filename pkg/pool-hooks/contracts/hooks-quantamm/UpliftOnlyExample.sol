@@ -419,10 +419,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         if (liquidityManagement.enableDonation == false) {
             revert PoolDoesNotSupportDonation();
         }
-        if (liquidityManagement.disableUnbalancedLiquidity == true) {
-            revert PoolSupportsUnbalancedLiquidity();
-        }
-
+        
         emit UpliftOnlyExampleRegistered(address(this), pool);
 
         return true;
@@ -434,7 +431,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         // `enableHookAdjustedAmounts` must be true for all contracts that modify the `amountCalculated`
         // in after hooks. Otherwise, the Vault will ignore any "hookAdjusted" amounts, and the transaction
         // might not settle. (It should be false if the after hooks do something else.)
-        hookFlags.enableHookAdjustedAmounts = false;
+        hookFlags.enableHookAdjustedAmounts = true;
         hookFlags.shouldCallBeforeAddLiquidity = true;
         hookFlags.shouldCallAfterRemoveLiquidity = true;
         hookFlags.shouldCallAfterSwap = true;
@@ -621,30 +618,19 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                     // Ensure fees do not exceed the amounts being withdrawn.
                     revert("Accrued fees exceed amounts out");
                 }
-                hookAdjustedAmountsOutRaw[i] = localData.amountsOutRaw[i] - exitFee;
 
-                // Fees don't need to be transferred to the hook, because donation will redeposit them in the Vault.
-            }
-
-            if (localData.adminFeePercent > 0) {
-                // Redistribute admin fees back to the QuantAMM admin.
-                _vault.addLiquidity(
-                    AddLiquidityParams({
-                        pool: localData.pool,
-                        to: localData.quantammAdminAddress,
-                        maxAmountsIn: localData.accruedQuantAMMFees,
-                        minBptAmountOut: localData.feeAmount.mulUp(localData.adminFeePercent),
-                        kind: AddLiquidityKind.UNBALANCED,
-                        userData: userData
-                    })
-                );
+                if(localData.accruedQuantAMMFees[i] > 0){
+                    _vault.sendTo(localData.tokens[i], localData.quantammAdminAddress, localData.accruedQuantAMMFees[i]);
+                }
 
                 emit ExitFeeCharged(
                     localData.userAddress,
                     localData.pool,
-                    IERC20(localData.pool),
-                    localData.feeAmount.mulDown(localData.adminFeePercent)
+                    localData.tokens[i],
+                    localData.accruedQuantAMMFees[i]
                 );
+
+                hookAdjustedAmountsOutRaw[i] = localData.amountsOutRaw[i] - exitFee;
             }
 
             if (localData.adminFeePercent != 1e18) {

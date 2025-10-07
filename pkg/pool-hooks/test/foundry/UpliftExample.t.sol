@@ -182,7 +182,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         roleAccounts.poolCreator = lp;
 
         LiquidityManagement memory liquidityManagement;
-        liquidityManagement.disableUnbalancedLiquidity = false;
+        liquidityManagement.disableUnbalancedLiquidity = true;
         liquidityManagement.enableDonation = true;
 
         factoryMock.registerPool(

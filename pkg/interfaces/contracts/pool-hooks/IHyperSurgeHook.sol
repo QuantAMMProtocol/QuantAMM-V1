@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.24;
 
+import { OracleWrapper } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/OracleWrapper.sol";
+
 /**
  * @title IHyperSurgeHook
  * @notice Interface for the Hyper Surge hook: oracle-deviation surge fees and
@@ -75,30 +77,35 @@ interface IHyperSurgeHook {
     event CapDeviationPercentageChanged(address indexed sender, address indexed pool, uint256 pct, TradeType tradeType);
 
     /**
-     * @notice Configure a single token’s external price mapping by token index for a given pool.
-     * @param tokenIndex balancer pools index of the token
-     * @param hlPairIdx the index of the pair being set from hl
-     * @param hlTokenIdx the index of the token being set from hl
+     * @notice Emitted when the oracle staleness threshold is changed
+     * @param sender address of the sender
+     * @param oldThreshold the old threshold in seconds
+     * @param newThreshold the new threshold in seconds
      */
-    function setTokenPriceConfigIndex(
+    event OracleStalenessThresholdChanged(address indexed sender, uint256 oldThreshold, uint256 newThreshold);
+    /**
+     * @notice Set the external price oracle for a specific token in a pool.
+     * @param pool The pool address to configure.
+     * @param tokenIndex The index of the token within the pool (0-based).
+     * @param oracle The OracleWrapper instance to use for the token's price.
+     */
+    function setTokenOracle(
         address pool,
         uint8 tokenIndex,
-        uint32 hlPairIdx,
-        uint32 hlTokenIdx
+        OracleWrapper oracle
     ) external;
 
+    
     /**
-     * @notice Batch configure multiple tokens’ external price mapping by token index for a given pool.
+     * @notice Batch version for setting oracle wrappers by token index.
      * @param pool The pool address to configure.
-     * @param tokenIndices The balancer indices of the tokens to configure (0..7).
-     * @param hlPairIdx The indices of the pairs being set from hl.
-     * @param hlTokenIdx The indices of the tokens being set from hl.
+     * @param tokenIndices The indices of the tokens to configure.
+     * @param oracles The oracle wrappers for each token index.
      */
-    function setTokenPriceConfigBatchIndex(
+    function setTokenOraclesBatch(
         address pool,
         uint8[] calldata tokenIndices,
-        uint32[] calldata hlPairIdx,
-        uint32[] calldata hlTokenIdx
+        OracleWrapper[] calldata oracles
     ) external;
 
     /**
@@ -155,22 +162,16 @@ interface IHyperSurgeHook {
     function getNumTokens(address pool) external view returns (uint8);
 
     /**
-     * @notice Read the token price configuration for a specific token index.
-     * @param pool        Pool address
-     * @param tokenIndex  Token index (0-based)
-     * @return pairIndex     Hyperliquid market/pair index (0 if USD-quoted)
-     * @return priceDivisor  Precomputed divisor used to scale Hyperliquid spot into 1e18
+     * @notice Get the external price oracle configuration for a given token index in a pool.
+     * @param pool Pool address
+     * @param tokenIndex Token index within the pool (0-based)
+     * @return oracle The OracleWrapper struct containing the oracle configuration.
+     * / 
      */
-    function getTokenPriceConfigIndex(
+     function getTokenOracle(
         address pool,
         uint8 tokenIndex
-    )
-        external
-        view
-        returns (
-            uint32 pairIndex,
-            uint32 priceDivisor
-        );
+    ) external view returns (OracleWrapper oracle) ;
 
     /**
      * @notice Read all token price configurations for a pool (length = numTokens).
@@ -178,15 +179,9 @@ interface IHyperSurgeHook {
      * @return pairIndexArr     Array of Hyperliquid pair indices (0 if USD-quoted)
      * @return priceDivisorArr  Array of price divisors for scaling spot into 1e18
      */
-    function getTokenPriceConfigs(
+    function getTokenOracles(
         address pool
-    )
-        external
-        view
-        returns (
-            uint32[] memory pairIndexArr,
-            uint32[] memory priceDivisorArr
-        );
+    ) external view returns (OracleWrapper[] memory oracles);
 
     /**
      * @notice Default max surge fee percentage used for new pools (1e18 = 100%).

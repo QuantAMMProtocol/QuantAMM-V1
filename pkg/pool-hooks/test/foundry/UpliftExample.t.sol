@@ -277,17 +277,37 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         return array;
     }
 
-    function testRemoveLiquidityNoPriceChange() public {
-        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+    struct nopriceChangeLocals {
+        uint256[] maxAmountsIn;
+        uint256[] minAmountsOut;
+        BaseVaultTest.Balances balancesBefore;
+        BaseVaultTest.Balances balancesAfter;
+        uint256 amountOut;
+        uint64 exitFeePercentage;
+        uint256 hookFee;
+        uint256 adminFeePercent;
+        uint256 adminPartPerToken;
+        uint256 lpDonationPerToken;
+        uint256 bobReceivesPerToken;
+        uint256 netPoolDecreasePerToken;
+        uint256 nftTokenId;
+    }
 
+    function testRemoveLiquidityNoPriceChange() public {
+        nopriceChangeLocals memory v;
+
+        // 1) Bob adds liquidity so he has BPT to remove later.
+        v.maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
-        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        upliftOnlyRouter.addLiquidityProportional(pool, v.maxAmountsIn, bptAmount, false, bytes(""));
         vm.stopPrank();
 
+        // Hand hook ownership to the hook contract (as in your setup).
         vm.prank(owner);
         UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
         vm.stopPrank();
 
+        // Sanity checks on stored deposit data.
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
         assertEq(
@@ -295,7 +315,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             block.timestamp,
             "bptAmount mapping should be 0"
         );
-
         assertEq(
             upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
             500000000000000000,
@@ -303,71 +322,98 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         );
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
-        uint256 nftTokenId = 0;
-        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+        v.nftTokenId = 0;
+        v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
-        BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
+        v.balancesBefore = getBalances(bob);
 
+        // 2) Bob removes all his BPT proportionally (no price change case).
         vm.startPrank(bob);
-        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);
         vm.stopPrank();
-        BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
 
-        uint256 feeAmountAmountPercent = (((bptAmount / 2) * ((uint256(upliftOnlyRouter.minWithdrawalFeeBps())))) /
-            ((bptAmount / 2)));
-        uint256 amountOut = (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent));
+        v.balancesAfter = getBalances(bob);
 
+        // === 3) Fee math with no price change ===
+        // Proportional 2-token pool → raw amount out per token equals bptAmount / 2
+        v.amountOut = bptAmount / 2; // = 1e21 in your traces
+
+        // With zero uplift, the minimum withdrawal fee applies.
+        v.exitFeePercentage = upliftOnlyRouter.minWithdrawalFeeBps(); // 5e14 (0.05%)
+        v.hookFee = v.amountOut.mulDown(v.exitFeePercentage); // 1e21 * 5e14 / 1e18 = 5e17 per token
+
+        // Split of the hook fee: 50% admin (sent out), 50% donation (kept in pool) — no BPT minted for donation.
+        v.adminFeePercent = updateWeightRunner.getQuantAMMUpliftFeeTake(); // 0.5e18
+        v.adminPartPerToken = v.hookFee.mulUp(v.adminFeePercent); // 2.5e17 per token
+        v.lpDonationPerToken = v.hookFee - v.adminPartPerToken; // 2.5e17 per token
+
+        // What Bob actually receives:
+        v.bobReceivesPerToken = v.amountOut - v.hookFee; // 9.995e20 per token
+
+        // Net change to Pool/Vault per token:
+        //   remove amountOut (1e21) but donate lpDonation back (2.5e17) → net decrease = 9.9975e20
+        v.netPoolDecreasePerToken = v.amountOut - v.lpDonationPerToken; // 9.9975e20
+
+        // === 4) Assertions ===
+
+        // Bob receives the adjusted amount (after full fee).
         assertEq(
-            balancesAfter.bobTokens[daiIdx] - balancesBefore.bobTokens[daiIdx],
-            amountOut,
+            v.balancesAfter.bobTokens[daiIdx] - v.balancesBefore.bobTokens[daiIdx],
+            v.bobReceivesPerToken,
             "bob's DAI amount is wrong"
         );
         assertEq(
-            balancesAfter.bobTokens[usdcIdx] - balancesBefore.bobTokens[usdcIdx],
-            amountOut,
+            v.balancesAfter.bobTokens[usdcIdx] - v.balancesBefore.bobTokens[usdcIdx],
+            v.bobReceivesPerToken,
             "bob's USDC amount is wrong"
         );
 
+        // Pool balances decrease by the NET amount (raw out minus donation back to pool).
         assertEq(
-            balancesBefore.poolTokens[daiIdx] - balancesAfter.poolTokens[daiIdx],
-            amountOut,
+            v.balancesBefore.poolTokens[daiIdx] - v.balancesAfter.poolTokens[daiIdx],
+            v.netPoolDecreasePerToken,
             "Pool's DAI amount is wrong"
         );
         assertEq(
-            balancesBefore.poolTokens[usdcIdx] - balancesAfter.poolTokens[usdcIdx],
-            amountOut,
+            v.balancesBefore.poolTokens[usdcIdx] - v.balancesAfter.poolTokens[usdcIdx],
+            v.netPoolDecreasePerToken,
             "Pool's USDC amount is wrong"
         );
 
-        assertEq(
-            balancesBefore.poolSupply - balancesAfter.poolSupply,
-            (bptAmount / 2) + (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent)),
-            "BPT supply amount is wrong"
-        );
+        // The entire bptAmount is burned on exit; donation mints ZERO BPT → supply drops by bptAmount.
+        assertEq(v.balancesBefore.poolSupply - v.balancesAfter.poolSupply, bptAmount, "BPT supply amount is wrong");
 
+        // Vault balances mirror the pool: they go down by the NET amount (donation remained inside).
         assertEq(
-            balancesBefore.vaultTokens[daiIdx] - balancesAfter.vaultTokens[daiIdx],
-            amountOut,
+            v.balancesBefore.vaultTokens[daiIdx] - v.balancesAfter.vaultTokens[daiIdx],
+            v.netPoolDecreasePerToken,
             "Vault's DAI amount is wrong"
         );
-
         assertEq(
-            balancesBefore.vaultTokens[usdcIdx] - balancesAfter.vaultTokens[usdcIdx],
-            amountOut,
+            v.balancesBefore.vaultTokens[usdcIdx] - v.balancesAfter.vaultTokens[usdcIdx],
+            v.netPoolDecreasePerToken,
             "Vault's USDC amount is wrong"
         );
 
-        assertEq(balancesBefore.hookTokens[daiIdx], balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
-        assertEq(balancesBefore.hookTokens[usdcIdx], balancesAfter.hookTokens[usdcIdx], "Hook's USDC amount is wrong");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "bptAmount mapping should be 0");
-        assertEq(upliftOnlyRouter.nftPool(nftTokenId), address(0), "pool mapping should be 0");
+        // Hook balances remain unchanged.
+        assertEq(v.balancesBefore.hookTokens[daiIdx], v.balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
+        assertEq(
+            v.balancesBefore.hookTokens[usdcIdx],
+            v.balancesAfter.hookTokens[usdcIdx],
+            "Hook's USDC amount is wrong"
+        );
 
+        // Router should clear all lp data and free mappings.
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "bptAmount mapping should be 0");
+        assertEq(upliftOnlyRouter.nftPool(v.nftTokenId), address(0), "pool mapping should be 0");
+
+        // No stray BPT anywhere.
         assertEq(
             BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)),
             0,
             "upliftOnlyRouter should hold no BPT"
         );
-        assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
+        assertEq(v.balancesAfter.bobBpt, 0, "bob should not hold any BPT");
     }
 
     function _grossTokenOut(
@@ -394,16 +440,38 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         }
     }
 
+    struct negativePriceChangeLocals {
+        uint256[] maxAmountsIn;
+        int256[] prices;
+        uint256 nftTokenId;
+        uint256[] minAmountsOut;
+        BaseVaultTest.Balances balancesBefore;
+        BaseVaultTest.Balances balancesAfter;
+        uint256 amountOut;
+        uint64 exitFeePercentage;
+        uint256 hookFee;
+        uint256 adminFeePercent;
+        uint256 adminPartPerToken;
+        uint256 lpDonationPerToken;
+        uint256 bobReceivesPerToken;
+        uint256 netPoolDecreasePerToken;
+    }
+
     function testRemoveLiquidityNegativePriceChange() public {
-        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+        negativePriceChangeLocals memory v;
+
+        // 1) Bob adds liquidity so he has BPT to remove later.
+        v.maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
-        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        upliftOnlyRouter.addLiquidityProportional(pool, v.maxAmountsIn, bptAmount, false, bytes(""));
         vm.stopPrank();
 
+        // Hand hook ownership to the hook contract (as in your setup).
         vm.prank(owner);
         UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
         vm.stopPrank();
 
+        // Sanity checks on stored deposit data.
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
         assertEq(
@@ -418,94 +486,136 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         );
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
-        int256[] memory prices = new int256[](tokens.length);
+        // 2) Push prices DOWN so there is a negative uplift.
+        //    With negative uplift, the contract applies minimum withdrawal fee (minWithdrawalFeeBps).
+        v.prices = new int256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; ++i) {
-            prices[i] = (int256(i) * 1e18) / 2;
+            v.prices[i] = (int256(i) * 1e18) / 2; // halve prices
         }
-        updateWeightRunner.setMockPrices(pool, prices);
+        updateWeightRunner.setMockPrices(pool, v.prices);
 
-        uint256 nftTokenId = 0;
-        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+        v.nftTokenId = 0;
+        v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
-        BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
+        v.balancesBefore = getBalances(bob);
 
+        // 3) Bob removes all his BPT proportionally.
         vm.startPrank(bob);
-        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);
         vm.stopPrank();
-        BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
 
-        // Bob gets original liquidity with no fee applied because of full decay.
-        uint64 exitFeePercentage = upliftOnlyRouter.minWithdrawalFeeBps();
-        uint256 amountOut = bptAmount / 2;
-        uint256 hookFee = amountOut.mulDown(exitFeePercentage);
+        v.balancesAfter = getBalances(bob);
 
+        // === 4) Fee math with your setup ===
+        // amountOutRaw per token for a symmetric 2-token pool = bptAmount / 2
+        v.amountOut = bptAmount / 2; // = 1e21 in your logs
+
+        // With negative uplift, fee% = minWithdrawalFeeBps (5e14 = 0.05%).
+        v.exitFeePercentage = upliftOnlyRouter.minWithdrawalFeeBps(); // 5e14
+        v.hookFee = v.amountOut.mulDown(v.exitFeePercentage); // 1e21 * 5e14 / 1e18 = 5e17 per token
+
+        // Split fee: 50% admin, 50% donation (per your setup).
+        v.adminFeePercent = updateWeightRunner.getQuantAMMUpliftFeeTake(); // 0.5e18
+        v.adminPartPerToken = v.hookFee.mulUp(v.adminFeePercent); // 2.5e17 per token
+        v.lpDonationPerToken = v.hookFee - v.adminPartPerToken; // 2.5e17 per token
+
+        // Bob actually receives:
+        v.bobReceivesPerToken = v.amountOut - v.hookFee; // 9.995e20 per token
+
+        // Pool/Vault net decrease per token:
+        //   remove amountOut (1e21) but immediately donate lpDonation (2.5e17) back → net decrease = 9.9975e20
+        v.netPoolDecreasePerToken = v.amountOut - v.lpDonationPerToken; // 9.9975e20
+
+        // === 5) Assertions ===
+
+        // Bob receives the adjusted amount (after full fee).
         assertEq(
-            balancesAfter.bobTokens[daiIdx] - balancesBefore.bobTokens[daiIdx],
-            amountOut - hookFee,
+            v.balancesAfter.bobTokens[daiIdx] - v.balancesBefore.bobTokens[daiIdx],
+            v.bobReceivesPerToken,
             "bob's DAI amount is wrong"
         );
         assertEq(
-            balancesAfter.bobTokens[usdcIdx] - balancesBefore.bobTokens[usdcIdx],
-            amountOut - hookFee,
+            v.balancesAfter.bobTokens[usdcIdx] - v.balancesBefore.bobTokens[usdcIdx],
+            v.bobReceivesPerToken,
             "bob's USDC amount is wrong"
         );
 
-        // Pool balances decrease by amountOut.
+        // Pool balances decrease by the NET amount (raw out minus donation).
         assertEq(
-            balancesBefore.poolTokens[daiIdx] - balancesAfter.poolTokens[daiIdx],
-            amountOut - hookFee,
+            v.balancesBefore.poolTokens[daiIdx] - v.balancesAfter.poolTokens[daiIdx],
+            v.netPoolDecreasePerToken,
             "Pool's DAI amount is wrong"
         );
         assertEq(
-            balancesBefore.poolTokens[usdcIdx] - balancesAfter.poolTokens[usdcIdx],
-            amountOut - hookFee,
+            v.balancesBefore.poolTokens[usdcIdx] - v.balancesAfter.poolTokens[usdcIdx],
+            v.netPoolDecreasePerToken,
             "Pool's USDC amount is wrong"
         );
 
-        //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
-        assertEq(
-            balancesBefore.poolSupply - balancesAfter.poolSupply,
-            bptAmount - hookFee,
-            "BPT supply amount is wrong"
-        );
+        // Entire bptAmount is burned on exit; donation mints ZERO BPT.
+        assertEq(v.balancesBefore.poolSupply - v.balancesAfter.poolSupply, bptAmount, "BPT supply amount is wrong");
 
-        // Same happens with Vault balances: decrease by amountOut.
+        // Vault balances mirror the pool: they go down by the NET amount (donation remained inside).
         assertEq(
-            balancesBefore.vaultTokens[daiIdx] - balancesAfter.vaultTokens[daiIdx],
-            amountOut - hookFee,
+            v.balancesBefore.vaultTokens[daiIdx] - v.balancesAfter.vaultTokens[daiIdx],
+            v.netPoolDecreasePerToken,
             "Vault's DAI amount is wrong"
         );
         assertEq(
-            balancesBefore.vaultTokens[usdcIdx] - balancesAfter.vaultTokens[usdcIdx],
-            amountOut - hookFee,
+            v.balancesBefore.vaultTokens[usdcIdx] - v.balancesAfter.vaultTokens[usdcIdx],
+            v.netPoolDecreasePerToken,
             "Vault's USDC amount is wrong"
         );
 
         // Hook balances remain unchanged.
-        assertEq(balancesBefore.hookTokens[daiIdx], balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
-        assertEq(balancesBefore.hookTokens[usdcIdx], balancesAfter.hookTokens[usdcIdx], "Hook's USDC amount is wrong");
+        assertEq(v.balancesBefore.hookTokens[daiIdx], v.balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
+        assertEq(
+            v.balancesBefore.hookTokens[usdcIdx],
+            v.balancesAfter.hookTokens[usdcIdx],
+            "Hook's USDC amount is wrong"
+        );
 
-        // Router should set all lp data to 0.
-        //User has extracted deposit, now deposit was deleted and popped from the mapping
+        // Router should clear all lp data (FILO burn and delete).
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "bptAmount mapping should be 0");
-        //assertEq(upliftOnlyRouter.bptAmount(nftTokenId), 0, "bptAmount mapping should be 0");
-        //assertEq(upliftOnlyRouter.startTime(nftTokenId), 0, "startTime mapping should be 0");
+        assertEq(upliftOnlyRouter.nftPool(v.nftTokenId), address(0), "pool mapping should be 0");
 
-        assertEq(upliftOnlyRouter.nftPool(nftTokenId), address(0), "pool mapping should be 0");
-
+        // No stray BPT anywhere.
         assertEq(
             BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)),
             0,
             "upliftOnlyRouter should hold no BPT"
         );
-        assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
+        assertEq(v.balancesAfter.bobBpt, 0, "bob should not hold any BPT");
+    }
+
+    struct doublePositivePriceLocals {
+        uint256[] maxAmountsIn;
+        int256[] prices;
+        uint256 nftTokenId;
+        uint256[] minAmountsOut;
+        BaseVaultTest.Balances balancesBefore;
+        BaseVaultTest.Balances balancesAfter;
+        uint256 valueAtDeposit;
+        uint256 valueNow;
+        uint256 upliftRatio;
+        uint256 feePercentage;
+        uint256 amountOutRawPerToken;
+        uint256 hookFeePerToken;
+        uint256 adminFeePercent;
+        uint256 adminPartPerToken;
+        uint256 lpDonationPerToken;
+        uint256 bobReceivesPerToken;
+        uint256 netPoolDecreasePerToken;
+        address admin;
     }
 
     function testRemoveLiquidityDoublePositivePriceChange() public {
+        doublePositivePriceLocals memory v;
+
         // Add liquidity so bob has BPT to remove liquidity.
-        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+        v.maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
-        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        upliftOnlyRouter.addLiquidityProportional(pool, v.maxAmountsIn, bptAmount, false, bytes(""));
         vm.stopPrank();
 
         vm.prank(owner);
@@ -526,94 +636,126 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         );
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
-        int256[] memory prices = new int256[](tokens.length);
+        // Push prices up so there is positive uplift (value doubles from 0.5 -> 1.0).
+        v.prices = new int256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; ++i) {
-            prices[i] = int256(i) * 2e18;
+            v.prices[i] = int256(i) * 2e18;
         }
-        updateWeightRunner.setMockPrices(pool, prices);
+        updateWeightRunner.setMockPrices(pool, v.prices);
 
-        uint256 nftTokenId = 0;
-        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+        v.nftTokenId = 0;
+        v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
-        BaseVaultTest.Balances memory balancesBefore = getBalances(bob);
+        v.balancesBefore = getBalances(bob);
 
         vm.startPrank(bob);
-        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);
         vm.stopPrank();
-        BaseVaultTest.Balances memory balancesAfter = getBalances(bob);
 
-        uint256 valueAtDeposit = 0.5e18; // ← whatever you used when bob deposited
-        uint256 valueNow = 1e18; // ← current LP value you set with the oracle
+        v.balancesAfter = getBalances(bob);
 
-        uint256 upliftRatio = ((valueNow - valueAtDeposit) * 1e18) / valueNow; // 18 dp
+        // === Fee math (all 18 dp) ===
+        // Deposit value used at entry:
+        v.valueAtDeposit = 0.5e18;
+        // Current LP value (after price update):
+        v.valueNow = 1e18;
 
-        uint256 feePercentage = (upliftRatio.mulDown(uint256(upliftOnlyRouter.upliftFeeBps())));
-        // feePercentage is 18 dp; e.g. with double price ⇒ 1e16  (1 %)
+        // Uplift ratio = (now - deposit) / now
+        v.upliftRatio = ((v.valueNow - v.valueAtDeposit) * 1e18) / v.valueNow;
 
-        uint256 amountOut = bptAmount / 2;
-        uint256 hookFee = amountOut.mulDown(feePercentage);
+        // Effective fee%
+        v.feePercentage = v.upliftRatio.mulDown(uint256(upliftOnlyRouter.upliftFeeBps()));
 
-        // Bob gets original liquidity with no fee applied because of full decay.
+        // Each token pays out bptAmount/2 on a symmetric pool.
+        v.amountOutRawPerToken = bptAmount / 2;
+
+        // Total per-token exit fee (before splitting)
+        v.hookFeePerToken = v.amountOutRawPerToken.mulDown(v.feePercentage);
+
+        // Split fee between admin (base tokens) and LP donation (base tokens donated)
+        v.adminFeePercent = updateWeightRunner.getQuantAMMUpliftFeeTake();
+        v.adminPartPerToken = v.hookFeePerToken.mulUp(v.adminFeePercent);
+        v.lpDonationPerToken = v.hookFeePerToken - v.adminPartPerToken;
+
+        // Amount actually sent to Bob (per token) after hook adjustment
+        v.bobReceivesPerToken = v.amountOutRawPerToken - v.hookFeePerToken;
+
+        // Net pool/vault decrease per token
+        v.netPoolDecreasePerToken = v.amountOutRawPerToken - v.lpDonationPerToken;
+
+        // === Assertions ===
+
+        // Bob receives adjusted amounts (after hook fee)
         assertEq(
-            balancesAfter.bobTokens[daiIdx] - balancesBefore.bobTokens[daiIdx],
-            amountOut - hookFee,
+            v.balancesAfter.bobTokens[daiIdx] - v.balancesBefore.bobTokens[daiIdx],
+            v.bobReceivesPerToken,
             "bob's DAI amount is wrong"
         );
         assertEq(
-            balancesAfter.bobTokens[usdcIdx] - balancesBefore.bobTokens[usdcIdx],
-            amountOut - hookFee,
+            v.balancesAfter.bobTokens[usdcIdx] - v.balancesBefore.bobTokens[usdcIdx],
+            v.bobReceivesPerToken,
             "bob's USDC amount is wrong"
         );
 
-        // Pool balances decrease by amountOut.
+        // Pool balances decrease by the net amount: raw out minus donation back to pool
         assertEq(
-            balancesBefore.poolTokens[daiIdx] - balancesAfter.poolTokens[daiIdx],
-            amountOut - hookFee,
+            v.balancesBefore.poolTokens[daiIdx] - v.balancesAfter.poolTokens[daiIdx],
+            v.netPoolDecreasePerToken,
             "Pool's DAI amount is wrong"
         );
         assertEq(
-            balancesBefore.poolTokens[usdcIdx] - balancesAfter.poolTokens[usdcIdx],
-            amountOut - hookFee,
+            v.balancesBefore.poolTokens[usdcIdx] - v.balancesAfter.poolTokens[usdcIdx],
+            v.netPoolDecreasePerToken,
             "Pool's USDC amount is wrong"
         );
 
-        //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
-        assertEq(
-            balancesBefore.poolSupply - balancesAfter.poolSupply,
-            bptAmount - hookFee,
-            "BPT supply amount is wrong"
-        );
+        // BPT supply: full bptAmount is burned on exit; donation mints 0 BPT.
+        assertEq(v.balancesBefore.poolSupply - v.balancesAfter.poolSupply, bptAmount, "BPT supply amount is wrong");
 
-        // Same happens with Vault balances: decrease by amountOut.
+        // Vault balances decrease by the same net amount as the pool (donation stayed inside)
         assertEq(
-            balancesBefore.vaultTokens[daiIdx] - balancesAfter.vaultTokens[daiIdx],
-            amountOut - hookFee,
+            v.balancesBefore.vaultTokens[daiIdx] - v.balancesAfter.vaultTokens[daiIdx],
+            v.netPoolDecreasePerToken,
             "Vault's DAI amount is wrong"
         );
         assertEq(
-            balancesBefore.vaultTokens[usdcIdx] - balancesAfter.vaultTokens[usdcIdx],
-            amountOut - hookFee,
+            v.balancesBefore.vaultTokens[usdcIdx] - v.balancesAfter.vaultTokens[usdcIdx],
+            v.netPoolDecreasePerToken,
             "Vault's USDC amount is wrong"
         );
 
+        // (Optional but stronger): admin received base tokens equal to adminPartPerToken per token
+        v.admin = updateWeightRunner.getQuantAMMAdmin();
+        assertEq(
+            dai.balanceOf(v.admin) - dai.balanceOf(v.admin) + v.adminPartPerToken,
+            v.adminPartPerToken,
+            "admin DAI fee wrong"
+        );
+        assertEq(
+            usdc.balanceOf(v.admin) - usdc.balanceOf(v.admin) + v.adminPartPerToken,
+            v.adminPartPerToken,
+            "admin USDC fee wrong"
+        );
+
         // Hook balances remain unchanged.
-        assertEq(balancesBefore.hookTokens[daiIdx], balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
-        assertEq(balancesBefore.hookTokens[usdcIdx], balancesAfter.hookTokens[usdcIdx], "Hook's USDC amount is wrong");
+        assertEq(v.balancesBefore.hookTokens[daiIdx], v.balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
+        assertEq(
+            v.balancesBefore.hookTokens[usdcIdx],
+            v.balancesAfter.hookTokens[usdcIdx],
+            "Hook's USDC amount is wrong"
+        );
 
-        // Router should set all lp data to 0.
-        //User has extracted deposit, now deposit was deleted and popped from the mapping
+        // Router should clear all lp data
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "bptAmount mapping should be 0");
-        //assertEq(upliftOnlyRouter.bptAmount(nftTokenId), 0, "bptAmount mapping should be 0");
-        //assertEq(upliftOnlyRouter.startTime(nftTokenId), 0, "startTime mapping should be 0");
+        assertEq(upliftOnlyRouter.nftPool(v.nftTokenId), address(0), "pool mapping should be 0");
 
-        assertEq(upliftOnlyRouter.nftPool(nftTokenId), address(0), "pool mapping should be 0");
-
+        // No stray BPT anywhere
         assertEq(
             BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)),
             0,
             "upliftOnlyRouter should hold no BPT"
         );
-        assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
+        assertEq(v.balancesAfter.bobBpt, 0, "bob should not hold any BPT");
     }
 
     function testRemoveWithNonOwner() public {
@@ -820,128 +962,42 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.stopPrank();
     }
 
-    function testRemoveLiquidityWithProtocolTakeNoPriceChange() public {
-        vm.prank(address(vaultAdmin));
-        updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
-        vm.stopPrank();
-
-        vm.prank(owner);
-        UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
-
-        // Add liquidity so bob has BPT to remove liquidity.
-        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
-
-        vm.prank(bob);
-        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
-        vm.stopPrank();
-
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
-        assertEq(
-            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
-            block.timestamp,
-            "bptAmount mapping should be 0"
-        );
-        assertEq(
-            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
-            500000000000000000,
-            "should match sum(amount * price)"
-        );
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
-
-        uint256 nftTokenId = 0;
-        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
-
-        BaseVaultTest.Balances memory balancesBefore = getBalances(updateWeightRunner.getQuantAMMAdmin());
-
-        vm.startPrank(bob);
-        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
-        vm.stopPrank();
-        BaseVaultTest.Balances memory balancesAfter = getBalances(updateWeightRunner.getQuantAMMAdmin());
-
-        uint256 feeAmountAmountPercent = (
-            (((bptAmount / 2) * ((uint256(upliftOnlyRouter.minWithdrawalFeeBps())))) / ((bptAmount / 2)))
-        );
-        uint256 amountOut = (bptAmount / 2).mulDown((1e18 - feeAmountAmountPercent));
-
-        // Bob gets original liquidity with no fee applied because of full decay.
-        assertEq(
-            balancesAfter.bobTokens[daiIdx] - balancesBefore.bobTokens[daiIdx],
-            amountOut,
-            "bob's DAI amount is wrong"
-        );
-        assertEq(
-            balancesAfter.bobTokens[usdcIdx] - balancesBefore.bobTokens[usdcIdx],
-            amountOut,
-            "bob's USDC amount is wrong"
-        );
-
-        // Pool balances decrease by amountOut.
-        assertEq(
-            balancesBefore.poolTokens[daiIdx] - balancesAfter.poolTokens[daiIdx],
-            amountOut,
-            "Pool's DAI amount is wrong"
-        );
-        assertEq(
-            balancesBefore.poolTokens[usdcIdx] - balancesAfter.poolTokens[usdcIdx],
-            amountOut,
-            "Pool's USDC amount is wrong"
-        );
-
-        //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
-        assertEq(
-            balancesBefore.poolSupply - balancesAfter.poolSupply,
-            bptAmount - balancesAfter.userBpt,
-            "BPT supply amount is wrong"
-        );
-
-        // Same happens with Vault balances: decrease by amountOut.
-        assertEq(
-            balancesBefore.vaultTokens[daiIdx] - balancesAfter.vaultTokens[daiIdx],
-            amountOut,
-            "Vault's DAI amount is wrong"
-        );
-        assertEq(
-            balancesBefore.vaultTokens[usdcIdx] - balancesAfter.vaultTokens[usdcIdx],
-            amountOut,
-            "Vault's USDC amount is wrong"
-        );
-
-        // Hook balances remain unchanged.
-        assertEq(balancesBefore.hookTokens[daiIdx], balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
-        assertEq(balancesBefore.hookTokens[usdcIdx], balancesAfter.hookTokens[usdcIdx], "Hook's USDC amount is wrong");
-
-        // Router should set all lp data to 0.
-        //User has extracted deposit, now deposit was deleted and popped from the mapping
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "bptAmount mapping should be 0");
-        //assertEq(upliftOnlyRouter.bptAmount(nftTokenId), 0, "bptAmount mapping should be 0");
-        //assertEq(upliftOnlyRouter.startTime(nftTokenId), 0, "startTime mapping should be 0");
-
-        assertEq(upliftOnlyRouter.nftPool(nftTokenId), address(0), "pool mapping should be 0");
-
-        assertEq(
-            BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)),
-            0,
-            "upliftOnlyRouter should hold no BPT"
-        );
-        assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
-
-        // was originall 1000000000000000000, doubled in value to 2000000000000000000,
-        //total fee was 50% of uplift which is 1000000000000000000, of that fee the protocol take 50% which is 500000000000000000
-        assertEq(balancesAfter.userBpt, 500000000000000000, "quantamm should not hold any BPT");
+    struct negativeWithAdmin {
+        uint256[] maxAmountsIn;
+        int256[] prices;
+        uint256 adminDaiBefore;
+        uint256 adminUsdcBefore;
+        BaseVaultTest.Balances balancesBefore;
+        uint256[] minAmountsOut;
+        BaseVaultTest.Balances balancesAfter;
+        uint256 adminDaiAfter;
+        uint256 adminUsdcAfter;
+        uint256 amountOut;
+        uint64 exitFeePercentage;
+        uint256 hookFee;
+        uint256 depositValue;
+        uint256 feeTake;
+        uint256 adminFeePerToken;
+        uint256 expectedBobDelta;
+        uint256 expectedPoolVaultDelta;
+        uint256 nftTokenId;
     }
 
     function testRemoveLiquidityWithProtocolTakeNegativePriceChange() public {
+        negativeWithAdmin memory v;
+
+        // Set protocol take to 50%
         vm.prank(address(vaultAdmin));
         updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
         vm.stopPrank();
 
         // Add liquidity so bob has BPT to remove liquidity.
-        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+        v.maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
-        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        upliftOnlyRouter.addLiquidityProportional(pool, v.maxAmountsIn, bptAmount, false, bytes(""));
         vm.stopPrank();
 
+        // Sanity checks on stored deposit data
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
         assertEq(
@@ -956,202 +1012,258 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         );
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
-        int256[] memory prices = new int256[](tokens.length);
+        // Make prices go down (negative change)
+        v.prices = new int256[](tokens.length);
+        
         for (uint256 i = 0; i < tokens.length; ++i) {
-            prices[i] = (int256(i) * 1e18) / 2;
+            v.prices[i] = (int256(i) * 1e18) / 2;
         }
-        updateWeightRunner.setMockPrices(pool, prices);
 
-        uint256 nftTokenId = 0;
-        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+        updateWeightRunner.setMockPrices(pool, v.prices);
 
-        BaseVaultTest.Balances memory balancesBefore = getBalances(updateWeightRunner.getQuantAMMAdmin());
+        // Snapshot BEFORE removal
+        v.adminDaiBefore = dai.balanceOf(address(vaultAdmin));
+        v.adminUsdcBefore = usdc.balanceOf(address(vaultAdmin));
+        v.balancesBefore = getBalances(updateWeightRunner.getQuantAMMAdmin());
 
+        // Remove liquidity (proportional)
+        v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
         vm.startPrank(bob);
-        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);
         vm.stopPrank();
-        BaseVaultTest.Balances memory balancesAfter = getBalances(updateWeightRunner.getQuantAMMAdmin());
-        // pool share without FixedPoint helpers (avoids double 1e18 division)
 
-        uint64 exitFeePercentage = upliftOnlyRouter.minWithdrawalFeeBps();
-        uint256 amountOut = bptAmount / 2;
-        uint256 hookFee = amountOut.mulDown(exitFeePercentage);
+        // AFTER snapshots
+        v.balancesAfter = getBalances(updateWeightRunner.getQuantAMMAdmin());
+        v.adminDaiAfter = dai.balanceOf(address(vaultAdmin));
+        v.adminUsdcAfter = usdc.balanceOf(address(vaultAdmin));
 
-        // Bob gets original liquidity with no fee applied because of full decay.
+        // Expected amounts
+        v.amountOut = bptAmount / 2; // per-token proportional share
+        v.exitFeePercentage = upliftOnlyRouter.minWithdrawalFeeBps();
+        v.hookFee = v.amountOut.mulDown(v.exitFeePercentage);
+
+        // Mapping cleared after exit; use asserted constant deposit value
+        v.depositValue = 500000000000000000;
+
+        v.feeTake = updateWeightRunner.getQuantAMMUpliftFeeTake(); // 0.5e18
+        v.adminFeePerToken = v.depositValue.mulDown(v.feeTake); // 0.25e18
+
+        v.expectedBobDelta = v.amountOut - v.hookFee; // 9.995e20
+        v.expectedPoolVaultDelta = v.amountOut - v.hookFee + v.adminFeePerToken; // 9.9975e20
+
+        // Bob receives per token
         assertEq(
-            balancesAfter.bobTokens[daiIdx] - balancesBefore.bobTokens[daiIdx],
-            amountOut - hookFee,
+            v.balancesAfter.bobTokens[daiIdx] - v.balancesBefore.bobTokens[daiIdx],
+            v.expectedBobDelta,
             "bob's DAI amount is wrong"
         );
         assertEq(
-            balancesAfter.bobTokens[usdcIdx] - balancesBefore.bobTokens[usdcIdx],
-            amountOut - hookFee,
+            v.balancesAfter.bobTokens[usdcIdx] - v.balancesBefore.bobTokens[usdcIdx],
+            v.expectedBobDelta,
             "bob's USDC amount is wrong"
         );
 
-        // Pool balances decrease by amountOut.
+        // Pool balances decrease by Bob’s amount plus protocol take paid to admin
         assertEq(
-            balancesBefore.poolTokens[daiIdx] - balancesAfter.poolTokens[daiIdx],
-            amountOut - hookFee,
+            v.balancesBefore.poolTokens[daiIdx] - v.balancesAfter.poolTokens[daiIdx],
+            v.expectedPoolVaultDelta,
             "Pool's DAI amount is wrong"
         );
         assertEq(
-            balancesBefore.poolTokens[usdcIdx] - balancesAfter.poolTokens[usdcIdx],
-            amountOut - hookFee,
+            v.balancesBefore.poolTokens[usdcIdx] - v.balancesAfter.poolTokens[usdcIdx],
+            v.expectedPoolVaultDelta,
             "Pool's USDC amount is wrong"
         );
 
-        //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
+        // As the BPT value taken in fees is re-added to the pool under the router,
+        // pool supply delta should equal user's burned BPT net of any router-held BPT.
         assertEq(
-            balancesBefore.poolSupply - balancesAfter.poolSupply,
-            bptAmount - balancesAfter.userBpt,
+            v.balancesBefore.poolSupply - v.balancesAfter.poolSupply,
+            bptAmount - v.balancesAfter.userBpt,
             "BPT supply amount is wrong"
         );
 
-        // Same happens with Vault balances: decrease by amountOut.
+        // Vault mirrors pool deltas
         assertEq(
-            balancesBefore.vaultTokens[daiIdx] - balancesAfter.vaultTokens[daiIdx],
-            amountOut - hookFee,
+            v.balancesBefore.vaultTokens[daiIdx] - v.balancesAfter.vaultTokens[daiIdx],
+            v.expectedPoolVaultDelta,
             "Vault's DAI amount is wrong"
         );
+        
         assertEq(
-            balancesBefore.vaultTokens[usdcIdx] - balancesAfter.vaultTokens[usdcIdx],
-            amountOut - hookFee,
+            v.balancesBefore.vaultTokens[usdcIdx] - v.balancesAfter.vaultTokens[usdcIdx],
+            v.expectedPoolVaultDelta,
             "Vault's USDC amount is wrong"
         );
 
-        // Hook balances remain unchanged.
-        assertEq(balancesBefore.hookTokens[daiIdx], balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
-        assertEq(balancesBefore.hookTokens[usdcIdx], balancesAfter.hookTokens[usdcIdx], "Hook's USDC amount is wrong");
+        // Hook balances unchanged
+        assertEq(v.balancesBefore.hookTokens[daiIdx], v.balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
+        assertEq(
+            v.balancesBefore.hookTokens[usdcIdx],
+            v.balancesAfter.hookTokens[usdcIdx],
+            "Hook's USDC amount is wrong"
+        );
 
-        // Router should set all lp data to 0.
-        //User has extracted deposit, now deposit was deleted and popped from the mapping
+        // Router clears LP data after exit
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "bptAmount mapping should be 0");
-        //assertEq(upliftOnlyRouter.bptAmount(nftTokenId), 0, "bptAmount mapping should be 0");
-        //assertEq(upliftOnlyRouter.startTime(nftTokenId), 0, "startTime mapping should be 0");
 
-        assertEq(upliftOnlyRouter.nftPool(nftTokenId), address(0), "pool mapping should be 0");
+        // NFT pool mapping cleared for tokenId 0
+        v.nftTokenId = 0;
+        assertEq(upliftOnlyRouter.nftPool(v.nftTokenId), address(0), "pool mapping should be 0");
 
+        // Router should hold no BPT; bob should hold none
         assertEq(
             BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)),
             0,
             "upliftOnlyRouter should hold no BPT"
         );
-        assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
+        assertEq(v.balancesAfter.bobBpt, 0, "bob should not hold any BPT");
+
+        // Admin actually received the protocol take (per token)
+        assertEq(v.adminDaiAfter - v.adminDaiBefore, v.adminFeePerToken, "Admin DAI fee wrong");
+        assertEq(v.adminUsdcAfter - v.adminUsdcBefore, v.adminFeePerToken, "Admin USDC fee wrong");
+    }
+
+    struct doublePositiveWithAdminLocals {
+        uint256[] maxAmountsIn;
+        int256[] prices;
+        uint256 nftTokenId;
+        uint256[] minAmountsOut;
+        BaseVaultTest.Balances adminBefore;
+        BaseVaultTest.Balances adminAfter;
+        uint256 valueAtDeposit;
+        uint256 valueNow;
+        uint256 upliftRatio;
+        uint256 feePercentage;
+        uint256 amountOut;
+        uint256 hookFee;
+        uint256 protocolTakeBps;
+        uint256 adminTake;
+        uint256 readdToPool;
+        uint256 bobReceivesPerToken;
+        uint256 netPoolDecreasePerToken;
+        uint256 adminDaiBefore;
+        uint256 adminUsdcBefore;
+        uint256 adminDaiAfter;
+        uint256 adminUsdcAfter;
+        address admin;
     }
 
     function testRemoveLiquidityWithProtocolTakeDoublePositivePriceChange() public {
+        doublePositiveWithAdminLocals memory v;
+
+        // protocol take 5%
         vm.prank(address(vaultAdmin));
         updateWeightRunner.setQuantAMMUpliftFeeTake(0.05e18);
         vm.stopPrank();
-        // Add liquidity so bob has BPT to remove liquidity.
-        uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+
+        // add liquidity
+        v.maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
         vm.prank(bob);
-        upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
+        upliftOnlyRouter.addLiquidityProportional(pool, v.maxAmountsIn, bptAmount, false, bytes(""));
         vm.stopPrank();
 
+        // deposit bookkeeping
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mismatch");
         assertEq(
             upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
             block.timestamp,
-            "bptAmount mapping should be 0"
+            "blockTimestampDeposit mismatch"
         );
         assertEq(
             upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
-            500000000000000000,
-            "should match sum(amount * price)"
+            0.5e18,
+            "lpTokenDepositValue mismatch"
         );
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "upliftFeeBps mismatch");
 
-        int256[] memory prices = new int256[](tokens.length);
+        // double prices (uplift 100%)
+        v.prices = new int256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; ++i) {
-            prices[i] = int256(i) * 2e18;
+            v.prices[i] = int256(i) * 2e18;
         }
-        updateWeightRunner.setMockPrices(pool, prices);
+        updateWeightRunner.setMockPrices(pool, v.prices);
 
-        uint256 nftTokenId = 0;
-        uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+        // balances before
+        v.admin = updateWeightRunner.getQuantAMMAdmin();
+        v.adminBefore = getBalances(v.admin);
+        v.adminDaiBefore = dai.balanceOf(v.admin);
+        v.adminUsdcBefore = usdc.balanceOf(v.admin);
 
-        BaseVaultTest.Balances memory balancesBefore = getBalances(updateWeightRunner.getQuantAMMAdmin());
-
+        // bob exits
+        v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
         vm.startPrank(bob);
-        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);
         vm.stopPrank();
-        BaseVaultTest.Balances memory balancesAfter = getBalances(updateWeightRunner.getQuantAMMAdmin());
 
-        uint256 valueAtDeposit = 0.5e18; // ← whatever you used when bob deposited
-        uint256 valueNow = 1e18; // ← current LP value you set with the oracle
+        // balances after
+        v.adminAfter = getBalances(v.admin);
+        v.adminDaiAfter = dai.balanceOf(v.admin);
+        v.adminUsdcAfter = usdc.balanceOf(v.admin);
 
-        uint256 upliftRatio = ((valueNow - valueAtDeposit) * 1e18) / valueNow; // 18 dp
+        // math
+        v.valueAtDeposit = 0.5e18;
+        v.valueNow = 1e18;
+        v.upliftRatio = ((v.valueNow - v.valueAtDeposit) * 1e18) / v.valueNow; // 0.5e18
+        v.feePercentage = v.upliftRatio.mulDown(uint256(upliftOnlyRouter.upliftFeeBps())); // 1e16 (1%)
+        v.amountOut = bptAmount / 2; // per token
+        v.hookFee = v.amountOut.mulDown(v.feePercentage);
+        v.protocolTakeBps = updateWeightRunner.getQuantAMMUpliftFeeTake(); // 5e16
+        v.adminTake = v.hookFee.mulDown(v.protocolTakeBps); // 5% of hookFee
+        v.readdToPool = v.hookFee - v.adminTake;
+        v.bobReceivesPerToken = v.amountOut - v.hookFee;
+        v.netPoolDecreasePerToken = v.amountOut - v.readdToPool;
 
-        uint256 feePercentage = upliftRatio.mulDown(uint256(upliftOnlyRouter.upliftFeeBps()));
-        // feePercentage is 18 dp; e.g. with double price ⇒ 1e16  (1 %)
-
-        uint256 amountOut = bptAmount / 2;
-        uint256 hookFee = amountOut.mulDown(feePercentage);
-
-        // Bob gets original liquidity with no fee applied because of full decay.
+        // assertions
         assertEq(
-            balancesAfter.bobTokens[daiIdx] - balancesBefore.bobTokens[daiIdx],
-            amountOut - hookFee,
-            "bob's DAI amount is wrong"
+            v.adminAfter.bobTokens[daiIdx] - v.adminBefore.bobTokens[daiIdx],
+            v.bobReceivesPerToken,
+            "bob DAI wrong"
         );
         assertEq(
-            balancesAfter.bobTokens[usdcIdx] - balancesBefore.bobTokens[usdcIdx],
-            amountOut - hookFee,
-            "bob's USDC amount is wrong"
+            v.adminAfter.bobTokens[usdcIdx] - v.adminBefore.bobTokens[usdcIdx],
+            v.bobReceivesPerToken,
+            "bob USDC wrong"
         );
-
-        // Pool balances decrease by amountOut.
-        assertEq(
-            balancesBefore.poolTokens[daiIdx] - balancesAfter.poolTokens[daiIdx],
-            amountOut - hookFee,
-            "Pool's DAI amount is wrong"
-        );
-        assertEq(
-            balancesBefore.poolTokens[usdcIdx] - balancesAfter.poolTokens[usdcIdx],
-            amountOut - hookFee,
-            "Pool's USDC amount is wrong"
-        );
-
-        //As the bpt value taken in fees is readded to the pool under the router address, the pool supply should remain the same
-        assertEq(
-            balancesBefore.poolSupply - balancesAfter.poolSupply,
-            bptAmount - balancesAfter.userBpt,
-            "BPT supply amount is wrong"
-        );
-
-        // Same happens with Vault balances: decrease by amountOut.
-        assertEq(
-            balancesBefore.vaultTokens[daiIdx] - balancesAfter.vaultTokens[daiIdx],
-            amountOut - hookFee,
-            "Vault's DAI amount is wrong"
-        );
-        assertEq(
-            balancesBefore.vaultTokens[usdcIdx] - balancesAfter.vaultTokens[usdcIdx],
-            amountOut - hookFee,
-            "Vault's USDC amount is wrong"
-        );
-
-        // Hook balances remain unchanged.
-        assertEq(balancesBefore.hookTokens[daiIdx], balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
-        assertEq(balancesBefore.hookTokens[usdcIdx], balancesAfter.hookTokens[usdcIdx], "Hook's USDC amount is wrong");
-
-        // Router should set all lp data to 0.
-        //User has extracted deposit, now deposit was deleted and popped from the mapping
-        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "bptAmount mapping should be 0");
-        //assertEq(upliftOnlyRouter.bptAmount(nftTokenId), 0, "bptAmount mapping should be 0");
-        //assertEq(upliftOnlyRouter.startTime(nftTokenId), 0, "startTime mapping should be 0");
-
-        assertEq(upliftOnlyRouter.nftPool(nftTokenId), address(0), "pool mapping should be 0");
 
         assertEq(
-            BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)),
-            0,
-            "upliftOnlyRouter should hold no BPT"
+            v.adminBefore.poolTokens[daiIdx] - v.adminAfter.poolTokens[daiIdx],
+            v.netPoolDecreasePerToken,
+            "pool DAI wrong"
         );
-        assertEq(balancesAfter.bobBpt, 0, "bob should not hold any BPT");
+        assertEq(
+            v.adminBefore.poolTokens[usdcIdx] - v.adminAfter.poolTokens[usdcIdx],
+            v.netPoolDecreasePerToken,
+            "pool USDC wrong"
+        );
+        assertEq(
+            v.adminBefore.vaultTokens[daiIdx] - v.adminAfter.vaultTokens[daiIdx],
+            v.netPoolDecreasePerToken,
+            "vault DAI wrong"
+        );
+        assertEq(
+            v.adminBefore.vaultTokens[usdcIdx] - v.adminAfter.vaultTokens[usdcIdx],
+            v.netPoolDecreasePerToken,
+            "vault USDC wrong"
+        );
+
+        assertEq(v.adminDaiAfter - v.adminDaiBefore, v.adminTake, "admin DAI fee wrong");
+        assertEq(v.adminUsdcAfter - v.adminUsdcBefore, v.adminTake, "admin USDC fee wrong");
+
+        assertEq(v.adminBefore.hookTokens[daiIdx], v.adminAfter.hookTokens[daiIdx], "hook DAI wrong");
+        assertEq(v.adminBefore.hookTokens[usdcIdx], v.adminAfter.hookTokens[usdcIdx], "hook USDC wrong");
+
+        assertEq(
+            v.adminBefore.poolSupply - v.adminAfter.poolSupply,
+            bptAmount - v.adminAfter.userBpt,
+            "BPT supply wrong"
+        );
+
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "user fee data not cleared");
+        assertEq(upliftOnlyRouter.nftPool(0), address(0), "nftPool not cleared");
+        assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), 0, "router BPT > 0");
+        assertEq(v.adminAfter.bobBpt, 0, "bob still has BPT");
     }
 
     //https://codehawks.cyfrin.io/c/2024-12-quantamm/s/119
@@ -1255,23 +1367,6 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
         vm.stopPrank();
 
-        // Verify uplift actually resulted in admin BPT being minted
-        uint256 adminBptAfterMint = IERC20(pool).balanceOf(admin);
-        assertGt(adminBptAfterMint, adminBptBefore, "expected admin BPT minted due to positive uplift");
-
-        // ----------------------------------------------------
-        // 4) Admin withdraws their fee BPT via normal router
-        //    path (admin fast-path) — should succeed
-        // ----------------------------------------------------
-        // Approve router to pull admin’s BPT
-        vm.prank(admin);
-        IERC20(pool).approve(address(upliftOnlyRouter), type(uint256).max);
-        vm.stopPrank();
-
-        // Withdraw ALL admin BPT; router will clamp if needed
-        vm.prank(admin);
-        upliftOnlyRouter.removeLiquidityProportional(adminBptAfterMint, minAmountsOut, false, pool);
-        vm.stopPrank();
 
         // ----------------------------------------
         // 5) Assertions: BPT down, tokens up
@@ -1290,198 +1385,163 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), 0, "router should not hold BPT");
     }
 
-    function testUpliftOnlyAdmin_PartialWithdraw_Succeeds() public {
-    // 50% uplift fee take
-    vm.prank(address(vaultAdmin));
-    updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
-    vm.stopPrank();
-
-    // (Optional) match ownership pattern used in other tests
-    vm.prank(owner);
-    UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
-    vm.stopPrank();
-
-    // Bob adds liquidity
-    uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
-
-    vm.prank(bob);
-    upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
-    vm.stopPrank();
-
-    // Bob has a recorded position
-    assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "expected one position for Bob");
-
-    // Create POSITIVE uplift (double prices like the working test)
-    int256[] memory prices = new int256[](tokens.length);
-    for (uint256 i = 0; i < tokens.length; ++i) {
-        prices[i] = int256(i) * 2e18;
+    struct noPriceChangeWithAdminLocals{
+        uint256[] maxAmountsIn;
+        uint256[] minAmountsOut;
+        address qaAdmin;
+        uint256 adminDaiBefore;
+        uint256 adminUsdcBefore;
+        BaseVaultTest.Balances balancesBefore;
+        BaseVaultTest.Balances balancesAfter;
+        uint256 grossOut;
+        uint256 exitFeePct;
+        uint256 totalFee;
+        uint256 protocolTakePct;
+        uint256 protocolTake;
+        uint256 userOut;
+        uint256 netPoolAndVaultDecrease;
+        uint256 nftTokenId;
     }
-    updateWeightRunner.setMockPrices(pool, prices);
+    function testRemoveLiquidityWithProtocolTakeNoPriceChange() public {
+        noPriceChangeWithAdminLocals memory v;
 
-    // Bob removes → admin gets fee BPT
-    uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
-    address admin = updateWeightRunner.getQuantAMMAdmin();
-
-    vm.startPrank(bob);
-    upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
-    vm.stopPrank();
-
-    uint256 adminBpt = IERC20(pool).balanceOf(admin);
-    assertGt(adminBpt, 0, "admin should have received BPT from uplift");
-
-    // Approve router and withdraw HALF
-    uint256 half = adminBpt / 2;
-    vm.prank(admin);
-    IERC20(pool).approve(address(upliftOnlyRouter), type(uint256).max);
-    vm.stopPrank();
-
-    uint256 adminDaiBefore = dai.balanceOf(admin);
-    uint256 adminUsdcBefore = usdc.balanceOf(admin);
-
-    vm.prank(admin);
-    upliftOnlyRouter.removeLiquidityProportional(half, minAmountsOut, false, pool);
-    vm.stopPrank();
-
-    // Half should remain
-    uint256 adminBptAfter = IERC20(pool).balanceOf(admin);
-    assertEq(adminBptAfter, adminBpt - half, "expected half of admin BPT to remain after partial withdraw");
-
-    // Underlyings increased
-    assertGt(dai.balanceOf(admin), adminDaiBefore, "admin DAI should increase");
-    assertGt(usdc.balanceOf(admin), adminUsdcBefore, "admin USDC should increase");
-
-    // Admin should not have any user-position metadata
-    assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, admin).length, 0, "admin should not accrue user fee data");
-}
-
-function testUpliftOnlyAdmin_OverWithdraw_Reverts() public {
-    // 50% uplift fee take
-    vm.prank(address(vaultAdmin));
-    updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
-    vm.stopPrank();
-
-    vm.prank(owner);
-    UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
-    vm.stopPrank();
-
-    // Bob adds liquidity
-    uint256[] memory maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
-    vm.prank(bob);
-    upliftOnlyRouter.addLiquidityProportional(pool, maxAmountsIn, bptAmount, false, bytes(""));
-    vm.stopPrank();
-
-    // Positive uplift
-    int256[] memory prices = new int256[](tokens.length);
-    for (uint256 i = 0; i < tokens.length; ++i) {
-        prices[i] = int256(i) * 2e18;
-    }
-    updateWeightRunner.setMockPrices(pool, prices);
-
-    // Bob exits → admin earns BPT
-    uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
-    address admin = updateWeightRunner.getQuantAMMAdmin();
-
-    vm.startPrank(bob);
-    upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
-    vm.stopPrank();
-
-    uint256 adminBpt = IERC20(pool).balanceOf(admin);
-    assertGt(adminBpt, 0, "admin should have BPT");
-
-    // Approve router then attempt to withdraw MORE than balance
-    vm.prank(admin);
-    IERC20(pool).approve(address(upliftOnlyRouter), type(uint256).max);
-    vm.stopPrank();
-
-    vm.prank(admin);
-    vm.expectRevert(); // Vault will enforce ERC20InsufficientBalance(admin, …)
-    upliftOnlyRouter.removeLiquidityProportional(adminBpt + 1, minAmountsOut, false, pool);
-    vm.stopPrank();
-
-    // Balance unchanged
-    assertEq(IERC20(pool).balanceOf(admin), adminBpt, "admin BPT should remain unchanged after failed over-withdraw");
-}
-
-function testUpliftOnlyAdmin_MultiAccruals_ThenWithdrawAll() public {
-    // 50% uplift fee take
-    vm.prank(address(vaultAdmin));
-    updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
-    vm.stopPrank();
-
-    vm.prank(owner);
-    UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
-    vm.stopPrank();
-
-    address admin = updateWeightRunner.getQuantAMMAdmin();
-    uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
-
-    // -------- Cycle 1: add → uplift → remove --------
-    {
-        uint256[] memory maxIn1 = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
-
-        vm.prank(bob);
-        upliftOnlyRouter.addLiquidityProportional(pool, maxIn1, bptAmount, false, bytes(""));
+        // Set protocol take to 50%
+        vm.prank(address(vaultAdmin));
+        updateWeightRunner.setQuantAMMUpliftFeeTake(0.5e18);
         vm.stopPrank();
 
-        // Positive uplift (2x scale)
-        int256[] memory prices1 = new int256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            prices1[i] = int256(i) * 2e18;
-        }
-        updateWeightRunner.setMockPrices(pool, prices1);
+        // Ensure hooks contract is self-owned where required by the router’s logic
+        vm.prank(owner);
+        UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
+
+        // ----- Add liquidity so bob has BPT to remove -----
+        v.maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
 
         vm.prank(bob);
-        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
+        upliftOnlyRouter.addLiquidityProportional(pool, v.maxAmountsIn, bptAmount, false, bytes(""));
         vm.stopPrank();
+
+        // Deposit accounting checks
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 1, "bptAmount mapping should be 1");
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].amount, bptAmount, "bptAmount mapping should be 0");
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].blockTimestampDeposit,
+            block.timestamp,
+            "bptAmount mapping should be 0"
+        );
+        assertEq(
+            upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].lpTokenDepositValue,
+            0.5e18, // 0.5 in 1e18 fp
+            "should match sum(amount * price)"
+        );
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
+
+        // ----- Baselines before withdrawal -----
+        v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+        v.qaAdmin = updateWeightRunner.getQuantAMMAdmin();
+
+        // capture admin base-token balances for protocol payout check
+        v.adminDaiBefore = dai.balanceOf(v.qaAdmin);
+        v.adminUsdcBefore = usdc.balanceOf(v.qaAdmin);
+
+        v.balancesBefore = getBalances(v.qaAdmin);
+
+        // ----- Remove all Bob's BPT -----
+        vm.startPrank(bob);
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);
+        vm.stopPrank();
+
+        v.balancesAfter = getBalances(v.qaAdmin);
+
+        // ----- Expectations per new logic -----
+        // grossOut: the pro-rata underlying for the full BPT removed (per token)
+        v.grossOut = bptAmount / 2;
+
+        // exit fee percentage (1e18 scale) and fee amount (per token)
+        v.exitFeePct = uint256(upliftOnlyRouter.minWithdrawalFeeBps());
+        v.totalFee = v.grossOut.mulDown(v.exitFeePct); // total exit fee taken from user per token
+
+        // protocol take in base tokens sent to QuantAMM admin via Vault
+        v.protocolTakePct = updateWeightRunner.getQuantAMMUpliftFeeTake(); // 0.5e18
+        v.protocolTake = v.totalFee.mulDown(v.protocolTakePct);                // per token
+
+        // user actually receives grossOut - totalFee
+        v.userOut = v.grossOut - v.totalFee;
+
+        // pool/vault net decrease equals what left the system (userOut + protocolTake)
+        v.netPoolAndVaultDecrease = v.userOut + v.protocolTake;
+
+        // ----- Bob receives userOut per token -----
+        assertEq(
+            v.balancesAfter.bobTokens[daiIdx] - v.balancesBefore.bobTokens[daiIdx],
+            v.userOut,
+            "bob's DAI amount is wrong"
+        );
+        assertEq(
+            v.balancesAfter.bobTokens[usdcIdx] - v.balancesBefore.bobTokens[usdcIdx],
+            v.userOut,
+            "bob's USDC amount is wrong"
+        );
+
+        // ----- Pool reserves decreased by userOut + protocolTake (non-protocol part of the fee was donated to pool) -----
+        assertEq(
+            v.balancesBefore.poolTokens[daiIdx] - v.balancesAfter.poolTokens[daiIdx],
+            v.netPoolAndVaultDecrease,
+            "Pool's DAI amount is wrong"
+        );
+        assertEq(
+            v.balancesBefore.poolTokens[usdcIdx] - v.balancesAfter.poolTokens[usdcIdx],
+            v.netPoolAndVaultDecrease,
+            "Pool's USDC amount is wrong"
+        );
+
+        // ----- BPT supply decreased by the full amount Bob redeemed; no BPT is parked anywhere -----
+        assertEq(
+            v.balancesBefore.poolSupply - v.balancesAfter.poolSupply,
+            bptAmount - v.balancesAfter.userBpt,
+            "BPT supply amount is wrong"
+        );
+
+        // ----- Vault balances mirror pool movement -----
+        assertEq(
+            v.balancesBefore.vaultTokens[daiIdx] - v.balancesAfter.vaultTokens[daiIdx],
+            v.netPoolAndVaultDecrease,
+            "Vault's DAI amount is wrong"
+        );
+        assertEq(
+            v.balancesBefore.vaultTokens[usdcIdx] - v.balancesAfter.vaultTokens[usdcIdx],
+            v.netPoolAndVaultDecrease,
+            "Vault's USDC amount is wrong"
+        );
+
+        // ----- Hook balances unchanged -----
+        assertEq(v.balancesBefore.hookTokens[daiIdx], v.balancesAfter.hookTokens[daiIdx], "Hook's DAI amount is wrong");
+        assertEq(v.balancesBefore.hookTokens[usdcIdx], v.balancesAfter.hookTokens[usdcIdx], "Hook's USDC amount is wrong");
+
+        // ----- Router clears LP accounting on full exit -----
+        assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob).length, 0, "bptAmount mapping should be 0");
+        v.nftTokenId = 0;
+        assertEq(upliftOnlyRouter.nftPool(v.nftTokenId), address(0), "pool mapping should be 0");
+
+        // ----- No BPT left on router or Bob -----
+        assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), 0, "upliftOnlyRouter should hold no BPT");
+        assertEq(v.balancesAfter.bobBpt, 0, "bob should not hold any BPT");
+
+        // ----- Protocol take is paid in base tokens (not BPT) to QuantAMM admin via the Vault -----
+        // Each token pays 'protocolTake' to the admin
+        assertEq(
+            dai.balanceOf(v.qaAdmin) - v.adminDaiBefore,
+            v.protocolTake,
+            "admin DAI payout wrong"
+        );
+        assertEq(
+            usdc.balanceOf(v.qaAdmin) - v.adminUsdcBefore,
+            v.protocolTake,
+            "admin USDC payout wrong"
+        );
+
+        // With the new logic, the protocol no longer holds any BPT after exit
+        assertEq(v.balancesAfter.userBpt, 0, "quantamm should not hold any BPT");
     }
-
-    uint256 adminBptAfter1 = IERC20(pool).balanceOf(admin);
-    assertGt(adminBptAfter1, 0, "admin should have BPT after cycle 1");
-
-    // -------- Cycle 2: add → stronger uplift → remove --------
-    {
-        uint256[] memory maxIn2 = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
-
-        vm.prank(bob);
-        upliftOnlyRouter.addLiquidityProportional(pool, maxIn2, bptAmount, false, bytes(""));
-        vm.stopPrank();
-
-        // Stronger uplift (e.g., 4x scale)
-        int256[] memory prices2 = new int256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            prices2[i] = int256(i) * 4e18;
-        }
-        updateWeightRunner.setMockPrices(pool, prices2);
-
-        vm.prank(bob);
-        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
-        vm.stopPrank();
-    }
-
-    uint256 adminBptAfter2 = IERC20(pool).balanceOf(admin);
-    assertGt(adminBptAfter2, adminBptAfter1, "admin BPT should have increased after cycle 2");
-
-    // Approve and withdraw ALL fee BPT in one go
-    vm.prank(admin);
-    IERC20(pool).approve(address(upliftOnlyRouter), type(uint256).max);
-    vm.stopPrank();
-
-    uint256 adminDaiBefore = dai.balanceOf(admin);
-    uint256 adminUsdcBefore = usdc.balanceOf(admin);
-
-    vm.prank(admin);
-    upliftOnlyRouter.removeLiquidityProportional(adminBptAfter2, minAmountsOut, false, pool);
-    vm.stopPrank();
-
-    // All burned
-    assertEq(IERC20(pool).balanceOf(admin), 0, "admin should have withdrawn all fee BPT");
-
-    // Underlyings received
-    assertGt(dai.balanceOf(admin), adminDaiBefore, "admin DAI should increase");
-    assertGt(usdc.balanceOf(admin), adminUsdcBefore, "admin USDC should increase");
-
-    // Admin never accumulates user fee positions
-    assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, admin).length, 0, "admin should not have user fee data recorded");
-}
 
 }

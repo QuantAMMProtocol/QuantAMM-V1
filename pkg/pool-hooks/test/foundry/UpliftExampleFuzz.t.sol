@@ -660,121 +660,154 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
     function testFuzz_removeLiquidityNegativePriceChange_noProtocolTake(uint16 withdrawalFeeBps, uint64 minFee) public {
         _runFuzzNegative(withdrawalFeeBps, 0, minFee);
     }
+function testFuzz_removeLiquidityNegativePriceChange_withProtocolTake(
+    uint16 withdrawalFeeBps,
+    uint256 protocolTakeE18,
+    uint64 minFee
+) public {
+    _runFuzzNegative(withdrawalFeeBps, protocolTakeE18, minFee);
+}
+struct FuzzNegativeParams {
+    uint256 amountOut;                // per-token proportional amount out
+    uint256 hookFee;                  // exit fee charged by the hook (per token)
+    uint256 adminFeePerToken;         // protocol take paid out in base tokens (per token)
+    uint256 expectedBobDelta;         // what Bob receives per token
+    uint256 expectedPoolVaultDelta;   // what the Pool/Vault lose per token
+    address admin;
+    BaseVaultTest.Balances beforeBalances;
+    BaseVaultTest.Balances afterBalances;
+    uint256 adminDaiBefore;
+    uint256 adminUsdcBefore;
+    uint256 adminDaiAfter;
+    uint256 adminUsdcAfter;
+    uint64 exitFeePctE18;
+    uint256 depositValue;
+}
 
-    function testFuzz_removeLiquidityNegativePriceChange_withProtocolTake(
-        uint16 withdrawalFeeBps,
-        uint256 protocolTakeE18,
-        uint64 minFee
-    ) public {
-        _runFuzzNegative(withdrawalFeeBps, protocolTakeE18, minFee);
+function _runFuzzNegative(
+    uint64 withdrawalFeeBps,
+    uint256 protocolTakeE18,
+    uint64 minFee
+) internal {
+    minFee = uint64(bound(minFee, 5, 100));
+    withdrawalFeeBps = uint64(bound(withdrawalFeeBps, 5, 500));
+    if (protocolTakeE18 > 0) {
+        protocolTakeE18 = uint256(bound(protocolTakeE18, 5, 9999)) * 1e14;
     }
 
-    struct FuzzNegativeParams {
-        uint256 amountOut;
-        uint256 hookFee;
-        uint256 upliftBpt;
-        uint256 protoShare;
-        uint256 routerKeep;
+    vm.prank(address(vaultAdmin));
+    updateWeightRunner.setQuantAMMUpliftFeeTake(protocolTakeE18);
+    vm.stopPrank();
+
+    vm.startPrank(owner);
+    upliftOnlyRouter = new UpliftOnlyExample(
+        IVault(address(vault)),
+        weth,
+        permit2,
+        withdrawalFeeBps * 1e14,
+        5e14,
+        address(updateWeightRunner),
+        "Uplift LiquidityPosition v1",
+        "Uplift LiquidityPosition v1",
+        "Uplift LiquidityPosition v1"
+    );
+    vm.stopPrank();
+
+    poolHooksContract = address(upliftOnlyRouter);
+    (pool,) = createPool();
+    _approveAllUsers();
+    initPool();
+
+    vm.prank(owner);
+    UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
+
+    uint256 bobDai = dai.balanceOf(bob);
+    uint256 bobUsdc = usdc.balanceOf(bob);
+    uint256[] memory maxIn = [bobDai + 5, bobUsdc + 5].toMemoryArray();
+
+    vm.prank(bob);
+    upliftOnlyRouter.addLiquidityProportional(pool, maxIn, bptAmount, false, "");
+    vm.stopPrank();
+
+    int256[] memory prices = new int256[](tokens.length);
+    for (uint256 i; i < tokens.length; ++i) {
+        prices[i] = (int256(i) * 1e18) / 2;
     }
+    updateWeightRunner.setMockPrices(pool, prices);
 
-    function _runFuzzNegative(uint64 withdrawalFeeBps, uint256 protocolTakeE18, uint64 minFee) internal {
-        minFee = uint64(bound(minFee, 5, 100));
-        withdrawalFeeBps = uint64(bound(withdrawalFeeBps, 5, 500));
-        if (protocolTakeE18 > 0) {
-            protocolTakeE18 = uint256(bound(protocolTakeE18, 5, 9999)) * 1e14; //realistically 1% admin take is lowest possible
-        }
-        vm.prank(address(vaultAdmin));
-        updateWeightRunner.setQuantAMMUpliftFeeTake(protocolTakeE18);
-        vm.stopPrank();
+    uint256[] memory minsOut = [uint256(0), uint256(0)].toMemoryArray();
 
-        vm.startPrank(owner);
-        upliftOnlyRouter = new UpliftOnlyExample(
-            IVault(address(vault)),
-            weth,
-            permit2,
-            withdrawalFeeBps * 1e14,
-            5e14,
-            address(updateWeightRunner),
-            "Uplift LiquidityPosition v1",
-            "Uplift LiquidityPosition v1",
-            "Uplift LiquidityPosition v1"
-        );
-        vm.stopPrank();
+    FuzzNegativeParams memory p;
+    p.admin = updateWeightRunner.getQuantAMMAdmin();
+    p.beforeBalances = getBalances(p.admin);
+    p.adminDaiBefore = dai.balanceOf(p.admin);
+    p.adminUsdcBefore = usdc.balanceOf(p.admin);
 
-        poolHooksContract = address(upliftOnlyRouter);
-        (pool, ) = createPool();
-        _approveAllUsers();
-        initPool();
+    vm.prank(bob);
+    upliftOnlyRouter.removeLiquidityProportional(bptAmount, minsOut, false, pool);
+    vm.stopPrank();
 
-        vm.prank(owner);
-        UpliftOnlyExample(payable(poolHooksContract)).transferOwnership(poolHooksContract);
+    p.afterBalances = getBalances(p.admin);
+    p.adminDaiAfter = dai.balanceOf(p.admin);
+    p.adminUsdcAfter = usdc.balanceOf(p.admin);
 
-        uint256 bobDai = dai.balanceOf(bob);
-        uint256 bobUsdc = usdc.balanceOf(bob);
-        uint256[] memory maxIn = [bobDai + 5, bobUsdc + 5].toMemoryArray(); // small head-room
+    p.amountOut = bptAmount / 2;
+    p.exitFeePctE18 = upliftOnlyRouter.minWithdrawalFeeBps();
+    p.hookFee = p.amountOut.mulDown(p.exitFeePctE18);
+    p.depositValue = 0.5e18;
+    p.adminFeePerToken = p.depositValue.mulDown(protocolTakeE18);
+    p.expectedBobDelta = p.amountOut - p.hookFee;
+    p.expectedPoolVaultDelta = p.expectedBobDelta + p.adminFeePerToken;
 
-        vm.prank(bob);
-        upliftOnlyRouter.addLiquidityProportional(pool, maxIn, bptAmount, false, "");
-        vm.stopPrank();
+    assertEq(
+        p.afterBalances.bobTokens[daiIdx] - p.beforeBalances.bobTokens[daiIdx],
+        p.expectedBobDelta,
+        "bob DAI wrong"
+    );
+    assertEq(
+        p.afterBalances.bobTokens[usdcIdx] - p.beforeBalances.bobTokens[usdcIdx],
+        p.expectedBobDelta,
+        "bob USDC wrong"
+    );
 
-        int256[] memory prices = new int256[](tokens.length);
-        for (uint256 i; i < tokens.length; ++i) {
-            prices[i] = (int256(i) * 1e18) / 2; // half previous price
-        }
-        updateWeightRunner.setMockPrices(pool, prices);
+    assertEq(
+        p.beforeBalances.poolTokens[daiIdx] - p.afterBalances.poolTokens[daiIdx],
+        p.expectedPoolVaultDelta,
+        "pool DAI wrong"
+    );
+    assertEq(
+        p.beforeBalances.poolTokens[usdcIdx] - p.afterBalances.poolTokens[usdcIdx],
+        p.expectedPoolVaultDelta,
+        "pool USDC wrong"
+    );
 
-        uint256[] memory minsOut = [uint256(0), uint256(0)].toMemoryArray();
+    assertEq(
+        p.beforeBalances.vaultTokens[daiIdx] - p.afterBalances.vaultTokens[daiIdx],
+        p.expectedPoolVaultDelta,
+        "vault DAI wrong"
+    );
+    assertEq(
+        p.beforeBalances.vaultTokens[usdcIdx] - p.afterBalances.vaultTokens[usdcIdx],
+        p.expectedPoolVaultDelta,
+        "vault USDC wrong"
+    );
 
-        BaseVaultTest.Balances memory before = getBalances(
-            protocolTakeE18 == 0 ? bob : updateWeightRunner.getQuantAMMAdmin()
-        );
+    assertEq(p.beforeBalances.hookTokens[daiIdx], p.afterBalances.hookTokens[daiIdx], "hook DAI wrong");
+    assertEq(p.beforeBalances.hookTokens[usdcIdx], p.afterBalances.hookTokens[usdcIdx], "hook USDC wrong");
 
-        vm.prank(bob);
-        upliftOnlyRouter.removeLiquidityProportional(bptAmount, minsOut, false, pool);
-        vm.stopPrank();
+    assertEq(
+        p.beforeBalances.poolSupply - p.afterBalances.poolSupply,
+        bptAmount - p.afterBalances.userBpt,
+        "pool supply wrong"
+    );
 
-        BaseVaultTest.Balances memory after_ = getBalances(updateWeightRunner.getQuantAMMAdmin());
+    assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), 0, "router BPT wrong");
+    assertEq(p.afterBalances.bobBpt, 0, "bob still holds BPT");
 
-        FuzzNegativeParams memory params;
+    assertEq(p.adminDaiAfter - p.adminDaiBefore, p.adminFeePerToken, "admin DAI fee wrong");
+    assertEq(p.adminUsdcAfter - p.adminUsdcBefore, p.adminFeePerToken, "admin USDC fee wrong");
+}
 
-        params.amountOut = bptAmount / 2;
-
-        uint64 exitFeePctE18 = upliftOnlyRouter.minWithdrawalFeeBps(); // 5 → 5 × 1e14 = 5e14
-        params.hookFee = params.amountOut.mulDown(exitFeePctE18);
-
-        assertEq(
-            after_.bobTokens[daiIdx] - before.bobTokens[daiIdx],
-            params.amountOut - params.hookFee,
-            "bob DAI wrong"
-        );
-        assertEq(
-            after_.bobTokens[usdcIdx] - before.bobTokens[usdcIdx],
-            params.amountOut - params.hookFee,
-            "bob USDC wrong"
-        );
-
-        assertEq(
-            before.poolTokens[daiIdx] - after_.poolTokens[daiIdx],
-            params.amountOut - params.hookFee,
-            "pool DAI wrong"
-        );
-        assertEq(
-            before.poolTokens[usdcIdx] - after_.poolTokens[usdcIdx],
-            params.amountOut - params.hookFee,
-            "pool USDC wrong"
-        );
-
-        params.upliftBpt = params.hookFee.mulUp(bptAmount).divDown(params.amountOut);
-        params.protoShare = (params.upliftBpt.mulDown(protocolTakeE18));
-        params.routerKeep = params.upliftBpt - params.protoShare;
-
-        assertEq(before.poolSupply - after_.poolSupply, bptAmount - params.protoShare, "pool supply wrong");
-        assertEq(after_.userBpt, params.protoShare, "admin BPT wrong");
-
-        assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), 0, "router BPT wrong");
-
-        assertEq(after_.bobBpt, 0, "bob still holds BPT");
-    }
 
     /* ────────────────────────────  FUZZ: POSITIVE P&L  ─────────────────────────── */
 
@@ -784,154 +817,218 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         uint64 minFee
     ) public {
         _runPositiveFuzz(withdrawalFeeBps_, 0, priceMulE18_, minFee);
+    }function testFuzz_removeLiquidityPositive_withProtocolTake(
+    uint64 withdrawalFeeBps_,
+    uint256 protocolTake,
+    uint256 priceMulE18_,
+    uint64 minFee
+) public {
+    _runPositiveFuzz(withdrawalFeeBps_, protocolTake, priceMulE18_, minFee);
+}
+struct FuzzPositiveParams {
+    uint64 minFee;
+    uint64 withdrawalFeeBpsBound;
+    uint256 protocolTake;
+    uint256 priceMulE18;
+    address observer;
+    address admin;
+    uint256 upliftFeePctE18;
+    uint256 minFeePctE18;
+    uint256 effectiveFeePctE18;
+    uint256 feeAmountTotal;
+    uint256 feePercentageE18;
+    uint256 tokensLen;
+    uint256 amountOut;                  // per-token gross
+    uint256 hookFeeTokens;              // per-token hook fee
+    uint256 adminFeeTokens;             // per-token (base tokens, NOT BPT)
+    uint256 adminMintedBpt;
+    uint256 adminDaiBefore;
+    uint256 adminUsdcBefore;
+    uint256 adminDaiAfter;
+    uint256 adminUsdcAfter;
+    uint256 bobReceivesPerToken;
+    uint256 readdToPool;
+    uint256 netPoolDecreasePerToken;
+    uint256[] maxIn;
+    uint256[] minsOut;
+    uint256[] amountsOut;
+    int256[] prices;
+    BaseVaultTest.Balances beforeBalances;
+    BaseVaultTest.Balances afterBalances;
+}
+
+function _runPositiveFuzz(
+    uint64 withdrawalFeeBps_,
+    uint256 protocolTake,
+    uint256 priceMulE18_,
+    uint64 minFee
+) internal {
+    FuzzPositiveParams memory p;
+
+    // -----------------------
+    // Bounds & config
+    // -----------------------
+    p.minFee = uint64(bound(minFee, 5, 100));
+    p.withdrawalFeeBpsBound = uint64(bound(withdrawalFeeBps_, p.minFee + 1, 500));
+
+    if (protocolTake > 0) {
+        p.protocolTake = uint256(bound(protocolTake, p.minFee, 9999)) * 1e14;
+    } else {
+        p.protocolTake = 0;
     }
 
-    function testFuzz_removeLiquidityPositive_withProtocolTake(
-        uint64 withdrawalFeeBps_,
-        uint256 protocolTake,
-        uint256 priceMulE18_,
-        uint64 minFee
-    ) public {
-        _runPositiveFuzz(withdrawalFeeBps_, protocolTake, priceMulE18_, minFee);
+    vm.prank(address(vaultAdmin));
+    updateWeightRunner.setQuantAMMUpliftFeeTake(p.protocolTake);
+    vm.stopPrank();
+
+    p.priceMulE18 = bound(priceMulE18_, 1e18, 10_000e18);
+
+    vm.prank(owner);
+    upliftOnlyRouter = new UpliftOnlyExample(
+        IVault(address(vault)),
+        weth,
+        permit2,
+        p.withdrawalFeeBpsBound * 1e14, // upliftFeeBps (1e18-scaled)
+        p.minFee * 1e14,                 // minWithdrawalFeeBps (1e18-scaled)
+        address(updateWeightRunner),
+        "Uplift LP v1",
+        "Uplift LP v1",
+        "Uplift LP v1"
+    );
+    vm.stopPrank();
+
+    poolHooksContract = address(upliftOnlyRouter);
+    (pool, ) = createPool();
+    _approveAllUsers();
+    initPool();
+
+    // Bob adds liquidity
+    p.maxIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+    vm.prank(bob);
+    upliftOnlyRouter.addLiquidityProportional(pool, p.maxIn, bptAmount, false, "");
+    vm.stopPrank();
+
+    // Price uplift
+    p.prices = new int256[](tokens.length);
+    for (uint256 i; i < tokens.length; ++i) {
+        p.prices[i] = int256(i) * int256(p.priceMulE18);
     }
+    updateWeightRunner.setMockPrices(pool, p.prices);
 
-    struct FuzzPositiveParams {
-        uint64 minFee;
-        uint64 withdrawalFeeBpsBound;
-        uint256 protocolTake;
-        uint256 priceMulE18;
-        address observer;
-        uint256 upliftFeePctE18;
-        uint256 minFeePctE18;
-        uint256 effectiveFeePctE18;
-        uint256 amountOut;
-        uint256 hookFeeTokens;
-        uint256 adminFeeTokens;
-        uint256 adminMintedBpt;
-        uint256[] maxIn;
-        uint256[] minsOut;
-        int256[] prices;
-        BaseVaultTest.Balances beforeBalances;
-        BaseVaultTest.Balances afterBalances;
+    // Remove with no mins
+    p.minsOut = [uint256(0), uint256(0)].toMemoryArray();
+
+    // Observer
+    p.observer = p.protocolTake == 0 ? bob : updateWeightRunner.getQuantAMMAdmin();
+
+    // Track balances before
+    p.beforeBalances = getBalances(p.observer);
+    p.admin = updateWeightRunner.getQuantAMMAdmin();
+    p.adminDaiBefore = dai.balanceOf(p.admin);
+    p.adminUsdcBefore = usdc.balanceOf(p.admin);
+
+    // Bob exits
+    vm.prank(bob);
+    p.amountsOut = upliftOnlyRouter.removeLiquidityProportional(bptAmount, p.minsOut, false, pool);
+    vm.stopPrank();
+
+    // Track balances after
+    p.afterBalances = getBalances(p.observer);
+    p.adminDaiAfter = dai.balanceOf(p.admin);
+    p.adminUsdcAfter = usdc.balanceOf(p.admin);
+
+    // -----------------------
+    // Math replication
+    // -----------------------
+    p.upliftFeePctE18 =
+    (p.priceMulE18 - 1e18)
+        .mulUp(p.withdrawalFeeBpsBound * 1e14)
+        .divDown(p.priceMulE18);
+
+    p.minFeePctE18 = uint256(upliftOnlyRouter.minWithdrawalFeeBps());
+
+    p.effectiveFeePctE18 = p.upliftFeePctE18 > p.minFeePctE18 ? p.upliftFeePctE18 : p.minFeePctE18;
+
+    p.amountOut = bptAmount / 2;
+
+    p.tokensLen = tokens.length; // 2
+    p.feeAmountTotal = p.amountOut.mulDown(p.effectiveFeePctE18) * p.tokensLen;
+
+    p.feePercentageE18 = p.feeAmountTotal.divDown(bptAmount);
+
+    p.hookFeeTokens = p.amountOut.mulUp(p.feePercentageE18);
+
+    p.adminFeeTokens = p.hookFeeTokens.mulDown(p.protocolTake);
+
+    p.bobReceivesPerToken = p.amountOut - p.hookFeeTokens;
+    p.readdToPool = p.hookFeeTokens - p.adminFeeTokens;
+    p.netPoolDecreasePerToken = p.amountOut - p.readdToPool;
+
+    // Admin minted BPT (if any)
+    p.adminMintedBpt = p.afterBalances.userBpt > p.beforeBalances.userBpt
+        ? (p.afterBalances.userBpt - p.beforeBalances.userBpt)
+        : 0;
+
+    // -----------------------
+    // Assertions
+    // -----------------------
+    assertEq(
+        p.afterBalances.bobTokens[daiIdx] - p.beforeBalances.bobTokens[daiIdx],
+        p.amountsOut[0],
+        "bob DAI"
+    );
+    assertEq(
+        p.afterBalances.bobTokens[usdcIdx] - p.beforeBalances.bobTokens[usdcIdx],
+        p.amountsOut[1],
+        "bob USDC"
+    );
+    assertEq(p.amountsOut[0], p.bobReceivesPerToken, "bob DAI amount mismatch");
+    assertEq(p.amountsOut[1], p.bobReceivesPerToken, "bob USDC amount mismatch");
+
+    assertEq(
+        p.beforeBalances.poolTokens[daiIdx] - p.afterBalances.poolTokens[daiIdx],
+        p.netPoolDecreasePerToken,
+        "pool DAI wrong"
+    );
+    assertEq(
+        p.beforeBalances.poolTokens[usdcIdx] - p.afterBalances.poolTokens[usdcIdx],
+        p.netPoolDecreasePerToken,
+        "pool USDC wrong"
+    );
+
+    assertEq(
+        p.beforeBalances.vaultTokens[daiIdx] - p.afterBalances.vaultTokens[daiIdx],
+        p.netPoolDecreasePerToken,
+        "vault DAI wrong"
+    );
+    assertEq(
+        p.beforeBalances.vaultTokens[usdcIdx] - p.afterBalances.vaultTokens[usdcIdx],
+        p.netPoolDecreasePerToken,
+        "vault USDC wrong"
+    );
+
+    assertEq(p.adminDaiAfter - p.adminDaiBefore, p.adminFeeTokens, "admin DAI fee wrong");
+    assertEq(p.adminUsdcAfter - p.adminUsdcBefore, p.adminFeeTokens, "admin USDC fee wrong");
+
+    assertApproxEqAbs(
+        p.beforeBalances.poolSupply - p.afterBalances.poolSupply,
+        bptAmount - p.adminMintedBpt,
+        2,
+        "pool supply"
+    );
+
+    assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), 0, "router holds BPT");
+    assertEq(p.afterBalances.bobBpt, 0, "bob BPT");
+
+    if (p.protocolTake == 0) {
+        assertEq(p.afterBalances.userBpt, 0, "admin BPT");
+    } else {
+        assertGt(p.afterBalances.userBpt, 0, "admin BPT > 0");
     }
+}
 
-    function _runPositiveFuzz(
-        uint64 withdrawalFeeBps_,
-        uint256 protocolTake,
-        uint256 priceMulE18_,
-        uint64 minFee
-    ) internal {
-        FuzzPositiveParams memory p;
 
-        // bounds
-        p.minFee = uint64(bound(minFee, 5, 100));
-        p.withdrawalFeeBpsBound = uint64(bound(withdrawalFeeBps_, p.minFee + 1, 500));
-        if (protocolTake > 0) {
-            p.protocolTake = uint256(bound(protocolTake, p.minFee, 9999)) * 1e14;
-        } else {
-            p.protocolTake = 0;
-        }
-        vm.prank(address(vaultAdmin));
-        updateWeightRunner.setQuantAMMUpliftFeeTake(p.protocolTake);
-        vm.stopPrank();
 
-        p.priceMulE18 = bound(priceMulE18_, 1e18, 10_000e18);
-
-        // fresh router
-        vm.prank(owner);
-        upliftOnlyRouter = new UpliftOnlyExample(
-            IVault(address(vault)),
-            weth,
-            permit2,
-            p.withdrawalFeeBpsBound * 1e14, // upliftFeeBps
-            p.minFee * 1e14, // minWithdrawalFeeBps
-            address(updateWeightRunner),
-            "Uplift LP v1",
-            "Uplift LP v1",
-            "Uplift LP v1"
-        );
-        vm.stopPrank();
-
-        poolHooksContract = address(upliftOnlyRouter);
-        (pool, ) = createPool();
-        _approveAllUsers();
-        initPool();
-
-        p.maxIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
-        vm.prank(bob);
-        upliftOnlyRouter.addLiquidityProportional(pool, p.maxIn, bptAmount, false, "");
-        vm.stopPrank();
-
-        p.prices = new int256[](tokens.length);
-        for (uint256 i; i < tokens.length; ++i) {
-            p.prices[i] = int256(i) * int256(p.priceMulE18);
-        }
-        updateWeightRunner.setMockPrices(pool, p.prices);
-
-        p.minsOut = [uint256(0), uint256(0)].toMemoryArray();
-        p.observer = p.protocolTake == 0 ? bob : updateWeightRunner.getQuantAMMAdmin();
-
-        p.beforeBalances = getBalances(p.observer);
-
-        vm.prank(bob);
-        uint256[] memory amountsOut = upliftOnlyRouter.removeLiquidityProportional(bptAmount, p.minsOut, false, pool);
-        vm.stopPrank();
-
-        p.afterBalances = getBalances(p.observer);
-
-        // fee percentage, 18 dec
-        p.upliftFeePctE18 = (p.priceMulE18 - 1e18).mulUp(1e18).divDown(p.priceMulE18).mulUp(
-            p.withdrawalFeeBpsBound * 1e14
-        );
-        // min
-        p.minFeePctE18 = uint256(upliftOnlyRouter.minWithdrawalFeeBps()); // e18-scaled
-        p.effectiveFeePctE18 = p.upliftFeePctE18 > p.minFeePctE18 ? p.upliftFeePctE18 : p.minFeePctE18;
-
-        assertEq(p.afterBalances.bobTokens[daiIdx] - p.beforeBalances.bobTokens[daiIdx], amountsOut[0], "bob DAI");
-        assertEq(p.afterBalances.bobTokens[usdcIdx] - p.beforeBalances.bobTokens[usdcIdx], amountsOut[1], "bob USDC");
-
-        assertEq(p.beforeBalances.poolTokens[daiIdx] - p.afterBalances.poolTokens[daiIdx], amountsOut[0], "pool DAI");
-        assertEq(
-            p.beforeBalances.poolTokens[usdcIdx] - p.afterBalances.poolTokens[usdcIdx],
-            amountsOut[1],
-            "pool USDC"
-        );
-
-        assertEq(
-            p.beforeBalances.vaultTokens[daiIdx] - p.afterBalances.vaultTokens[daiIdx],
-            amountsOut[0],
-            "vault DAI"
-        );
-
-        assertEq(
-            p.beforeBalances.vaultTokens[usdcIdx] - p.afterBalances.vaultTokens[usdcIdx],
-            amountsOut[1],
-            "vault USDC"
-        );
-
-        p.amountOut = bptAmount / 2; // per-token (kept for admin calc parity with existing suite)
-        p.hookFeeTokens = p.amountOut.mulUp(p.effectiveFeePctE18);
-
-        p.adminFeeTokens = p.hookFeeTokens.mulDown(p.protocolTake); // 0 if take = 0
-        p.adminMintedBpt = p.adminFeeTokens.mulDown(bptAmount).divDown(p.amountOut);
-
-        // totalSupply must fall by the burned amount minus what we just minted
-        assertApproxEqAbs(
-            p.beforeBalances.poolSupply - p.afterBalances.poolSupply,
-            bptAmount - p.adminMintedBpt,
-            2,
-            "pool supply"
-        );
-
-        assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), 0, "router holds BPT");
-        assertEq(p.afterBalances.bobBpt, 0, "bob BPT");
-
-        if (p.protocolTake == 0) {
-            assertEq(p.afterBalances.userBpt, 0, "admin BPT");
-        } else {
-            assertGt(p.afterBalances.userBpt, 0, "admin BPT > 0");
-        }
-    }
 
     function testSetHookFeeOwnerPass(uint64 poolHookAmount) public {
         uint64 boundFeeAmount = uint64(bound(poolHookAmount, _MIN_SWAP_FEE_PERCENTAGE, _MAX_SWAP_FEE_PERCENTAGE));

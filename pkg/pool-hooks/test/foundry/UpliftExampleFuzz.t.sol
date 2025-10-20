@@ -1106,8 +1106,21 @@ function testFuzzUpliftOnlyAdmin_Succeeds_WithPositiveUplift(
     // Admin should have received some BPT; redeem all with zero mins
     address admin = updateWeightRunner.getQuantAMMAdmin();
     uint256 adminBpt = IERC20(pool).balanceOf(admin);
-    assertGt(adminBpt, 0, "admin BPT should increase due to positive uplift");
+    assertEq(adminBpt, 0, "admin should not own BPT as fees are not transferred in underlying tokens");
+    // Admin should have received proportional uplift fees in the underlying
+    uint256 adminDai = dai.balanceOf(admin);
+    uint256 adminUsdc = usdc.balanceOf(admin);
 
+    assertGt(adminDai, 0, "admin DAI uplift fee not received");
+    assertGt(adminUsdc, 0, "admin USDC uplift fee not received");
+
+    // For proportional removal, fees across tokens should be proportional
+    assertApproxEqAbs(adminDai, adminUsdc, 1, "admin underlying fees not proportional");
+
+    // Sanity: admin fee per-token must not exceed gross per-token amount
+    uint256 perTokenGross = bptIn / 2;
+    assertLe(adminDai, perTokenGross, "admin DAI fee too large");
+    assertLe(adminUsdc, perTokenGross, "admin USDC fee too large");
     vm.prank(admin);
     IERC20(pool).approve(address(upliftOnlyRouter), type(uint256).max);
     vm.stopPrank();

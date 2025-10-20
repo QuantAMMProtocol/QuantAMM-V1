@@ -36,6 +36,20 @@ abstract contract QuantAMMStorage {
         require((_leftInt >= MIN128) && (_rightInt >= MIN128), "Underflow");
         packed = (_leftInt << 128) | int256(uint256(_rightInt << 128) >> 128);
     }
+
+    /// @notice Unpack a single 256-bit integer into two 128-bit integers (high, low)
+    /// @dev Uses arithmetic right shift for the high part; direct cast for the low part.
+    /// @param packed The 256-bit integer containing two packed int128s: [high | low]
+    /// @return high The signed high 128 bits
+    /// @return low  The signed low  128 bits
+    function _quantAMMUnpackTwo128(int256 packed)
+        internal
+        pure
+        returns (int256 high, int256 low)
+    {
+        high = int256(int128(packed >> 128));
+        low  = int256(int128(packed));
+    }
 }
 
 /// @title QuantAMMStorage contract for QuantAMM storage slot packing and unpacking scalar quantAMM Base weights

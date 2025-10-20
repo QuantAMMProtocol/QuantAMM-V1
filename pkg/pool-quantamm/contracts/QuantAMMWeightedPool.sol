@@ -31,7 +31,7 @@ import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Vers
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IUpdateRule } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IUpdateRule.sol"; // Ensure this path is correct
 import { IQuantAMMWeightedPool } from "@balancer-labs/v3-interfaces/contracts/pool-quantamm/IQuantAMMWeightedPool.sol";
-import { ScalarQuantAMMBaseStorage } from "./QuantAMMStorage.sol";
+import { QuantAMMStorage } from "./QuantAMMStorage.sol";
 import { UpdateWeightRunner } from "./UpdateWeightRunner.sol";
 import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
@@ -68,6 +68,7 @@ contract QuantAMMWeightedPool is
     IQuantAMMWeightedPool,
     IBasePool,
     BalancerPoolToken,
+    QuantAMMStorage,
     PoolInfo,
     Version,
     Initializable
@@ -87,8 +88,7 @@ contract QuantAMMWeightedPool is
     ///@dev First elem = category, second elem is name, third variable type, fourth elem detail
     string[][] private poolDetails;
 
-    int256[] internal _weights;
-    int256[] internal _multipliers;
+    int256[] internal _weightsAndMultipliers;
 
     UpdateWeightRunner public updateWeightRunner;
 
@@ -354,10 +354,13 @@ contract QuantAMMWeightedPool is
         uint256 tokenIndex,
         uint256 timeSinceLastUpdate
     ) internal view virtual returns (uint256) {
+
+        (int256 weight, int256 multiplier) = _quantAMMUnpackTwo128(_weightsAndMultipliers[tokenIndex]);
+
         return
             _calculateCurrentBlockWeight(
-                _weights[tokenIndex],
-                _multipliers[tokenIndex],
+                weight,
+                multiplier,
                 timeSinceLastUpdate
             );
     }
@@ -429,7 +432,7 @@ contract QuantAMMWeightedPool is
         data.isPoolInitialized = poolConfig.isPoolInitialized;
         data.isPoolPaused = poolConfig.isPoolPaused;
         data.isPoolInRecoveryMode = poolConfig.isPoolInRecoveryMode;
-         uint256 N = _weights.length;
+        uint256 N = _weightsAndMultipliers.length;
 
         int256[] memory firstFour = new int256[](8);
         int256[] memory secondFour = new int256[](8);
@@ -438,8 +441,9 @@ contract QuantAMMWeightedPool is
         if (N <= 4) {
             // Pack weights at [0..N-1], multipliers at [N..2N-1]
             for (uint256 i = 0; i < N; i++) {
-                firstFour[i]     = _weights[i];
-                firstFour[i + N] = _multipliers[i];
+                (int256 weight, int256 multiplier) = _quantAMMUnpackTwo128(_weightsAndMultipliers[i]);
+                firstFour[i]     = weight;
+                firstFour[i + N] = multiplier;
             }
         }
         else{
@@ -447,8 +451,9 @@ contract QuantAMMWeightedPool is
             // —— Case 2: N > 4 —— 
             // firstFour = 4 weights, then 4 multipliers
             for (uint256 i = 0; i < 4; i++) {
-                firstFour[i]     = _weights[i];
-                firstFour[i + 4] = _multipliers[i];
+                (int256 weight, int256 multiplier) = _quantAMMUnpackTwo128(_weightsAndMultipliers[i]);
+                firstFour[i]     = weight;
+                firstFour[i + 4] = multiplier;
             }
 
             // secondFour: we have `secondCount = N-4` tokens here
@@ -456,8 +461,9 @@ contract QuantAMMWeightedPool is
             // pack next weights [4..N-1] into secondFour[0..secondCount-1]
             // and their multipliers into secondFour[secondCount..secondCount*2-1]
             for (uint256 i = 0; i < secondCount; i++) {
-                secondFour[i]               = _weights[4 + i];
-                secondFour[i + secondCount] = _multipliers[4 + i];
+                (int256 weight, int256 multiplier) = _quantAMMUnpackTwo128(_weightsAndMultipliers[4 + i]);
+                secondFour[i]               = weight;
+                secondFour[i + secondCount] = multiplier;
             }
         }
 
@@ -505,8 +511,7 @@ contract QuantAMMWeightedPool is
         require(_inputweights.length == totalTokens * 2, "WD"); //weight length different
 
         for(uint256 i = 0; i < totalTokens; i++) {
-            _weights[i] = _inputweights[i];
-            _multipliers[i] = _inputweights[i + totalTokens];
+            _weightsAndMultipliers[i] = _quantAMMPackTwo128(_inputweights[i], _inputweights[i + totalTokens]);
         }
 
         //struct allows one SSTORE
@@ -521,15 +526,11 @@ contract QuantAMMWeightedPool is
     /// @notice the initialising function during registration of the pool with the vault to set the initial weights
     /// @param _inputWeights the target weights
     function _setInitialWeights(int256[] memory _inputWeights) internal {
-        require(_weights.length == 0, "init");
+        require(_weightsAndMultipliers.length == 0, "init");
 
-        _weights = new int256[](_inputWeights.length);
-        _multipliers = new int256[](_inputWeights.length);
-
+        _weightsAndMultipliers = new int256[](_inputWeights.length);
         for (uint i; i < _inputWeights.length; ) {
-            _weights[i] = _inputWeights[i];
-            _multipliers[i] = int256(0);
-
+            _weightsAndMultipliers[i] = _quantAMMPackTwo128(_inputWeights[i], 0);
             unchecked {
                 ++i;
             }

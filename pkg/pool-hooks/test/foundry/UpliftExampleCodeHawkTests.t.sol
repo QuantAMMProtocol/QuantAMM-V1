@@ -170,6 +170,7 @@ contract UpliftExampleCode is BaseVaultTest {  // use default dai, usdc, weth an
         minAmountsOut[1] = 1;
 
         vm.prank(liquidityProvider1);
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
         UpliftOnlyExample(payable(poolHooksContract)).removeLiquidityProportional(2e18, minAmountsOut, true, pool);
     }
 

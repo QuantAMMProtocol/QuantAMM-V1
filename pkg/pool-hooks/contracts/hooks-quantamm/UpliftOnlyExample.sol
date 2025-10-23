@@ -172,6 +172,13 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
     error TooFastDeposits(address pool, address depositor);
 
     /**
+     * @notice To avoid block withdrawal arb, a single withdrawer can only withdraw After a certain blocktime
+     * @param pool The pool the withdrawer is attempting to withdraw from
+     * @param withdrawer The address of the withdrawer
+     */
+    error TooFastWithdrawals(address pool, address withdrawer);
+
+    /**
      * @notice Attempted withdrawal of an NFT-associated position by an address that is not the owner.
      * @param withdrawer The address attempting to withdraw
      * @param pool The attempted target pool
@@ -555,6 +562,10 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             localData.amountLeft = bptAmountIn;
 
             for (uint256 i = localData.feeDataArrayLength - 1; i >= 0; --i) {
+                if(feeDataArray[i].blockTimestampDeposit + 60 > block.timestamp){
+                    revert TooFastWithdrawals(pool, localData.userAddress);
+                }
+
                 localData.lpTokenDepositValue = feeDataArray[i].lpTokenDepositValue;
                 localData.lpTokenDepositValueChange =
                     ((int256(localData.lpTokenDepositValueNow) - int256(localData.lpTokenDepositValue)) * 1e18) /

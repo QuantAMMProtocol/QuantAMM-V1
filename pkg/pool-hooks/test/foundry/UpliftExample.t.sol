@@ -326,6 +326,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
         v.balancesBefore = getBalances(bob);
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
 
         // 2) Bob removes all his BPT proportionally (no price change case).
         vm.startPrank(bob);
@@ -498,7 +499,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
         v.balancesBefore = getBalances(bob);
-
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
         // 3) Bob removes all his BPT proportionally.
         vm.startPrank(bob);
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);
@@ -647,7 +648,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
         v.balancesBefore = getBalances(bob);
-
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
         vm.startPrank(bob);
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);
         vm.stopPrank();
@@ -766,7 +767,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.stopPrank();
 
         uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
-
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
         // Remove fails because lp isn't the owner of the NFT.
         vm.expectRevert(abi.encodeWithSelector(UpliftOnlyExample.WithdrawalByNonOwner.selector, lp, pool, bptAmount));
         vm.prank(lp);
@@ -788,6 +789,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.expectRevert(
             abi.encodeWithSelector(UpliftOnlyExample.WithdrawalByNonOwner.selector, lp, pool, amountOut * 2)
         );
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
         vm.startPrank(lp);
         upliftOnlyRouter.removeLiquidityProportional(amountOut * 2, minAmountsOut, false, pool);
         vm.stopPrank();
@@ -1028,6 +1030,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         // Remove liquidity (proportional)
         v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
         vm.startPrank(bob);
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);
         vm.stopPrank();
@@ -1193,6 +1196,8 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         // bob exits
         v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
+
         vm.startPrank(bob);
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);
         vm.stopPrank();
@@ -1305,6 +1310,8 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         uint256[] memory minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
 
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
+
         vm.startPrank(bob);
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
         vm.stopPrank();
@@ -1359,9 +1366,10 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         address admin = updateWeightRunner.getQuantAMMAdmin();
 
         // Snapshot admin balances before
-        uint256 adminBptBefore = IERC20(pool).balanceOf(admin);
         uint256 adminDaiBefore = dai.balanceOf(admin);
         uint256 adminUsdcBefore = usdc.balanceOf(admin);
+
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
 
         vm.startPrank(bob);
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, minAmountsOut, false, pool);
@@ -1445,7 +1453,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         v.adminUsdcBefore = usdc.balanceOf(v.qaAdmin);
 
         v.balancesBefore = getBalances(v.qaAdmin);
-
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
         // ----- Remove all Bob's BPT -----
         vm.startPrank(bob);
         upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);

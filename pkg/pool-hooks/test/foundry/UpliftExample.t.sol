@@ -786,10 +786,10 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         uint256 amountOut = poolInitAmount / 2;
         uint256[] memory minAmountsOut = [amountOut, amountOut].toMemoryArray();
 
+        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
         vm.expectRevert(
             abi.encodeWithSelector(UpliftOnlyExample.WithdrawalByNonOwner.selector, lp, pool, amountOut * 2)
         );
-        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
         vm.startPrank(lp);
         upliftOnlyRouter.removeLiquidityProportional(amountOut * 2, minAmountsOut, false, pool);
         vm.stopPrank();
@@ -1269,6 +1269,47 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         assertEq(upliftOnlyRouter.nftPool(0), address(0), "nftPool not cleared");
         assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), 0, "router BPT > 0");
         assertEq(v.adminAfter.bobBpt, 0, "bob still has BPT");
+    }
+
+
+    function testRemoveTooFast() public {
+        doublePositiveWithAdminLocals memory v;
+
+        // protocol take 5%
+        vm.prank(address(vaultAdmin));
+        updateWeightRunner.setQuantAMMUpliftFeeTake(0.05e18);
+        vm.stopPrank();
+
+        // add liquidity
+        v.maxAmountsIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
+        vm.prank(bob);
+        upliftOnlyRouter.addLiquidityProportional(pool, v.maxAmountsIn, bptAmount, false, bytes(""));
+        vm.stopPrank();
+
+        // double prices (uplift 100%)
+        v.prices = new int256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; ++i) {
+            v.prices[i] = int256(i) * 2e18;
+        }
+        updateWeightRunner.setMockPrices(pool, v.prices);
+
+        // balances before
+        v.admin = updateWeightRunner.getQuantAMMAdmin();
+        v.adminBefore = getBalances(v.admin);
+        v.adminDaiBefore = dai.balanceOf(v.admin);
+        v.adminUsdcBefore = usdc.balanceOf(v.admin);
+
+        // bob exits
+        v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
+        
+        vm.startPrank(bob);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UpliftOnlyExample.TooFastWithdrawals.selector, pool, bob)
+        );
+
+        upliftOnlyRouter.removeLiquidityProportional(bptAmount, v.minAmountsOut, false, pool);
+        vm.stopPrank();
     }
 
     //https://codehawks.cyfrin.io/c/2024-12-quantamm/s/119

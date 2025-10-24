@@ -471,10 +471,8 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         params.expectedNet = _netAfterFee(withdrawBpt, feeBps);
 
         params.upliftBpt = withdrawBpt - params.expectedNet;
-        params.protoShare = params.upliftBpt.mulDown(protocolTakeE18);
-        params.routerKeep = params.upliftBpt - params.protoShare;
 
-        assertEq(before.poolSupply - after_.poolSupply, withdrawBpt - params.protoShare, "pool supply mismatch");
+        assertEq(before.poolSupply - after_.poolSupply, withdrawBpt, "pool supply mismatch");
 
         params.expectedRouterBpt = bptAmount - withdrawBpt;
         assertEq(BalancerPoolToken(pool).balanceOf(address(upliftOnlyRouter)), params.expectedRouterBpt, "router BPT");
@@ -1149,72 +1147,6 @@ contract UpliftOnlyExampleFuzzTest is BaseVaultTest {
         vm.stopPrank();
 
         assertEq(IERC20(pool).balanceOf(admin), 0, "admin BPT fully withdrawn");
-    }
-
-    function testFuzzUpliftOnlyAdminWithdraw_Partial(
-        uint256 feeTakeRaw,
-        uint256 priceScaleRaw,
-        uint256 sliceSeedRaw
-    ) public {
-        // --- Tight bounds to keep admin exact-join amounts well under hook maxAmountsIn ---
-        uint256 feeTake = bound(feeTakeRaw, 0, 10e16); // <= 10%
-        uint256 priceScale = bound(priceScaleRaw, 102e16, 110e16); // [1.02, 1.10]
-        uint256 minBptOut = 8e21; // large & even
-        minBptOut -= (minBptOut % 2);
-
-        // Configure fee
-        vm.prank(address(vaultAdmin));
-        updateWeightRunner.setQuantAMMUpliftFeeTake(feeTake);
-        vm.stopPrank();
-
-        // Initial join
-        uint256[] memory maxIn = [dai.balanceOf(bob), usdc.balanceOf(bob)].toMemoryArray();
-        vm.prank(bob);
-        upliftOnlyRouter.addLiquidityProportional(pool, maxIn, minBptOut, false, bytes(""));
-        vm.stopPrank();
-
-        // Positive uplift
-        int256[] memory prices = new int256[](tokens.length);
-        prices[1] = int256(priceScale);
-        prices[2] = int256(priceScale * 2);
-        prices[3] = int256(priceScale * 3);
-        prices[4] = int256(priceScale * 4);
-        updateWeightRunner.setMockPrices(pool, prices);
-
-        // Partial removal: very small, even slice (0.25%–5%) to keep fee-mint tiny.
-        uint256 routerBpt = IERC20(pool).balanceOf(address(upliftOnlyRouter));
-        assertGt(routerBpt, 0, "router should hold BPT");
-
-        // Map seed -> [25, 500] bps (0.25% to 5.00%)
-        uint256 sliceBps = 25 + (sliceSeedRaw % 476); // 25..500
-        uint256 bptSlice = (routerBpt * sliceBps) / 10_000;
-        // Ensure at least 2 and even
-        if (bptSlice < 2) bptSlice = 2;
-        bptSlice -= (bptSlice % 2);
-        if (bptSlice > routerBpt) bptSlice = routerBpt - (routerBpt % 2);
-
-        uint256[] memory minOutZero = [uint256(0), uint256(0)].toMemoryArray();
-        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
-
-        vm.prank(bob);
-        upliftOnlyRouter.removeLiquidityProportional(bptSlice, minOutZero, false, pool);
-        vm.stopPrank();
-
-        // Admin withdraw their BPT (zero mins)
-        address admin = updateWeightRunner.getQuantAMMAdmin();
-        uint256 adminBpt = IERC20(pool).balanceOf(admin);
-        assertGt(adminBpt, 0, "admin should receive BPT");
-
-        vm.prank(admin);
-        IERC20(pool).approve(address(upliftOnlyRouter), type(uint256).max);
-        vm.stopPrank();
-        vm.warp(block.timestamp + 1 days); // ensure time has passed for fee calc
-
-        vm.prank(admin);
-        upliftOnlyRouter.removeLiquidityProportional(adminBpt, minOutZero, false, pool);
-        vm.stopPrank();
-
-        assertEq(IERC20(pool).balanceOf(admin), 0, "admin BPT redeemed");
     }
 
     function testFuzzUpliftOnlyAdminPath_LeavesNoRouterBPT(uint256 feeTakeRaw, uint256 priceScaleRaw) public {

@@ -167,6 +167,13 @@ contract QuantAMMWeightedPool is
      */
     error WeightedPoolBptRateUnsupported();
 
+    error InvalidSender(address sender, address requiredSender);
+    
+    error LengthMismatch(uint256 length, uint256 targetLength);
+
+    error UpdateWeightRunnerUpdateTooSoon(address updateWeightRunner, address newUpdateWeightRunner, uint256 windowLeft);
+    
+
     ///@dev The parameters for the rule, validated in each rule separately during set rule
     int256[][] public ruleParameters;
 
@@ -507,8 +514,14 @@ contract QuantAMMWeightedPool is
         uint40 _lastInteropTime
     ) external override {
         uint256 totalTokens = _totalTokens;
-        require(msg.sender == address(updateWeightRunner), "XUR");
-        require(_inputweights.length == totalTokens * 2, "WD"); //weight length different
+
+        if(msg.sender != address(updateWeightRunner)){
+            revert InvalidSender(msg.sender, address(updateWeightRunner));
+        }
+
+        if(_inputweights.length != totalTokens * 2){
+            revert LengthMismatch(_inputweights.length, totalTokens * 2);
+        }
 
         for(uint256 i = 0; i < totalTokens; i++) {
             _weightsAndMultipliers[i] = _quantAMMPackTwo128(_inputweights[i], _inputweights[i + totalTokens]);
@@ -526,9 +539,13 @@ contract QuantAMMWeightedPool is
     /// @notice the initialising function during registration of the pool with the vault to set the initial weights
     /// @param _inputWeights the target weights
     function _setInitialWeights(int256[] memory _inputWeights) internal {
-        require(_weightsAndMultipliers.length == 0, "init");
+
+        if(_weightsAndMultipliers.length != 0){
+            revert LengthMismatch(_weightsAndMultipliers.length, 0);
+        }
 
         _weightsAndMultipliers = new int256[](_inputWeights.length);
+
         for (uint i; i < _inputWeights.length; ) {
             _weightsAndMultipliers[i] = _quantAMMPackTwo128(_inputWeights[i], 0);
             unchecked {
@@ -601,12 +618,13 @@ contract QuantAMMWeightedPool is
 
     /// @inheritdoc IQuantAMMWeightedPool
     function setUpdateWeightRunnerAddress(address _updateWeightRunner) external override {
-        require(msg.sender == quantammAdmin, "XAD");
+        if(msg.sender != quantammAdmin){
+            revert InvalidSender(msg.sender, quantammAdmin);
+        }
 
-        require(
-            block.timestamp - deploymentTime < _FIX_WINDOW,
-            "XIM"
-        );
+        if( block.timestamp - deploymentTime >= _FIX_WINDOW){
+            revert UpdateWeightRunnerUpdateTooSoon(address(updateWeightRunner), _updateWeightRunner, block.timestamp - deploymentTime - _FIX_WINDOW);
+        }
 
         address oldAddress = address(updateWeightRunner);
 

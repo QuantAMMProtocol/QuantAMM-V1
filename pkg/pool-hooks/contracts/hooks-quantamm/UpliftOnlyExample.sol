@@ -680,7 +680,8 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             revert TransferUpdateTokenIDInvalid(_from, _to, _tokenID);
         }
 
-        if (poolsFeeData[poolAddress][_to].length >= 100) {
+        //changed to 50 instead of 100 so that a dust transfer attack doesnt block depositors
+        if (poolsFeeData[poolAddress][_to].length >= 50) {
             revert TooManyDeposits(poolAddress, _to);
         }
 

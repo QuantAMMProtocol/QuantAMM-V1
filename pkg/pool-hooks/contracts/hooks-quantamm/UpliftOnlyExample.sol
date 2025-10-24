@@ -31,6 +31,8 @@ import { MinimalRouter } from "../MinimalRouter.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IVaultExplorer } from "@balancer-labs/v3-interfaces/contracts/vault/IVaultExplorer.sol";
 
+import { LPOracleBase } from "@balancer-labs/v3-standalone-utils/contracts/LPOracleBase.sol";
+
 import { LPNFT } from "./LPNFT.sol";
 
 struct PoolCreationSettings {
@@ -89,7 +91,9 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
     // NFT unique identifier.
     uint256 private _nextTokenId;
 
-    address private immutable _updateWeightRunner;
+    address private _updateWeightRunner;
+
+    LPOracleBase public _poolLPOracle;
 
     uint64 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16; // 0.001%
     uint64 private constant _MAX_SWAP_FEE_PERCENTAGE = 10e16; // 10%
@@ -286,18 +290,15 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
 
         //this requires the pool to be registered with the QuantAMM update weight runner
         //as well as approved with oracles that provide the prices
-        uint256 depositValue = getPoolLPTokenValue(
-            IUpdateWeightRunner(_updateWeightRunner).getData(pool),
-            pool,
-            MULDIRECTION.MULDOWN
-        );
+        (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) = _poolLPOracle.latestRoundData();
 
+        require(answer > 0, "answer == 0");
         poolsFeeData[pool][msg.sender].push(
             FeeData({
                 tokenID: tokenID,
                 amount: exactBptAmountOut,
                 //this rounding favours the LP
-                lpTokenDepositValue: depositValue,
+                lpTokenDepositValue: uint256(answer),
                 //known use of timestamp, caveats are known.
                 blockTimestampDeposit: uint40(block.timestamp),
                 upliftFeeBps: upliftFeeBps
@@ -481,7 +482,6 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         uint256[] accruedQuantAMMFees;
         uint256 currentFee;
         uint256 feeAmount;
-        int256[] prices;
         uint256 lpTokenDepositValueNow;
         int256 lpTokenDepositValueChange;
         uint256 lpTokenDepositValue;
@@ -525,6 +525,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         uint256[] memory,
         bytes memory userData
     ) public override onlySelfRouter(router) returns (bool, uint256[] memory hookAdjustedAmountsOutRaw) {
+        
         AfterRemoveLiquidityData memory localData = AfterRemoveLiquidityData({
                 pool: pool,
                 bptAmountIn: bptAmountIn,
@@ -534,7 +535,6 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
                 accruedQuantAMMFees: new uint256[](amountsOutRaw.length),
                 currentFee: minWithdrawalFeeBps,
                 feeAmount: 0,
-                prices: IUpdateWeightRunner(_updateWeightRunner).getData(pool),
                 lpTokenDepositValueNow: 0,
                 lpTokenDepositValueChange: 0,
                 lpTokenDepositValue: 0,
@@ -554,8 +554,11 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
             // We only allow removeLiquidity via the Router/Hook itself so that fee is applied correctly.
             hookAdjustedAmountsOutRaw = amountsOutRaw;
 
+            (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) = _poolLPOracle.latestRoundData();
+            require(answer > 0, "bad price");
+
             // Calculate the current value of the pool in USD, rounding down to favor LPs.
-            localData.lpTokenDepositValueNow = getPoolLPTokenValue(localData.prices, pool, MULDIRECTION.MULDOWN);
+            localData.lpTokenDepositValueNow = uint256(answer);
 
             FeeData[] storage feeDataArray = poolsFeeData[pool][localData.userAddress];
             localData.feeDataArrayLength = feeDataArray.length;

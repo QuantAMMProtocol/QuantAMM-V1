@@ -221,7 +221,8 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         address _updateWeightRunnerParam,
         string memory version,
         string memory name,
-        string memory symbol
+        string memory symbol,
+        LPOracleBase poolLPOracle
     ) MinimalRouter(vault, weth, permit2, version) Ownable(msg.sender) {
         require(bytes(name).length > 0 && bytes(symbol).length > 0, "NAMEREQ"); //Must provide a name / symbol
 
@@ -230,6 +231,7 @@ contract UpliftOnlyExample is MinimalRouter, BaseHooks, Ownable {
         upliftFeeBps = _upliftFeeBps;
         minWithdrawalFeeBps = _minWithdrawalFeeBps;
         _updateWeightRunner = _updateWeightRunnerParam;
+        _poolLPOracle = poolLPOracle;
     }
 
     /***************************************************************************

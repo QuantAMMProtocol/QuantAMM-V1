@@ -43,6 +43,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 import { UpliftOnlyExample } from "../../contracts/hooks-quantamm/UpliftOnlyExample.sol";
 import { LPNFT } from "../../contracts/hooks-quantamm/LPNFT.sol";
+import { WeightedLPOracleMock } from "@balancer-labs/v3-standalone-utils/contracts/test/WeightedLPOracleMock.sol";
 
 contract UpliftOnlyExampleTest is BaseVaultTest {
     using CastingHelpers for address[];
@@ -69,6 +70,8 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
     MockUpdateWeightRunner internal updateWeightRunner;
 
     UpliftOnlyExample internal upliftOnlyRouter;
+
+    WeightedLPOracleMock internal lpOracle;
 
     function setUp() public virtual override {
         BaseTest.setUp();
@@ -101,6 +104,11 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         vm.stopPrank();
 
+
+        // 1) Deploy the LP oracle mock the same way as in WeightedLPOracle.t.sol
+        lpOracle = new WeightedLPOracleMock();
+
+
         vm.startPrank(owner);
         upliftOnlyRouter = new UpliftOnlyExample(
             IVault(address(vault)),
@@ -111,7 +119,8 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
             address(updateWeightRunner),
             "Uplift LiquidityPosition v1",
             "Uplift LiquidityPosition v1",
-            "Uplift LiquidityPosition v1"
+            "Uplift LiquidityPosition v1",
+            lpOracle
         );
         vm.stopPrank();
         vm.label(address(upliftOnlyRouter), "upliftOnlyRouter");
@@ -172,11 +181,8 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         newPool = address(deployPoolMock(IVault(address(vault)), name, symbol));
         vm.label(newPool, label);
-        int256[] memory prices = new int256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            prices[i] = int256(i) * 1e18;
-        }
-        updateWeightRunner.setMockPrices(address(newPool), prices);
+        
+        lpOracle.setPrice(int256(1e18));
 
         PoolRoleAccounts memory roleAccounts;
         roleAccounts.poolCreator = lp;
@@ -489,11 +495,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
 
         // 2) Push prices DOWN so there is a negative uplift.
         //    With negative uplift, the contract applies minimum withdrawal fee (minWithdrawalFeeBps).
-        v.prices = new int256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            v.prices[i] = (int256(i) * 1e18) / 2; // halve prices
-        }
-        updateWeightRunner.setMockPrices(pool, v.prices);
+        lpOracle.setPrice(int256(0.5e18));
 
         v.nftTokenId = 0;
         v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
@@ -638,11 +640,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
         // Push prices up so there is positive uplift (value doubles from 0.5 -> 1.0).
-        v.prices = new int256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            v.prices[i] = int256(i) * 2e18;
-        }
-        updateWeightRunner.setMockPrices(pool, v.prices);
+        lpOracle.setPrice(int256(2e18));
 
         v.nftTokenId = 0;
         v.minAmountsOut = [uint256(0), uint256(0)].toMemoryArray();
@@ -1015,13 +1013,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "fee");
 
         // Make prices go down (negative change)
-        v.prices = new int256[](tokens.length);
-        
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            v.prices[i] = (int256(i) * 1e18) / 2;
-        }
-
-        updateWeightRunner.setMockPrices(pool, v.prices);
+        lpOracle.setPrice(int256(0.5e18));
 
         // Snapshot BEFORE removal
         v.adminDaiBefore = dai.balanceOf(address(vaultAdmin));
@@ -1182,11 +1174,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         assertEq(upliftOnlyRouter.getUserPoolFeeData(pool, bob)[0].upliftFeeBps, 200e14, "upliftFeeBps mismatch");
 
         // double prices (uplift 100%)
-        v.prices = new int256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            v.prices[i] = int256(i) * 2e18;
-        }
-        updateWeightRunner.setMockPrices(pool, v.prices);
+        lpOracle.setPrice(int256(2e18));
 
         // balances before
         v.admin = updateWeightRunner.getQuantAMMAdmin();
@@ -1287,11 +1275,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         vm.stopPrank();
 
         // double prices (uplift 100%)
-        v.prices = new int256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            v.prices[i] = int256(i) * 2e18;
-        }
-        updateWeightRunner.setMockPrices(pool, v.prices);
+        lpOracle.setPrice(int256(2e18));
 
         // balances before
         v.admin = updateWeightRunner.getQuantAMMAdmin();
@@ -1392,11 +1376,7 @@ contract UpliftOnlyExampleTest is BaseVaultTest {
         // ------------------------------------------------------
         // Using the same price-setting pattern as other tests:
         // prices[i] = int256(i) * 2e18  (for two tokens: [0, 2e18])
-        int256[] memory prices = new int256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            prices[i] = int256(i) * 2e18;
-        }
-        updateWeightRunner.setMockPrices(pool, prices);
+        lpOracle.setPrice(int256(2e18));
 
         // --------------------------------------------
         // 3) Bob removes liquidity — this should mint

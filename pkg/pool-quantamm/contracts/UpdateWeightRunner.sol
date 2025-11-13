@@ -646,7 +646,8 @@ contract UpdateWeightRunner is IUpdateWeightRunner {
         //it also centralises logic for weight vectors, just like normal rules, zk rules do not to duplicate logic somewhere else.
         _calculateMultiplerAndSetWeights(params);
     }
-/// @notice Breakglass function to allow the admin or the pool manager to set the quantammAdmins weights manually
+    
+    /// @notice Breakglass function to allow the admin or the pool manager to set the quantammAdmins weights manually
     /// @param _weights the new weights
     /// @param _poolAddress the target pool
     /// @param _interpolationTime the time required to calcluate the multiplier

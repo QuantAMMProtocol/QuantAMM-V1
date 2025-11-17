@@ -18,7 +18,7 @@ abstract contract QuantAMMMathGuard {
     /// @param _absoluteWeightGuardRail Minimum allowed weight in the QuantAMM whitepaper
     function _guardQuantAMMWeights(
         int256[] memory _weights,
-        int256[] calldata _prevWeights,
+        int256[] memory _prevWeights,
         int256 _epsilonMax,
         int256 _absoluteWeightGuardRail
     ) internal pure returns (int256[] memory guardedNewWeights) {

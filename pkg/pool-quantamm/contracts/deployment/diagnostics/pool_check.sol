@@ -31,7 +31,7 @@ contract Deploy is Script {
         // For dry runs, we don't need a private key
         vm.startBroadcast();
 
-        address pool = 0xd4Ed17bBF48Af09B87fD7d8C60970f5Da79D4852;
+        address pool = 0x6B61D8680C4F9E560c8306807908553f95c749C5;
         address rule = 0x62B9eC6A5BBEBe4F5C5f46C8A8880df857004295;
         address updateWeightRunnerAddress = 0x21Ae9576a393413D6d91dFE2543dCb548Dbb8748;
 
@@ -148,9 +148,10 @@ contract Deploy is Script {
             }
         }
 
-        console.log("last update time");
+        console.log("last interop time");
         console.logUint(uint256(weights.lastInteropTime));
         console.log(weights.lastInteropTime.toString());
+        console.log("last update time");
         console.logUint(uint256(weights.lastUpdateTime));
         console.log(weights.lastUpdateTime.toString());
 

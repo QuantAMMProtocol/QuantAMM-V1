@@ -20,7 +20,7 @@ contract CreReceiverFuzzTest is Test {
     event ForwarderAddressChanged(address indexed newForwarder, address indexed oldForwarder, address indexed changer);
 
     function setUp() public {
-        receiver = new MockCreReceiver();
+        receiver = new MockCreReceiver(address(this));
     }
 
     // -----------------------
@@ -60,14 +60,14 @@ contract CreReceiverFuzzTest is Test {
     // -----------------------
 
     function testFuzz_SetForwarderAddressUpdatesStateAndEmitsEvent(address newForwarder) public {
-        address oldForwarder = receiver.forwarderAddress();
+        address oldForwarder = receiver.getForwarderAddress();
 
         vm.expectEmit(true, true, true, false);
         emit ForwarderAddressChanged(newForwarder, oldForwarder, address(this));
 
         receiver.setForwarderAddress(newForwarder);
 
-        assertEq(receiver.forwarderAddress(), newForwarder);
+        assertEq(receiver.getForwarderAddress(), newForwarder);
     }
 
     function testFuzz_SetForwarderAddressOnlyOwner(address nonOwner, address newForwarder) public {
@@ -79,14 +79,14 @@ contract CreReceiverFuzzTest is Test {
     }
 
     function testFuzz_SetExpectedAuthorUpdatesStateAndEmitsEvent(address newAuthor) public {
-        address oldAuthor = receiver.expectedAuthor();
+        address oldAuthor = receiver.getExpectedAuthor();
 
         vm.expectEmit(true, true, true, false);
         emit ExpectedAuthorChanged(newAuthor, oldAuthor, address(this));
 
         receiver.setExpectedAuthor(newAuthor);
 
-        assertEq(receiver.expectedAuthor(), newAuthor);
+        assertEq(receiver.getExpectedAuthor(), newAuthor);
     }
 
     function testFuzz_SetExpectedAuthorOnlyOwner(address nonOwner, address newAuthor) public {
@@ -98,14 +98,15 @@ contract CreReceiverFuzzTest is Test {
     }
 
     function testFuzz_SetExpectedWorkflowNameUpdatesStateAndEmitsEvent(bytes10 newName) public {
-        bytes10 oldName = receiver.expectedWorkflowName();
+        bytes10 oldName = receiver.getExpectedWorkflowName();
 
         vm.expectEmit(true, true, true, false);
         emit ExpectedWorkflowNameChanged(newName, oldName, address(this));
 
-        receiver.setExpectedWorkflowName(newName);
+        string memory newNameStr = string(abi.encodePacked(newName));
+        receiver.setExpectedWorkflowName(newNameStr);
 
-        assertEq(receiver.expectedWorkflowName(), newName);
+        assertEq(receiver.getExpectedWorkflowName(), newName);
     }
 
     function testFuzz_SetExpectedWorkflowNameOnlyOwner(bytes10 newName, address nonOwner) public {
@@ -113,18 +114,20 @@ contract CreReceiverFuzzTest is Test {
 
         vm.prank(nonOwner);
         vm.expectRevert(abi.encodeWithSelector(_ownableUnauthorizedAccountSelector(), nonOwner));
-        receiver.setExpectedWorkflowName(newName);
+
+        string memory newNameStr = string(abi.encodePacked(newName));
+        receiver.setExpectedWorkflowName(newNameStr);
     }
 
     function testFuzz_SetExpectedWorkflowIdUpdatesStateAndEmitsEvent(bytes32 newId) public {
-        bytes32 oldId = receiver.expectedWorkflowId();
+        bytes32 oldId = receiver.getExpectedWorkflowId();
 
         vm.expectEmit(true, true, true, false);
         emit ExpectedWorkflowIdChanged(newId, oldId, address(this));
 
         receiver.setExpectedWorkflowId(newId);
 
-        assertEq(receiver.expectedWorkflowId(), newId);
+        assertEq(receiver.getExpectedWorkflowId(), newId);
     }
 
     function testFuzz_SetExpectedWorkflowIdOnlyOwner(bytes32 newId, address nonOwner) public {
@@ -154,12 +157,13 @@ contract CreReceiverFuzzTest is Test {
     }
 
     function testFuzz_SetExpectedWorkflowNameEmitsWhenSettingSameValue(bytes10 name) public {
-        receiver.setExpectedWorkflowName(name);
+        string memory nameStr = string(abi.encodePacked(name));
+        receiver.setExpectedWorkflowName(nameStr);
 
         vm.expectEmit(true, true, true, false);
         emit ExpectedWorkflowNameChanged(name, name, address(this));
 
-        receiver.setExpectedWorkflowName(name);
+        receiver.setExpectedWorkflowName(nameStr);
     }
 
     function testFuzz_SetExpectedWorkflowIdEmitsWhenSettingSameValue(bytes32 id) public {
@@ -363,7 +367,8 @@ contract CreReceiverFuzzTest is Test {
         vm.assume(expectedName != bytes10(0));
         vm.assume(wrongName != expectedName);
 
-        receiver.setExpectedWorkflowName(expectedName);
+        string memory wfNameStr = string(abi.encodePacked(expectedName));
+        receiver.setExpectedWorkflowName(wfNameStr);
 
         bytes memory metadata = _encodeMetadata(workflowId, wrongName, workflowOwner);
 
@@ -379,7 +384,8 @@ contract CreReceiverFuzzTest is Test {
     ) public {
         vm.assume(expectedName != bytes10(0));
 
-        receiver.setExpectedWorkflowName(expectedName);
+        string memory wfNameStr = string(abi.encodePacked(expectedName));
+        receiver.setExpectedWorkflowName(wfNameStr);
 
         bytes memory metadata = _encodeMetadata(workflowId, expectedName, workflowOwner);
 
@@ -396,14 +402,15 @@ contract CreReceiverFuzzTest is Test {
         vm.assume(expectedName != bytes10(0));
         vm.assume(wrongName != expectedName);
 
-        receiver.setExpectedWorkflowName(expectedName);
+        string memory wfNameStr = string(abi.encodePacked(expectedName));
+        receiver.setExpectedWorkflowName(wfNameStr);
 
         bytes memory badMetadata = _encodeMetadata(workflowId, wrongName, workflowOwner);
 
         vm.expectRevert(abi.encodeWithSelector(_invalidWorkflowNameSelector(), wrongName, expectedName));
         receiver.onReport(badMetadata, report);
 
-        receiver.setExpectedWorkflowName(bytes10(0));
+        receiver.setExpectedWorkflowName(wfNameStr);
 
         receiver.onReport(badMetadata, report);
     }
@@ -414,10 +421,10 @@ contract CreReceiverFuzzTest is Test {
         address workflowOwner,
         bytes memory report
     ) public {
-        assertEq(receiver.forwarderAddress(), address(0));
-        assertEq(receiver.expectedAuthor(), address(0));
-        assertEq(receiver.expectedWorkflowName(), bytes10(0));
-        assertEq(receiver.expectedWorkflowId(), bytes32(0));
+        assertEq(receiver.getForwarderAddress(), address(0));
+        assertEq(receiver.getExpectedAuthor(), address(0));
+        assertEq(receiver.getExpectedWorkflowName(), bytes10(0));
+        assertEq(receiver.getExpectedWorkflowId(), bytes32(0));
 
         bytes memory metadata = _encodeMetadata(workflowId, workflowName, workflowOwner);
 
@@ -443,7 +450,8 @@ contract CreReceiverFuzzTest is Test {
 
         receiver.setExpectedWorkflowId(expectedId);
         receiver.setExpectedAuthor(expectedAuthor);
-        receiver.setExpectedWorkflowName(expectedName);
+        string memory wfNameStr = string(abi.encodePacked(expectedName));
+        receiver.setExpectedWorkflowName(wfNameStr);
 
         bytes memory metadata = _encodeMetadata(wrongId, wrongName, wrongAuthor);
 
@@ -467,7 +475,8 @@ contract CreReceiverFuzzTest is Test {
         vm.assume(wrongName != expectedName);
 
         receiver.setExpectedAuthor(expectedAuthor);
-        receiver.setExpectedWorkflowName(expectedName);
+        string memory wfNameStr = string(abi.encodePacked(expectedName));
+        receiver.setExpectedWorkflowName(wfNameStr);
 
         bytes memory metadata = _encodeMetadata(workflowId, wrongName, wrongAuthor);
 
@@ -500,18 +509,19 @@ contract CreReceiverFuzzTest is Test {
     function testFuzz_OnReportSucceedsWhenAllChecksPass(
         address trustedForwarder,
         bytes32 workflowId,
-        bytes10 workflowName,
         address workflowOwner,
-        bytes memory report
+        bytes memory report,
+        bytes10 workflowName
     ) public {
         vm.assume(trustedForwarder != address(0));
         vm.assume(workflowId != bytes32(0));
-        vm.assume(workflowName != bytes10(0));
         vm.assume(workflowOwner != address(0));
+
+        string memory wfNameStr = string(abi.encodePacked(workflowName));
 
         receiver.setForwarderAddress(trustedForwarder);
         receiver.setExpectedWorkflowId(workflowId);
-        receiver.setExpectedWorkflowName(workflowName);
+        receiver.setExpectedWorkflowName(wfNameStr);
         receiver.setExpectedAuthor(workflowOwner);
 
         bytes memory metadata = _encodeMetadata(workflowId, workflowName, workflowOwner);

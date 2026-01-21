@@ -17,7 +17,7 @@ import { IQuantAMMWeightedPool } from "@balancer-labs/v3-interfaces/contracts/po
 ///      The metadata is set by the workflow sender and cannot be manipulated.
 ///      Checking the metadata as well as the msg.sender means that the auth is complete
 contract CreUpdateRule is QuantAMMMathGuard, CreReceiver, ITypeAndVersion, IUpdateRule {
-    constructor(address updateWeightRunnerAddress) CreReceiver() {
+    constructor(address updateWeightRunnerAddress) CreReceiver(updateWeightRunnerAddress) {
         updateWeightRunner = UpdateWeightRunner(updateWeightRunnerAddress);
     }
 

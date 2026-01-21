@@ -20,7 +20,7 @@ contract CreReceiverTest is Test {
     event ForwarderAddressChanged(address indexed newForwarder, address indexed oldForwarder, address indexed changer);
 
     function setUp() public {
-        receiver = new MockCreReceiver();
+        receiver = new MockCreReceiver(address(this));
     }
 
     // -----------------------
@@ -56,10 +56,10 @@ contract CreReceiverTest is Test {
     }
 
     function testInitialState() public view {
-        assertEq(receiver.forwarderAddress(), address(0));
-        assertEq(receiver.expectedAuthor(), address(0));
-        assertEq(receiver.expectedWorkflowName(), bytes10(0));
-        assertEq(receiver.expectedWorkflowId(), bytes32(0));
+        assertEq(receiver.getForwarderAddress(), address(0));
+        assertEq(receiver.getExpectedAuthor(), address(0));
+        assertEq(receiver.getExpectedWorkflowName(), bytes10(0));
+        assertEq(receiver.getExpectedWorkflowId(), bytes32(0));
 
         // CreReceiver constructor passes msg.sender into Ownable
         assertEq(receiver.owner(), address(this));
@@ -67,14 +67,14 @@ contract CreReceiverTest is Test {
 
     function testSetForwarderAddressUpdatesStateAndEmitsEvent() public {
         address newForwarder = address(0xF0F0);
-        address oldForwarder = receiver.forwarderAddress();
+        address oldForwarder = receiver.getForwarderAddress();
 
         vm.expectEmit(true, true, true, false);
         emit ForwarderAddressChanged(newForwarder, oldForwarder, address(this));
 
         receiver.setForwarderAddress(newForwarder);
 
-        assertEq(receiver.forwarderAddress(), newForwarder);
+        assertEq(receiver.getForwarderAddress(), newForwarder);
     }
 
     function testSetForwarderAddressOnlyOwner() public {
@@ -88,14 +88,14 @@ contract CreReceiverTest is Test {
 
     function testSetExpectedAuthorUpdatesStateAndEmitsEvent() public {
         address newAuthor = address(0xA1);
-        address oldAuthor = receiver.expectedAuthor();
+        address oldAuthor = receiver.getExpectedAuthor();
 
         vm.expectEmit(true, true, true, false);
         emit ExpectedAuthorChanged(newAuthor, oldAuthor, address(this));
 
         receiver.setExpectedAuthor(newAuthor);
 
-        assertEq(receiver.expectedAuthor(), newAuthor);
+        assertEq(receiver.getExpectedAuthor(), newAuthor);
     }
 
     function testSetExpectedAuthorOnlyOwner() public {
@@ -109,14 +109,15 @@ contract CreReceiverTest is Test {
 
     function testSetExpectedWorkflowNameUpdatesStateAndEmitsEvent() public {
         bytes10 newName = bytes10("WF_LOW_001");
-        bytes10 oldName = receiver.expectedWorkflowName();
+        bytes10 oldName = receiver.getExpectedWorkflowName();
 
         vm.expectEmit(true, true, true, false);
         emit ExpectedWorkflowNameChanged(newName, oldName, address(this));
 
-        receiver.setExpectedWorkflowName(newName);
+        string memory newNameStr = string(abi.encodePacked(newName));
+        receiver.setExpectedWorkflowName(newNameStr);
 
-        assertEq(receiver.expectedWorkflowName(), newName);
+        assertEq(receiver.getExpectedWorkflowName(), newName);
     }
 
     function testSetExpectedWorkflowNameOnlyOwner() public {
@@ -125,19 +126,20 @@ contract CreReceiverTest is Test {
 
         vm.prank(nonOwner);
         vm.expectRevert(abi.encodeWithSelector(_ownableUnauthorizedAccountSelector(), nonOwner));
-        receiver.setExpectedWorkflowName(newName);
+        string memory newNameStr = string(abi.encodePacked(newName));
+        receiver.setExpectedWorkflowName(newNameStr);
     }
 
     function testSetExpectedWorkflowIdUpdatesStateAndEmitsEvent() public {
         bytes32 newId = keccak256("new-workflow-id");
-        bytes32 oldId = receiver.expectedWorkflowId();
+        bytes32 oldId = receiver.getExpectedWorkflowId();
 
         vm.expectEmit(true, true, true, false);
         emit ExpectedWorkflowIdChanged(newId, oldId, address(this));
 
         receiver.setExpectedWorkflowId(newId);
 
-        assertEq(receiver.expectedWorkflowId(), newId);
+        assertEq(receiver.getExpectedWorkflowId(), newId);
     }
 
     function testSetExpectedWorkflowIdOnlyOwner() public {
@@ -254,7 +256,8 @@ contract CreReceiverTest is Test {
 
     function testOnReportRevertsForInvalidWorkflowName() public {
         bytes10 expectedName = bytes10("WF_EXPECT");
-        receiver.setExpectedWorkflowName(expectedName);
+        string memory expectedNameStr = string(abi.encodePacked(expectedName));
+        receiver.setExpectedWorkflowName(expectedNameStr);
 
         bytes32 workflowId = keccak256("wf-id");
         bytes10 wrongName = bytes10("WF_WRONG");
@@ -269,7 +272,8 @@ contract CreReceiverTest is Test {
 
     function testOnReportSucceedsWithCorrectWorkflowName() public {
         bytes10 expectedName = bytes10("WF_EXPECT");
-        receiver.setExpectedWorkflowName(expectedName);
+        string memory expectedNameStr = string(abi.encodePacked(expectedName));
+        receiver.setExpectedWorkflowName(expectedNameStr);
 
         bytes32 workflowId = keccak256("wf-id");
         address workflowOwner = address(this);
@@ -292,7 +296,10 @@ contract CreReceiverTest is Test {
         address expectedAuthor = address(0xA1);
 
         receiver.setExpectedWorkflowId(expectedId);
-        receiver.setExpectedWorkflowName(expectedName);
+
+        string memory expectedNameStr = string(abi.encodePacked(expectedName));
+        receiver.setExpectedWorkflowName(expectedNameStr);
+
         receiver.setExpectedAuthor(expectedAuthor);
 
         bytes memory metadata = _encodeMetadata(expectedId, expectedName, expectedAuthor);
@@ -370,7 +377,8 @@ contract CreReceiverTest is Test {
 
     function testDisableExpectedWorkflowNameAllowsAnyWorkflowName() public {
         bytes10 expectedName = bytes10("WF_NAME_OK");
-        receiver.setExpectedWorkflowName(expectedName);
+        string memory expectedNameStr = string(abi.encodePacked(expectedName));
+        receiver.setExpectedWorkflowName(expectedNameStr);
 
         bytes32 workflowId = keccak256("wf-id");
         bytes10 wrongName = bytes10("BAD_NAME");
@@ -382,7 +390,8 @@ contract CreReceiverTest is Test {
         vm.expectRevert(abi.encodeWithSelector(_invalidWorkflowNameSelector(), wrongName, expectedName));
         receiver.onReport(badMetadata, report);
 
-        receiver.setExpectedWorkflowName(bytes10(0));
+        string memory zeroNameStr = string(abi.encodePacked(bytes10(0)));
+        receiver.setExpectedWorkflowName(zeroNameStr);
 
         receiver.onReport(badMetadata, report);
         assertTrue(receiver.processCalled());
@@ -391,7 +400,7 @@ contract CreReceiverTest is Test {
 
     function testOnReportIgnoresAuthorWhenExpectationZero() public {
         // Expectation is zero by default
-        assertEq(receiver.expectedAuthor(), address(0));
+        assertEq(receiver.getExpectedAuthor(), address(0));
 
         bytes32 workflowId = keccak256("wf-id");
         bytes10 workflowName = bytes10("WF_AUTH0");
@@ -406,7 +415,7 @@ contract CreReceiverTest is Test {
     }
 
     function testOnReportIgnoresWorkflowIdWhenExpectationZero() public {
-        assertEq(receiver.expectedWorkflowId(), bytes32(0));
+        assertEq(receiver.getExpectedWorkflowId(), bytes32(0));
 
         bytes32 anyId = keccak256("any-id");
         bytes10 workflowName = bytes10("WF_ID0");
@@ -421,7 +430,7 @@ contract CreReceiverTest is Test {
     }
 
     function testOnReportIgnoresWorkflowNameWhenExpectationZero() public {
-        assertEq(receiver.expectedWorkflowName(), bytes10(0));
+        assertEq(receiver.getExpectedWorkflowName(), bytes10(0));
 
         bytes32 workflowId = keccak256("wf-id");
         bytes10 anyName = bytes10("ANY_NAME");
@@ -443,7 +452,8 @@ contract CreReceiverTest is Test {
         receiver.setExpectedAuthor(expectedAuthor);
 
         bytes10 expectedName = bytes10("WF_EXPECT");
-        receiver.setExpectedWorkflowName(expectedName);
+        string memory expectedNameStr = string(abi.encodePacked(expectedName));
+        receiver.setExpectedWorkflowName(expectedNameStr);
 
         // All three are wrong: id, author, name
         bytes32 wrongId = keccak256("wrong-id");
@@ -462,7 +472,8 @@ contract CreReceiverTest is Test {
         receiver.setExpectedAuthor(expectedAuthor);
 
         bytes10 expectedName = bytes10("WF_EXPECT");
-        receiver.setExpectedWorkflowName(expectedName);
+        string memory expectedNameStr = string(abi.encodePacked(expectedName));
+        receiver.setExpectedWorkflowName(expectedNameStr);
 
         bytes32 workflowId = keccak256("wf-id");
         address wrongAuthor = address(0xDEAD);
@@ -522,12 +533,13 @@ contract CreReceiverTest is Test {
 
     function testSetExpectedWorkflowNameEmitsWhenSettingSameValue() public {
         bytes10 name = bytes10("WF_REPEAT");
-        receiver.setExpectedWorkflowName(name);
+        string memory nameStr = string(abi.encodePacked(name));
+        receiver.setExpectedWorkflowName(nameStr);
 
         vm.expectEmit(true, true, true, false);
         emit ExpectedWorkflowNameChanged(name, name, address(this));
 
-        receiver.setExpectedWorkflowName(name);
+        receiver.setExpectedWorkflowName(nameStr);
     }
 
     function testSetExpectedWorkflowIdEmitsWhenSettingSameValue() public {

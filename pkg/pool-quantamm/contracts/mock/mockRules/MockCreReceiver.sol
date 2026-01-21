@@ -6,7 +6,7 @@ contract MockCreReceiver is CreReceiver {
     bytes public lastReport;
     bool public processCalled;
 
-    constructor() CreReceiver() {}
+    constructor(address forwarderAddress) CreReceiver(forwarderAddress) {}
 
     function ProcessReport(bytes calldata metaData) external {
         _processReport(metaData);

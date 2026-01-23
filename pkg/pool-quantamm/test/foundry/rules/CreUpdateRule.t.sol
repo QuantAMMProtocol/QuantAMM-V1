@@ -185,8 +185,7 @@ contract CreUpdateRuleTest is Test, QuantAMMTestUtils {
         bytes memory metaData = abi.encode(
             CreUpdateRule.WorkflowMetadata({
                 poolAddress: address(mockPool),
-                weights: weights,
-                lastInterpolationTimePossible: updateInterval
+                weights: weights
             })
         );
 
@@ -223,8 +222,7 @@ contract CreUpdateRuleTest is Test, QuantAMMTestUtils {
         bytes memory metaData = abi.encode(
             CreUpdateRule.WorkflowMetadata({
                 poolAddress: address(0),
-                weights: weights,
-                lastInterpolationTimePossible: uint40(1)
+                weights: weights
             })
         );
 
@@ -286,8 +284,7 @@ contract CreUpdateRuleTest is Test, QuantAMMTestUtils {
         bytes memory metaData = abi.encode(
             CreUpdateRule.WorkflowMetadata({
                 poolAddress: address(mockPool),
-                weights: weights,
-                lastInterpolationTimePossible: updateInterval
+                weights: weights
             })
         );
 
@@ -319,8 +316,7 @@ contract CreUpdateRuleTest is Test, QuantAMMTestUtils {
         bytes memory metaData = abi.encode(
             CreUpdateRule.WorkflowMetadata({
                 poolAddress: address(unconfiguredPool),
-                weights: weights,
-                lastInterpolationTimePossible: uint40(1)
+                weights: weights
             })
         );
 
@@ -387,8 +383,7 @@ contract CreUpdateRuleTest is Test, QuantAMMTestUtils {
         bytes memory metaData = abi.encode(
             CreUpdateRule.WorkflowMetadata({
                 poolAddress: address(mockPool),
-                weights: weights,
-                lastInterpolationTimePossible: updateInterval
+                weights: weights
             })
         );
 
@@ -463,8 +458,7 @@ contract CreUpdateRuleTest is Test, QuantAMMTestUtils {
         bytes memory metaData = abi.encode(
             CreUpdateRule.WorkflowMetadata({
                 poolAddress: address(mockPool),
-                weights: weights,
-                lastInterpolationTimePossible: updateInterval
+                weights: weights
             })
         );
 

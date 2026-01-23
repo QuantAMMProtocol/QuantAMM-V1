@@ -28,7 +28,6 @@ contract CreUpdateRule is QuantAMMMathGuard, CreReceiver, ITypeAndVersion, IUpda
     struct WorkflowMetadata {
         address poolAddress;
         uint256[] weights;
-        uint40 lastInterpolationTimePossible;
     }
 
     event TargetWeightsForwarded(address indexed pool, address sender);

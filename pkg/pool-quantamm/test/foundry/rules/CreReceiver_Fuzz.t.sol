@@ -36,6 +36,11 @@ contract CreReceiverFuzzTest is Test {
         return abi.encodePacked(workflowId, workflowName, workflowOwner);
     }
 
+    function _invalidForwarderAddress() internal pure returns (bytes4) {
+        return bytes4(keccak256("InvalidForwarderAddress()"));
+    }
+
+
     function _invalidSenderSelector() internal pure returns (bytes4) {
         return bytes4(keccak256("InvalidSender(address,address)"));
     }
@@ -61,6 +66,8 @@ contract CreReceiverFuzzTest is Test {
     // -----------------------
 
     function testFuzz_SetForwarderAddressUpdatesStateAndEmitsEvent(address newForwarder) public {
+        vm.assume(newForwarder != address(0));
+
         address oldForwarder = receiver.getForwarderAddress();
 
         vm.expectEmit(true, true, true, false);
@@ -80,6 +87,8 @@ contract CreReceiverFuzzTest is Test {
     }
 
     function testFuzz_SetExpectedAuthorUpdatesStateAndEmitsEvent(address newAuthor) public {
+        vm.assume(newAuthor != address(0));
+
         address oldAuthor = receiver.getExpectedAuthor();
 
         vm.expectEmit(true, true, true, false);
@@ -121,6 +130,8 @@ contract CreReceiverFuzzTest is Test {
     }
 
     function testFuzz_SetExpectedWorkflowIdUpdatesStateAndEmitsEvent(bytes32 newId) public {
+        vm.assume(newId != bytes32(0));
+
         bytes32 oldId = receiver.getExpectedWorkflowId();
 
         vm.expectEmit(true, true, true, false);
@@ -140,6 +151,8 @@ contract CreReceiverFuzzTest is Test {
     }
 
     function testFuzz_SetForwarderAddressEmitsWhenSettingSameValue(address forwarder) public {
+        vm.assume(forwarder != address(0));
+
         receiver.setForwarderAddress(forwarder);
 
         vm.expectEmit(true, true, true, false);
@@ -149,6 +162,8 @@ contract CreReceiverFuzzTest is Test {
     }
 
     function testFuzz_SetExpectedAuthorEmitsWhenSettingSameValue(address author) public {
+        vm.assume(author != address(0));
+
         receiver.setExpectedAuthor(author);
 
         vm.expectEmit(true, true, true, false);
@@ -169,6 +184,8 @@ contract CreReceiverFuzzTest is Test {
     }
 
     function testFuzz_SetExpectedWorkflowIdEmitsWhenSettingSameValue(bytes32 id) public {
+        vm.assume(id != bytes32(0));
+
         receiver.setExpectedWorkflowId(id);
 
         vm.expectEmit(true, true, true, false);
@@ -225,30 +242,6 @@ contract CreReceiverFuzzTest is Test {
         receiver.onReport(metadata, report);
     }
 
-    function testFuzz_DisableForwarderAllowsAnySender(
-        address trustedForwarder,
-        address nonForwarder,
-        bytes32 workflowId,
-        bytes10 workflowName,
-        address workflowOwner,
-        bytes memory report
-    ) public {
-        vm.assume(trustedForwarder != address(0));
-        vm.assume(nonForwarder != trustedForwarder);
-
-        receiver.setForwarderAddress(trustedForwarder);
-        bytes memory metadata = _encodeMetadata(workflowId, workflowName, workflowOwner);
-
-        vm.prank(nonForwarder);
-        vm.expectRevert(abi.encodeWithSelector(_invalidSenderSelector(), nonForwarder, trustedForwarder));
-        receiver.onReport(metadata, report);
-
-        receiver.setForwarderAddress(address(0));
-
-        vm.prank(nonForwarder);
-        receiver.onReport(metadata, report);
-    }
-
     function testFuzz_OnReportRevertsForInvalidWorkflowId(
         bytes32 expectedId,
         bytes32 wrongId,
@@ -280,28 +273,6 @@ contract CreReceiverFuzzTest is Test {
         bytes memory metadata = _encodeMetadata(expectedId, workflowName, workflowOwner);
 
         receiver.onReport(metadata, report);
-    }
-
-    function testFuzz_DisableExpectedWorkflowIdAllowsAnyWorkflowId(
-        bytes32 expectedId,
-        bytes32 wrongId,
-        bytes10 workflowName,
-        address workflowOwner,
-        bytes memory report
-    ) public {
-        vm.assume(expectedId != bytes32(0));
-        vm.assume(wrongId != expectedId);
-
-        receiver.setExpectedWorkflowId(expectedId);
-
-        bytes memory badMetadata = _encodeMetadata(wrongId, workflowName, workflowOwner);
-
-        vm.expectRevert(abi.encodeWithSelector(_invalidWorkflowIdSelector(), wrongId, expectedId));
-        receiver.onReport(badMetadata, report);
-
-        receiver.setExpectedWorkflowId(bytes32(0));
-
-        receiver.onReport(badMetadata, report);
     }
 
     function testFuzz_OnReportRevertsForInvalidAuthor(
@@ -337,26 +308,37 @@ contract CreReceiverFuzzTest is Test {
         receiver.onReport(metadata, report);
     }
 
-    function testFuzz_DisableExpectedAuthorAllowsAnyAuthor(
-        address expectedAuthor,
-        address wrongOwner,
-        bytes32 workflowId,
-        bytes10 workflowName,
-        bytes memory report
+
+    function testFuzz_DisableForwarderNotAllowed(
+        address trustedForwarder
+    ) public {
+        vm.assume(trustedForwarder != address(0));
+
+        receiver.setForwarderAddress(trustedForwarder);
+        
+        vm.expectRevert(abi.encodeWithSelector(_invalidForwarderAddress(), address(0), trustedForwarder));
+        receiver.setForwarderAddress(address(0));
+    }
+
+    function testFuzz_DisableExpectedWorkflowIdNotAllowed(
+        bytes32 expectedId
+    ) public {
+        vm.assume(expectedId != bytes32(0));
+
+        receiver.setExpectedWorkflowId(expectedId);
+
+        vm.expectRevert(abi.encodeWithSelector(_invalidWorkflowIdSelector(), bytes32(0), expectedId));
+        receiver.setExpectedWorkflowId(bytes32(0));
+    }
+
+    function testFuzz_DisableExpectedAuthorNotAllowed(
+        address expectedAuthor
     ) public {
         vm.assume(expectedAuthor != address(0));
-        vm.assume(wrongOwner != expectedAuthor);
 
         receiver.setExpectedAuthor(expectedAuthor);
-
-        bytes memory metadata = _encodeMetadata(workflowId, workflowName, wrongOwner);
-
-        vm.expectRevert(abi.encodeWithSelector(_invalidAuthorSelector(), wrongOwner, expectedAuthor));
-        receiver.onReport(metadata, report);
-
+        vm.expectRevert(abi.encodeWithSelector(_invalidAuthorSelector(), address(0), expectedAuthor));
         receiver.setExpectedAuthor(address(0));
-
-        receiver.onReport(metadata, report);
     }
 
     function testFuzz_OnReportRevertsForInvalidWorkflowName(

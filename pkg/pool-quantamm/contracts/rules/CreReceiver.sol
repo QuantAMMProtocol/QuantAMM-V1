@@ -123,17 +123,13 @@ abstract contract CreReceiver is IReceiver, Ownable {
 
   /// @notice Updates the forwarder address that is allowed to call onReport
   /// @param _forwarder The new forwarder address
-  /// @dev WARNING: Setting to address(0) disables forwarder validation.
-  ///      This makes your contract INSECURE - anyone can call onReport() with arbitrary data.
-  ///      Only use address(0) if you fully understand the security implications.
   function setForwarderAddress(
     address _forwarder
   ) external onlyOwner {
     address previousForwarder = s_forwarderAddress;
 
-    // Emit warning if disabling forwarder check
     if (_forwarder == address(0)) {
-      emit SecurityWarning("Forwarder address set to zero - contract is now INSECURE");
+      revert InvalidForwarderAddress();
     }
 
     s_forwarderAddress = _forwarder;
@@ -141,10 +137,13 @@ abstract contract CreReceiver is IReceiver, Ownable {
   }
 
   /// @notice Updates the expected workflow owner address
-  /// @param _author The new expected author address (use address(0) to disable this check)
+  /// @param _author The new expected author address 
   function setExpectedAuthor(
     address _author
   ) external onlyOwner {
+    if(_author == address(0)){
+      revert InvalidAuthor(_author, s_expectedAuthor);
+    }
     address previousAuthor = s_expectedAuthor;
     s_expectedAuthor = _author;
     emit ExpectedAuthorUpdated(previousAuthor, _author);
@@ -164,9 +163,7 @@ abstract contract CreReceiver is IReceiver, Ownable {
     bytes10 previousName = s_expectedWorkflowName;
 
     if (bytes(_name).length == 0) {
-      s_expectedWorkflowName = bytes10(0);
-      emit ExpectedWorkflowNameUpdated(previousName, bytes10(0));
-      return;
+      revert InvalidWorkflowName(bytes10(0), s_expectedWorkflowName);
     }
 
     // Convert workflow name to bytes10:
@@ -182,10 +179,13 @@ abstract contract CreReceiver is IReceiver, Ownable {
   }
 
   /// @notice Updates the expected workflow ID
-  /// @param _id The new expected workflow ID (use bytes32(0) to disable this check)
+  /// @param _id The new expected workflow ID 
   function setExpectedWorkflowId(
     bytes32 _id
   ) external onlyOwner {
+    if(_id == bytes32(0)){
+      revert InvalidWorkflowId(_id, s_expectedWorkflowId);
+    }
     bytes32 previousId = s_expectedWorkflowId;
     s_expectedWorkflowId = _id;
     emit ExpectedWorkflowIdUpdated(previousId, _id);

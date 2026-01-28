@@ -40,6 +40,10 @@ contract CreReceiverTest is Test {
         return bytes4(keccak256("InvalidSender(address,address)"));
     }
 
+    function _invalidForwarderAddress() internal pure returns (bytes4) {
+        return bytes4(keccak256("InvalidForwarderAddress()"));
+    }
+
     function _invalidAuthorSelector() internal pure returns (bytes4) {
         return bytes4(keccak256("InvalidAuthor(address,address)"));
     }
@@ -312,63 +316,24 @@ contract CreReceiverTest is Test {
     function testDisableForwarderAllowsAnySender() public {
         address trustedForwarder = address(0xF0F0);
         receiver.setForwarderAddress(trustedForwarder);
-
-        address nonForwarder = address(0xBEEF);
-        bytes memory metadata = "";
-        bytes memory report = abi.encodePacked(uint256(111));
-
-        vm.prank(nonForwarder);
-        vm.expectRevert(abi.encodeWithSelector(_invalidSenderSelector(), nonForwarder, trustedForwarder));
-        receiver.onReport(metadata, report);
+        vm.expectRevert(_invalidForwarderAddress());
         receiver.setForwarderAddress(address(0));
-
-        vm.prank(nonForwarder);
-        receiver.onReport(metadata, report);
-
-        assertTrue(receiver.processCalled());
-        assertEq(receiver.lastReport(), report);
     }
 
     function testDisableExpectedAuthorAllowsAnyAuthor() public {
         address expectedAuthor = address(0xA1);
         receiver.setExpectedAuthor(expectedAuthor);
 
-        bytes32 workflowId = keccak256("wf-id");
-        bytes10 workflowName = bytes10("WF_AUTH");
-        address wrongOwner = address(0xDEAD);
-
-        bytes memory metadata = _encodeMetadata(workflowId, workflowName, wrongOwner);
-        bytes memory report = abi.encodePacked(uint256(222));
-
-        vm.expectRevert(abi.encodeWithSelector(_invalidAuthorSelector(), wrongOwner, expectedAuthor));
-        receiver.onReport(metadata, report);
-
+        vm.expectRevert(abi.encodeWithSelector(_invalidAuthorSelector(), address(0), expectedAuthor));
         receiver.setExpectedAuthor(address(0));
-        receiver.onReport(metadata, report);
-
-        assertTrue(receiver.processCalled());
-        assertEq(receiver.lastReport(), report);
     }
 
     function testDisableExpectedWorkflowIdAllowsAnyWorkflowId() public {
         bytes32 expectedId = keccak256("expected-id");
         receiver.setExpectedWorkflowId(expectedId);
 
-        bytes32 wrongId = keccak256("wrong-id");
-        bytes10 workflowName = bytes10("WF_ID");
-        address workflowOwner = address(this);
-
-        bytes memory badMetadata = _encodeMetadata(wrongId, workflowName, workflowOwner);
-        bytes memory report = abi.encodePacked(uint256(333));
-
-        vm.expectRevert(abi.encodeWithSelector(_invalidWorkflowIdSelector(), wrongId, expectedId));
-        receiver.onReport(badMetadata, report);
-
+        vm.expectRevert(abi.encodeWithSelector(_invalidWorkflowIdSelector(), bytes32(0), expectedId));
         receiver.setExpectedWorkflowId(bytes32(0));
-
-        receiver.onReport(badMetadata, report);
-        assertTrue(receiver.processCalled());
-        assertEq(receiver.lastReport(), report);
     }
 
     function testNameOnlyFailsValidation() public {
